@@ -1,0 +1,6 @@
+Options -Indexes
+
+# Config and bootstrap files are only meant to be included
+<FilesMatch "^(App\.php|config(\.local)?\.php|.*\.sql|.*\.sqlite.*)$">
+    Require all denied
+</FilesMatch>
