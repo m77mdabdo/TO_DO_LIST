@@ -1,0 +1,7 @@
+config.local.php
+database/*.sqlite
+database/*.sqlite-*
+.DS_Store
+.idea/
+.vscode/
+node_modules/
