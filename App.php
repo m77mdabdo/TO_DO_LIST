@@ -1,37 +1,42 @@
 <?php
 
-require_once 'classes/Request.php';
-require_once 'classes/sessionClass.php';
-require_once 'classes/validation/validator.php';
-require_once 'classes/validation/required.php' ;
-require_once 'classes/validation/preg_match.php' ;
-require_once 'classes/validation/str.php';
-require_once 'classes/validation/strlen.php' ;
-require_once 'classes/validation/validation.php';
-require_once 'inc/connection.php';
+declare(strict_types=1);
 
+define('BASE_PATH', __DIR__);
 
+// Classes\Validation\Required -> classes/validation/Required.php
+spl_autoload_register(function (string $class): void {
+    $parts = explode('\\', $class);
+    if (array_shift($parts) !== 'Classes') {
+        return;
+    }
+    $file = array_pop($parts) . '.php';
+    $dir  = $parts ? strtolower(implode('/', $parts)) . '/' : '';
+    $path = BASE_PATH . '/classes/' . $dir . $file;
 
+    if (is_file($path)) {
+        require $path;
+    }
+});
+
+$config = require is_file(BASE_PATH . '/config.local.php')
+    ? BASE_PATH . '/config.local.php'
+    : BASE_PATH . '/config.php';
+
+date_default_timezone_set($config['timezone']);
+
+require_once BASE_PATH . '/inc/helpers.php';
+
+use Classes\Auth;
+use Classes\Database;
 use Classes\Request;
-use classes\Session;
-use Classes\Validation\Preg_match;
-use Classes\Validation\Required ;
-use Classes\Validation\Str;
-use Classes\Validation\Strlen ;
-use Classes\Validation\Validation;
-// use Classes\Validation\Validator ;
+use Classes\Session;
+use Classes\TaskRepository;
 
+Session::start();
+send_security_headers();
 
-$request= new Request ;
-$session =new Session;
-$preg=new Preg_match ;
-$required= new Required;
-$str= new str ;
-$strlen= new Strlen ;
-$validation = new Validation;
-
-
-
-
-
-
+$db      = Database::connect($config['db']);
+$request = new Request();
+$auth    = new Auth($db);
+$tasks   = new TaskRepository($db);
