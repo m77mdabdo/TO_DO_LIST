@@ -1,38 +1,39 @@
 <?php
 
+require_once __DIR__ . '/../App.php';
+
 use Classes\Session;
-require_once '../App.php';
+use Classes\TaskRepository;
 
-if ($request->check($request->get("status")) && $request->check($request->get("id"))) {
-    $id = $request->get("id");
-    $status = $request->get("status");
-     
-    $result= $conn->prepare("select titile from todo where id=:id");
-    $result->bindParam(":id",$id,PDO::PARAM_INT);
-    $result->execute();
-    if($result->rowCount()==1){
+$request->requirePostWithToken();
+$user = require_login();
 
-        $updateQuery = $conn->prepare("UPDATE todo SET status = :status WHERE id = :id");
-        $updateQuery->bindParam(":status", $status, PDO::PARAM_STR);
-        $updateQuery->bindParam(":id", $id, PDO::PARAM_INT);
-        $result = $updateQuery->execute();
+$id     = $request->int('id');
+$status = $request->input('status');
 
-        if ($result) {
-            Session::set("success", "status updated successfully");
-            header("location: ../index.php");
-            exit();
-        } else {
-            Session::set("errors", ["Error while updating"]);
-            header("location: ../edit.php?id=$id");
-            exit();
-        }
-
-    }else{
-        Session::set("errors",["todo not found"]);
-        $request->redirect("../index.php");
-    }
-
-    
-}else{
-    $request->redirect("../indec.php");
+if (!$id || !isset(TaskRepository::STATUSES[$status])) {
+    abort(422, 'That move is not allowed.');
 }
+
+if (!$tasks->find($user['id'], $id)) {
+    abort(404, "We couldn't find that task.");
+}
+
+$tasks->move($user['id'], $id, $status);
+
+// The board moves cards with fetch() and swaps in the fresh card html.
+if ($request->wantsJson()) {
+    $task = $tasks->find($user['id'], $id);
+    ob_start();
+    require BASE_PATH . '/inc/task_card.php';
+    $html = ob_get_clean();
+
+    $request->json([
+        'ok'    => true,
+        'html'  => $html,
+        'stats' => $tasks->stats($tasks->board($user['id'])),
+    ]);
+}
+
+Session::flash('success', $status === 'done' ? 'Nice, task finished!' : 'Task moved to ' . TaskRepository::STATUSES[$status] . '.');
+$request->redirect('index.php');
