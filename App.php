@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 define('BASE_PATH', __DIR__);
 
+require_once BASE_PATH . '/bootstrap/autoload.php';
+
 // Classes\Validation\Required -> classes/validation/Required.php
 spl_autoload_register(function (string $class): void {
     $parts = explode('\\', $class);
