@@ -13,6 +13,8 @@ spl_autoload_register(function (string $class): void {
 
 define('BASE_PATH', dirname(__DIR__));
 
+require BASE_PATH . '/bootstrap/autoload.php';
+
 // legacy Classes\ namespace, same rules as App.php
 spl_autoload_register(function (string $class): void {
     $parts = explode('\\', $class);
