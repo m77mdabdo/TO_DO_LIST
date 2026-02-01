@@ -1,33 +1,21 @@
 <?php
 
+require_once __DIR__ . '/../App.php';
+
 use Classes\Session;
 
-require_once '../App.php' ;
+$request->requirePostWithToken();
+$user = require_login();
 
-if($request->check($request->get("id"))){
-    $id=$request->get("id");
-    $result=$conn->prepare("select `titile` from todo where id=:id");
-    $result->bindParam(":id",$id,PDO::PARAM_INT);
-    $result->execute();
-    $titile = $result->fetch(PDO::FETCH_ASSOC);
+$id = $request->int('id');
 
-    if(count($titile)>0){
-        $result=$conn->prepare("delete from todo where id=:id");
-        $result->bindParam(":id",$id,PDO::PARAM_INT);
-        $out = $result->execute();
-
-        if($out){
-            Session::set("success","deleted successfly");
-            $request ->redirect("../index.php");
-
-        }
-      
-    
-
-    }else{
-        Session::set("errors",["not found"]);
-        $request->redirect("../index.php");
-    }
-}else{
-    $request->redirect("../index.php");
+if (!$id || !$tasks->delete($user['id'], $id)) {
+    abort(404, "We couldn't find that task.");
 }
+
+if ($request->wantsJson()) {
+    $request->json(['ok' => true, 'stats' => $tasks->stats($tasks->board($user['id']))]);
+}
+
+Session::flash('success', 'Task deleted.');
+$request->redirect('index.php');
