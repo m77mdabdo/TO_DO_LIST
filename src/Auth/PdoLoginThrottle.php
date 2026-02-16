@@ -38,9 +38,4 @@ final class PdoLoginThrottle implements LoginThrottle
     {
         $this->db->prepare('DELETE FROM login_attempts WHERE ip = ?')->execute([$ip]);
     }
-
-    public function lockMinutes(): int
-    {
-        return intdiv($this->lockSeconds, 60);
-    }
 }
