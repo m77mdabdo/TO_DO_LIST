@@ -14,11 +14,48 @@ use App\Validation\Validator;
  */
 final class AuthService
 {
+    /** Checked when the email doesn't exist, so a wrong email takes as long as a wrong password. */
+    private const DUMMY_HASH = '$2y$10$yo7DWutMZbeStohJaVd1Ruj4hq721ZOMsDpHuNtHXwKA2CzjGLFsq';
+
     public function __construct(
         private UserRepository $users,
         private Authenticator $auth,
+        private LoginThrottle $throttle,
         private Validator $validator,
     ) {
+    }
+
+    /**
+     * @param array{email?: string, password?: string} $input
+     */
+    public function attempt(array $input, string $ip): User
+    {
+        if ($this->throttle->tooManyAttempts($ip)) {
+            $this->throwIfFailed(new ValidationResult([
+                'login' => 'Too many attempts. Please wait 15 minutes and try again.',
+            ]));
+        }
+
+        $this->throwIfFailed($this->validator->validate($input, AuthRules::login()));
+
+        $email    = (string) $input['email'];
+        $password = (string) $input['password'];
+        $user     = $this->users->findByEmail($email);
+
+        if (!password_verify($password, $user?->passwordHash ?? self::DUMMY_HASH) || $user === null) {
+            $this->throttle->recordFailure($ip, $email);
+            $this->throwIfFailed(new ValidationResult(['login' => "That email and password don't match."]));
+        }
+
+        $this->throttle->clear($ip);
+
+        if (password_needs_rehash($user->passwordHash, PASSWORD_DEFAULT)) {
+            $this->users->updatePassword($user->id, password_hash($password, PASSWORD_DEFAULT));
+        }
+
+        $this->auth->login($user);
+
+        return $user;
     }
 
     /**

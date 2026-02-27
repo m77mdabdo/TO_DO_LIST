@@ -35,6 +35,6 @@ final class Auth
         $this->users    = new PdoUserRepository($this->pdo, $this->clock);
         $this->throttle = new PdoLoginThrottle($this->pdo, $this->clock);
         $this->auth     = new Authenticator($this->session, $this->users, new Csrf($this->session));
-        $this->service  = new AuthService($this->users, $this->auth, new Validator());
+        $this->service  = new AuthService($this->users, $this->auth, $this->throttle, new Validator());
     }
 }
