@@ -27,17 +27,13 @@ final class Kernel
     public function handle(Request $request): Response
     {
         return $this->pipeline($this->globalMiddleware, $request, function (Request $request): Response {
-            try {
-                [$route, $params] = $this->router->match($request);
+            [$route, $params] = $this->router->match($request);
 
-                return $this->pipeline(
-                    $route->middleware,
-                    $request,
-                    fn (Request $request) => $this->callController($route, $request, $params),
-                );
-            } catch (Throwable $e) {
-                return $this->renderError($e, $request);
-            }
+            return $this->pipeline(
+                $route->middleware,
+                $request,
+                fn (Request $request) => $this->callController($route, $request, $params),
+            );
         });
     }
 
@@ -47,13 +43,31 @@ final class Kernel
      */
     private function pipeline(array $middleware, Request $request, callable $destination): Response
     {
-        $next = $destination;
+        $next = $this->guarded($destination);
 
         foreach (array_reverse($middleware) as $class) {
-            $next = fn (Request $request) => $this->container->get($class)->handle($request, $next);
+            $next = $this->guarded(fn (Request $request) => $this->container->get($class)->handle($request, $next));
         }
 
         return $next($request);
+    }
+
+    /**
+     * Turns an exception into an error response right where it happens,
+     * so outer middleware (like the security headers) still run.
+     *
+     * @param callable(Request): Response $step
+     * @return callable(Request): Response
+     */
+    private function guarded(callable $step): callable
+    {
+        return function (Request $request) use ($step): Response {
+            try {
+                return $step($request);
+            } catch (Throwable $e) {
+                return $this->renderError($e, $request);
+            }
+        };
     }
 
     /** @param array<string, int> $params */
