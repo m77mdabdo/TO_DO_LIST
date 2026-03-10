@@ -1,6 +1,13 @@
 Options -Indexes
 
-# Config and bootstrap files are only meant to be included
-<FilesMatch "^(App\.php|config(\.local)?\.php|.*\.sql|.*\.sqlite.*)$">
+# Config files are only meant to be included
+<FilesMatch "^(config(\.local)?\.php|.*\.sql|.*\.sqlite.*)$">
     Require all denied
 </FilesMatch>
+
+# Pretty URLs: send everything that isn't a real file to index.php
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [QSA,L]
+</IfModule>
