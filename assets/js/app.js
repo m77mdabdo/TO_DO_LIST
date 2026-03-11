@@ -165,7 +165,6 @@
     async function moveCard(card, status, url) {
         const data = new FormData();
         data.append('_token', csrf);
-        data.append('id', card.dataset.id);
         data.append('status', status);
 
         const json = await post(url, data);
@@ -235,7 +234,7 @@
             if (!card || card.dataset.status === status) return;
 
             try {
-                await moveCard(card, status, board.dataset.moveUrl);
+                await moveCard(card, status, card.dataset.moveUrl);
             } catch (error) {
                 toast(error.message, 'error');
             }
