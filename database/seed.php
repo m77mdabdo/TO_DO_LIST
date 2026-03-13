@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  | Fills the app with a demo account and some sample tasks.
  |
@@ -8,19 +10,25 @@
  | Login: demo@todo.test / demo1234
  */
 
+use App\Auth\PasswordHasher;
+use App\Core\Config;
+use App\Session\ArraySession;
+
 if (PHP_SAPI !== 'cli') {
     http_response_code(404);
     exit;
 }
 
-$_SERVER['SCRIPT_NAME'] = '/index.php';
-require __DIR__ . '/../App.php';
+require __DIR__ . '/../bootstrap/autoload.php';
+
+$app = (require __DIR__ . '/../bootstrap/app.php')(Config::load(dirname(__DIR__)), new ArraySession());
+$db  = $app->get(PDO::class);
 
 $email = 'demo@todo.test';
 
 $db->prepare('DELETE FROM users WHERE email = ?')->execute([$email]);
 $db->prepare('INSERT INTO users (name, email, password, created_at) VALUES (?, ?, ?, ?)')
-    ->execute(['Mohamed Abdo', $email, password_hash('demo1234', PASSWORD_DEFAULT), now()]);
+    ->execute(['Mohamed Abdo', $email, (new PasswordHasher())->hash('demo1234'), date('Y-m-d H:i:s')]);
 $userId = (int) $db->lastInsertId();
 
 $day = fn (int $offset) => date('Y-m-d', strtotime("$offset days"));
@@ -36,7 +44,7 @@ $samples = [
     ['Write LinkedIn post about this project', 'Screenshots + 3 things I learned.', 'doing', 'normal', 'Content', $day(1), '-1 day', null],
     ['تجهيز عرض السعر للعميل', 'إضافة تفاصيل الدفع والمدة', 'todo', 'normal', 'Work', $day(3), '-4 hours', null],
     ['Pay internet bill', null, 'done', 'normal', 'Home', null, '-3 days', '-2 hours'],
-    ['Refactor validation classes', 'Rules with params like Min:3 and Max:150.', 'done', 'high', 'Work', null, '-4 days', '-1 day'],
+    ['Refactor validation classes', 'Rules with params like min:3 and max:150.', 'done', 'high', 'Work', null, '-4 days', '-1 day'],
     ['Call mom', null, 'done', 'low', 'Personal', null, '-2 days', '-30 minutes'],
 ];
 
@@ -52,4 +60,4 @@ foreach ($samples as [$title, $notes, $status, $priority, $category, $due, $crea
     ]);
 }
 
-echo "Seeded " . count($samples) . " tasks. Log in with $email / demo1234\n";
+echo 'Seeded ' . count($samples) . " tasks. Log in with $email / demo1234\n";
