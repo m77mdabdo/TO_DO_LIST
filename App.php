@@ -21,9 +21,9 @@ spl_autoload_register(function (string $class): void {
     }
 });
 
-$config = require is_file(BASE_PATH . '/config.local.php')
-    ? BASE_PATH . '/config.local.php'
-    : BASE_PATH . '/config.php';
+$config = require is_file(BASE_PATH . '/config/local.php')
+    ? BASE_PATH . '/config/local.php'
+    : BASE_PATH . '/config/app.php';
 
 date_default_timezone_set($config['timezone']);
 

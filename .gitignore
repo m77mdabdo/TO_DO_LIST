@@ -1,4 +1,4 @@
-config.local.php
+config/local.php
 database/*.sqlite
 database/*.sqlite-*
 .DS_Store
