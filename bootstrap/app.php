@@ -24,6 +24,8 @@ use App\Http\Url;
 use App\Security\Csrf;
 use App\Session\Session;
 use App\Support\Clock;
+use App\Support\FileLogger;
+use App\Support\Logger;
 use App\Support\SystemClock;
 use App\Support\TimeAgo;
 use App\Task\PdoTaskRepository;
@@ -74,11 +76,14 @@ return static function (Config $config, Session $session, string $basePath = '')
         return $router;
     });
 
+    $container->singleton(Logger::class, fn (Container $c) => new FileLogger($root . '/storage/logs', $c->get(Clock::class)));
+
     $container->singleton(Kernel::class, fn (Container $c) => new Kernel(
         $c,
         $c->get(Router::class),
         [SecurityHeaders::class, VerifyCsrfToken::class],
-        static fn (Throwable $e) => error_log((string) $e),
+        $c->get(Logger::class),
+        (bool) $config->get('debug', false),
     ));
 
     return $container;
