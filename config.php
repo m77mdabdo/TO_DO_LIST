@@ -10,6 +10,9 @@ return [
     'app_name' => getenv('APP_NAME') ?: 'Todo Board',
     'timezone' => getenv('APP_TIMEZONE') ?: 'Asia/Riyadh',
 
+    // Show error details on the error page. Keep it off on a real server.
+    'debug' => filter_var(getenv('APP_DEBUG') ?: false, FILTER_VALIDATE_BOOL),
+
     'db' => [
         // "sqlite" works out of the box, "mysql" for XAMPP / shared hosting
         'driver'      => getenv('DB_DRIVER') ?: 'sqlite',
