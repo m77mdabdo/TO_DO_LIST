@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http;
 
 use App\Core\Container;
+use App\Support\Logger;
 use App\Task\TaskNotFound;
 use App\View\View;
 use Throwable;
@@ -20,7 +21,8 @@ final class Kernel
         private Container $container,
         private Router $router,
         private array $globalMiddleware = [],
-        private ?\Closure $reportError = null,
+        private ?Logger $logger = null,
+        private bool $debug = false,
     ) {
     }
 
@@ -86,8 +88,12 @@ final class Kernel
             default                     => [500, 'Something broke on our side. Please try again.'],
         };
 
-        if ($status === 500 && $this->reportError) {
-            ($this->reportError)($e);
+        if ($status === 500) {
+            $this->logger?->error($e);
+
+            if ($this->debug) {
+                $message = $e::class . ': ' . $e->getMessage() . ' (' . basename($e->getFile()) . ':' . $e->getLine() . ')';
+            }
         }
 
         if ($request->wantsJson()) {
