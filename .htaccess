@@ -1,6 +1,12 @@
+# XAMPP / shared hosting: when the project folder itself is the web root,
+# send every request into public/ so nothing else can be reached.
 Options -Indexes
 
-# Config and bootstrap files are only meant to be included
-<FilesMatch "^(App\.php|config(\.local)?\.php|.*\.sql|.*\.sqlite.*)$">
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+<IfModule !mod_rewrite.c>
     Require all denied
-</FilesMatch>
+</IfModule>
