@@ -49,6 +49,7 @@ final class Router
     public function match(Request $request): array
     {
         $pathExists = false;
+        $method = $request->method() === 'HEAD' ? 'GET' : $request->method(); // HEAD is a GET without the body
 
         foreach ($this->routes as $route) {
             $params = $route->matchPath($request->path());
@@ -57,7 +58,7 @@ final class Router
                 continue;
             }
 
-            if ($route->method === $request->method()) {
+            if ($route->method === $method) {
                 return [$route, $params];
             }
 

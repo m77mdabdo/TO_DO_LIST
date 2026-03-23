@@ -23,4 +23,4 @@ $request = Request::fromGlobals($container->get(UrlGenerator::class)->basePath()
 
 $container->get(NativeSession::class)->start($request->isSecure());
 
-$container->get(Kernel::class)->handle($request)->send();
+$container->get(Kernel::class)->handle($request)->send(withBody: $request->method() !== 'HEAD');

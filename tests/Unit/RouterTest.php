@@ -39,6 +39,13 @@ final class RouterTest extends TestCase
         $this->assertStatus(405, new Request('GET', '/tasks/12/move'));
     }
 
+    public function testHeadRequestsMatchGetRoutes(): void
+    {
+        [$route] = $this->router->match(new Request('HEAD', '/'));
+
+        $this->assertSame(['Board', 'index'], $route->action);
+    }
+
     public function testGroupsAddMiddleware(): void
     {
         $this->router->group(['Auth'], function (Router $router): void {

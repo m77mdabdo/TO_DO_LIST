@@ -73,7 +73,7 @@ final class Response
         return $copy;
     }
 
-    public function send(): void
+    public function send(bool $withBody = true): void
     {
         if (!headers_sent()) {
             http_response_code($this->status);
@@ -83,6 +83,8 @@ final class Response
             }
         }
 
-        echo $this->body;
+        if ($withBody) {
+            echo $this->body;
+        }
     }
 }
