@@ -24,6 +24,7 @@ return static function (Router $router): void {
 
         $router->post('/tasks', [TaskController::class, 'store']);
         $router->post('/tasks/clear-done', [TaskController::class, 'clearDone']);
+        $router->get('/tasks/export', [TaskController::class, 'export']);
         $router->get('/tasks/{id}/edit', [TaskController::class, 'edit']);
         $router->post('/tasks/{id}', [TaskController::class, 'update']);
         $router->post('/tasks/{id}/move', [TaskController::class, 'move']);
