@@ -9,6 +9,7 @@ use App\Http\Request;
 use App\Http\Response;
 use App\Http\Url;
 use App\Session\Session;
+use App\Task\CsvExport;
 use App\Task\Status;
 use App\Task\TaskService;
 use App\Validation\ValidationException;
@@ -18,8 +19,13 @@ final class TaskController extends Controller
 {
     private const FIELDS = ['title', 'notes', 'priority', 'due_date', 'category'];
 
-    public function __construct(View $view, Url $url, Session $session, private TaskService $tasks)
-    {
+    public function __construct(
+        View $view,
+        Url $url,
+        Session $session,
+        private TaskService $tasks,
+        private CsvExport $csv,
+    ) {
         parent::__construct($view, $url, $session);
     }
 
@@ -97,5 +103,15 @@ final class TaskController extends Controller
         $count = $this->tasks->clearDone($this->user($request)->id);
 
         return $this->redirect('/', $count === 1 ? 'Cleared 1 finished task.' : "Cleared $count finished tasks.");
+    }
+
+    public function export(Request $request): Response
+    {
+        $tasks = $this->tasks->board($this->user($request)->id);
+
+        return new Response($this->csv->build([...$tasks->open(), ...$tasks->column(Status::Done)]), 200, [
+            'Content-Type'        => 'text/csv; charset=utf-8',
+            'Content-Disposition' => 'attachment; filename="tasks-' . date('Y-m-d') . '.csv"',
+        ]);
     }
 }
