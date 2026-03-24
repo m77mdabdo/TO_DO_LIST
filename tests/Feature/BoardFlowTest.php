@@ -78,6 +78,18 @@ final class BoardFlowTest extends TestCase
         $this->assertSame(404, $this->app->post('/tasks/1/delete')->status);
     }
 
+    public function testExportsTasksAsCsv(): void
+    {
+        $this->signUp();
+        $this->app->post('/tasks', ['title' => 'Pay rent', 'category' => 'Home']);
+
+        $response = $this->app->get('/tasks/export');
+
+        $this->assertSame(200, $response->status);
+        $this->assertTrue(str_starts_with((string) $response->header('Content-Type'), 'text/csv'));
+        $this->assertTrue(str_contains($response->body, '"Pay rent"'));
+    }
+
     public function testResponsesCarrySecurityHeaders(): void
     {
         $this->assertSame('DENY', $this->app->get('/login')->header('X-Frame-Options'));
