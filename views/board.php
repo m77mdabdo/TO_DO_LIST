@@ -24,6 +24,7 @@ $form = $this->form;
         <button class="icon-btn js-theme" type="button" title="Toggle dark mode">
             <span class="show-light"><?= $this->icon('moon') ?></span><span class="show-dark"><?= $this->icon('sun') ?></span>
         </button>
+        <a class="icon-btn" href="<?= $this->url('/tasks/export') ?>" title="Download tasks as CSV"><?= $this->icon('download') ?></a>
         <span class="avatar" title="<?= $this->e($user->email) ?>"><?= $this->e($user->initial()) ?></span>
         <form action="<?= $this->url('/logout') ?>" method="post">
             <?= $this->csrfField() ?>
