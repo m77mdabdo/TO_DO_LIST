@@ -59,6 +59,8 @@ so it stays easy to learn from and easy to extend.
 - 📱 **Responsive** — works nicely on phones
 - 🌍 **Arabic & English text** — every task field uses `dir="auto"`, so RTL text just works
 
+- ⬇️ **Export** — download all your tasks as a CSV that opens in Excel or Google Sheets
+
 **Accounts**
 - 👤 Register / log in / log out — every user has a private board
 - 🧹 Clear all finished tasks in one click
@@ -185,6 +187,7 @@ Response ◀─ redirect, HTML from views/, or JSON for drag & drop
 | POST | `/tasks/{id}/move` | move to To do / Doing / Done (form or `fetch()`) |
 | POST | `/tasks/{id}/delete` | delete |
 | POST | `/tasks/clear-done` | remove all finished tasks |
+| GET | `/tasks/export` | download all tasks as CSV |
 
 ### SOLID in practice
 
@@ -276,7 +279,8 @@ Routes inside the `Authenticate` group get the signed-in user from `$request->at
 - [ ] Recurring tasks (daily, weekly)
 - [ ] Reorder cards inside a column
 - [ ] Reminder e-mails for tasks due today
-- [ ] Export / import as CSV
+- [x] Export as CSV
+- [ ] Import from CSV
 - [ ] Arabic interface translation
 
 Ideas and pull requests are welcome.
