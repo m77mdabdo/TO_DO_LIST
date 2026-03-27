@@ -26,6 +26,7 @@ No framework, no build step, no heavy CSS library — just clean OOP you can rea
 - [Screenshots](#screenshots)
 - [Getting started](#getting-started)
 - [Project structure](#project-structure)
+- [Running the tests](#running-the-tests)
 - [How it works](#how-it-works)
 - [Security](#security)
 - [Performance](#performance)
@@ -39,8 +40,9 @@ No framework, no build step, no heavy CSS library — just clean OOP you can rea
 
 This started as a small CRUD exercise (add / edit / delete notes with three statuses) to practice OOP,
 SOLID and PDO in native PHP. I rebuilt it into something I actually use every day: a personal board
-for work, study and life tasks — while keeping the same simple structure of `classes/`, `handle/` and `inc/`
-so it stays easy to learn from and easy to extend.
+for work, study and life tasks — and then rebuilt the code itself the way a framework app is organised:
+one front controller, a router, middleware, controllers, services, repositories and views, all in
+plain PHP with no Composer. Every class has one job and the whole app is covered by tests.
 
 ## Features
 
@@ -94,7 +96,7 @@ so it stays easy to learn from and easy to extend.
 ```bash
 git clone https://github.com/m77mdabdo/TO_DO_LIST.git
 cd TO_DO_LIST
-php -S localhost:8000
+php -S localhost:8000 -t public public/index.php
 ```
 
 Open <http://localhost:8000>, create an account and start adding tasks.
@@ -109,9 +111,9 @@ php database/seed.php
 
 ### Option 2 — XAMPP + MySQL
 
-1. Copy the project into `htdocs/TO_DO_LIST`.
+1. Copy the project into `htdocs/TO_DO_LIST` (make sure `mod_rewrite` is on — it is by default).
 2. Create a database called `to_do_list` in phpMyAdmin.
-3. Copy `config.php` to `config.local.php` and set:
+3. Copy `config/app.php` to `config/local.php` and set:
    ```php
    'driver' => 'mysql',
    'name'   => 'to_do_list',
@@ -121,79 +123,90 @@ php database/seed.php
 4. Visit <http://localhost/TO_DO_LIST>. Tables are created on the first request
    (or import `database/schema.mysql.sql` yourself).
 
-You can also use environment variables instead of `config.local.php`:
-`DB_DRIVER`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`, `APP_NAME`, `APP_TIMEZONE`.
+The root `.htaccess` forwards every request into `public/`, so nothing else in the project can be opened
+from the browser. On a real server, point the document root at `public/` instead.
+
+You can also use environment variables instead of `config/local.php`:
+`DB_DRIVER`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`, `APP_NAME`, `APP_TIMEZONE`, `APP_DEBUG`.
 
 ## Project structure
 
 ```
 TO_DO_LIST/
-├── App.php                 # bootstrap: autoloader, config, session, headers, services
-├── config.php              # default settings (override with config.local.php)
-├── index.php               # the board
-├── edit.php                # edit a task
-├── login.php / register.php
-├── 404.php                 # error page (404, 405, 419…)
+├── public/                 # the only folder the web server exposes
+│   ├── index.php           # front controller: every request starts here
+│   └── assets/             # style.css, app.js, theme.js, favicon.svg
 │
-├── classes/
-│   ├── Auth.php            # login, register, throttling
-│   ├── Csrf.php            # CSRF tokens
-│   ├── Database.php        # PDO connection + first-run migration
-│   ├── Request.php         # input helpers, redirects, JSON responses
-│   ├── Session.php         # hardened session + flash messages
-│   ├── TaskRepository.php  # every task query lives here
-│   └── validation/         # one class per rule (Required, Min, Max, Email, In, Date, Str)
+├── bootstrap/
+│   ├── app.php             # loads config and builds the service container
+│   └── autoload.php        # PSR-4 autoloader for App\ → src/
+├── config/
+│   ├── app.php             # settings (override with config/local.php or env vars)
+│   └── routes.php          # every URL the app answers
 │
-├── handle/                 # POST-only actions
-│   ├── addToDo.php  edit.php  goto.php  delete.php  clearDone.php
-│   └── login.php  register.php  logout.php
+├── src/
+│   ├── Auth/               # User, AuthService, Authenticator, LoginThrottle, repositories
+│   ├── Bootstrap/          # Services: wires interfaces to implementations
+│   ├── Controllers/        # AuthController, BoardController, TaskController
+│   ├── Database/           # ConnectionFactory, Migrator
+│   ├── Http/               # Request, Response, Router, Kernel, middleware, Redirector, FormState
+│   ├── Security/           # Csrf
+│   ├── Session/            # Session interface, NativeSession, ArraySession
+│   ├── Support/            # Clock, Container, TimeAgo, Greeting
+│   ├── Task/               # Task, Board, BoardStats, DueDate, Status, Priority, TaskService …
+│   ├── Validation/         # Validator + one class per rule
+│   └── View/               # View renderer, ViewHelpers, Html, Icons
 │
-├── inc/                    # layout pieces and view helpers
-│   ├── header.php  footer.php  flash.php  task_card.php  helpers.php
-│
-├── assets/
-│   ├── css/style.css       # the whole design (~20 KB, light + dark)
-│   ├── js/app.js           # board interactions
-│   ├── js/theme.js         # applies the theme before first paint
-│   └── img/favicon.svg
-│
-├── database/
-│   ├── schema.sqlite.sql  schema.mysql.sql
-│   └── seed.php            # demo data (CLI only)
-└── docs/screenshots/
+├── views/                  # plain PHP templates (layout, board, card, edit, login, register, error)
+├── database/               # schema.sqlite.sql, schema.mysql.sql, seed.php
+├── tests/                  # Unit, Integration and Feature tests + a tiny test runner
+└── docs/                   # ARCHITECTURE.md and screenshots
 ```
 
 ## How it works
 
 ```
-Browser ──GET──▶ index.php ──▶ TaskRepository::board() ──▶ inc/task_card.php
-   │
-   └──POST (form or fetch)──▶ handle/*.php
-                                 1. requirePostWithToken()   (405 / 419)
-                                 2. require_login()          (redirect / 401)
-                                 3. Validation               (flash errors + old input)
-                                 4. TaskRepository           (scoped by user_id)
-                                 5. redirect  — or JSON for drag & drop
+Browser ──▶ public/index.php ──▶ Kernel
+                                   1. SecurityHeaders       CSP, no framing, nosniff
+                                   2. HandleErrors          exceptions → error page / JSON
+                                   3. VerifyCsrfToken       every POST (419)
+                                   4. Router                404 / 405, {id} parameters
+                                   5. Authenticate          redirect to /login, or 401 for fetch()
+                                   6. Controller            → TaskService → TaskRepository (scoped by user)
+                                 ◀── Response               HTML, redirect, or JSON for drag & drop
 ```
 
-When a card is moved with drag & drop, `handle/goto.php` returns the freshly rendered card HTML and the
-new stats as JSON, so the page updates instantly without reloading — and the exact same endpoint still
+When a card is moved with drag & drop, `POST /tasks/{id}/move` returns the freshly rendered card HTML and
+the new stats as JSON, so the page updates instantly without reloading — and the exact same route still
 works as a normal form post when JavaScript is off.
+
+The full tour of the layers, and how each SOLID principle shows up in the code, is in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Running the tests
+
+```bash
+php tests/run.php
+```
+
+No PHPUnit needed: `tests/run.php` is a small runner that finds every `*Test.php` file.
+The suite has unit tests, integration tests against an in-memory SQLite database, and feature tests
+that send real requests through the Kernel. GitHub Actions runs it on PHP 8.1 – 8.4 for every push.
 
 ## Security
 
 | Threat | How it's handled |
 |---|---|
 | SQL injection | PDO prepared statements everywhere, emulated prepares off |
-| XSS | Output escaped with `e()` at render time; strict **Content-Security-Policy** (no inline scripts or styles) |
+| XSS | Output escaped with `$v->e()` at render time; strict **Content-Security-Policy** (no inline scripts or styles) |
 | CSRF | Per-session token on every form and `fetch()` call, compared with `hash_equals` |
-| State changes over GET | Every handler rejects non-POST requests (405) |
+| State changes over GET | Every action is a POST route; other methods get 405 |
 | Reading other users' tasks (IDOR) | Every query is scoped by `user_id`; foreign ids return 404 |
 | Passwords | `password_hash` / `password_verify`, automatic rehash, same timing for unknown emails |
 | Brute force | 5 failed logins per IP → 15-minute lock |
 | Session fixation / theft | ID regenerated on login, strict mode, `HttpOnly` + `SameSite=Lax` (+ `Secure` on HTTPS) |
 | Clickjacking & sniffing | `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy` |
-| Direct file access | `.htaccess` blocks `classes/`, `inc/`, `database/`, config and SQL files on Apache |
+| Direct file access | Only `public/` is reachable; the root `.htaccess` forwards everything into it |
 | Invalid data | Whitelisted status / priority values, real date parsing, length limits |
 
 ## Performance
@@ -207,37 +220,9 @@ works as a normal form post when JavaScript is off.
 
 ## Adding your own features
 
-**A new validation rule** — drop a class in `classes/validation/`:
-
-```php
-namespace Classes\Validation;
-
-class Url implements Validator
-{
-    public function check(string $label, mixed $value, array $params = []): string|false
-    {
-        return filter_var($value, FILTER_VALIDATE_URL) ? false : "$label must be a valid link.";
-    }
-}
-```
-
-and use it: `->validate('link', $link, ['Url'], 'Link')`. Rules can take parameters too: `Min:3`, `In:a,b,c`.
-
-**A new task field** (for example `link`):
-
-1. Add the column to both files in `database/`.
-2. Add it to `TaskRepository::FIELDS` and the `INSERT` / `UPDATE` queries.
-3. Validate it in `handle/taskRules.php`.
-4. Show it in `inc/task_card.php` and add an input to `index.php` / `edit.php`.
-
-**A new action** — create `handle/yourAction.php` and start it with:
-
-```php
-require_once __DIR__ . '/../App.php';
-
-$request->requirePostWithToken();
-$user = require_login();
-```
+A new validation rule is one class that implements `App\Validation\Rule`; a new page is a route in
+`config/routes.php` plus a controller method; a new field touches the schema, `TaskData`, the repository,
+`TaskRules` and the views. Step-by-step examples are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#adding-things).
 
 ## Roadmap
 
