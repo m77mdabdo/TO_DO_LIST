@@ -57,6 +57,17 @@ final class BoardFlowTest extends TestCase
         $this->assertTrue(str_contains($this->app->get('/')->body, 'Title is required.'));
     }
 
+    public function testUnknownStatusIsRejected(): void
+    {
+        $this->signUp();
+        $this->app->post('/tasks', ['title' => 'Report']);
+
+        $response = $this->app->post('/tasks/1/move', ['status' => 'archived'], json: true);
+
+        $this->assertSame(422, $response->status);
+        $this->assertSame('That move is not allowed.', json_decode($response->body, true)['message']);
+    }
+
     public function testPostsWithoutTheCsrfTokenAreRejected(): void
     {
         $this->signUp();
