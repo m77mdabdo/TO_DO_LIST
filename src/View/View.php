@@ -19,6 +19,9 @@ final class View
     /** @var array<string, mixed> shared with every template */
     private array $shared = [];
 
+    /** @var array<string, list<callable(array<string, mixed>): array<string, mixed>>> template => composers */
+    private array $composers = [];
+
     public function __construct(
         private string $directory,
         private Url $url,
@@ -32,6 +35,17 @@ final class View
     public function share(string $key, mixed $value): void
     {
         $this->shared[$key] = $value;
+    }
+
+    /**
+     * Lets a module add data to a template every time it renders, e.g. the
+     * workspace switcher in the header, without each controller passing it.
+     *
+     * @param callable(array<string, mixed>): array<string, mixed> $composer
+     */
+    public function composer(string $template, callable $composer): void
+    {
+        $this->composers[$template][] = $composer;
     }
 
     /** @param array<string, mixed> $data */
@@ -131,6 +145,10 @@ final class View
 
         if (!is_file($file)) {
             throw new RuntimeException("View [$template] not found.");
+        }
+
+        foreach ($this->composers[$template] ?? [] as $composer) {
+            $data = $composer($data) + $data;
         }
 
         extract($this->shared + $data, EXTR_SKIP);

@@ -24,11 +24,29 @@ final class Container
     /** @var array<string, object> */
     private array $instances = [];
 
+    /** @var array<string, list<Closure(object, self): void>> */
+    private array $extenders = [];
+
     /** @param Closure(self): object $factory */
     public function singleton(string $id, Closure $factory): void
     {
         $this->factories[$id] = $factory;
         unset($this->instances[$id]);
+    }
+
+    /**
+     * Runs $extender on the service right after it's first built, e.g. so a
+     * module can register its view composers on the shared View.
+     *
+     * @param Closure(object, self): void $extender
+     */
+    public function extend(string $id, Closure $extender): void
+    {
+        $this->extenders[$id][] = $extender;
+
+        if (isset($this->instances[$id])) {
+            $extender($this->instances[$id], $this);
+        }
     }
 
     public function instance(string $id, object $service): void
@@ -48,7 +66,13 @@ final class Container
         }
 
         if (isset($this->factories[$id])) {
-            return $this->instances[$id] = ($this->factories[$id])($this);
+            $service = $this->instances[$id] = ($this->factories[$id])($this);
+
+            foreach ($this->extenders[$id] ?? [] as $extender) {
+                $extender($service, $this);
+            }
+
+            return $service;
         }
 
         return $this->build($id);
