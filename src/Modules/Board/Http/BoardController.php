@@ -95,6 +95,7 @@ final class BoardController extends Controller
             }
         }
         $activity = $role->allows(Permission::ViewActivity) ? $this->activity->forBoard($board->id, null, 15) : [];
+        $cardMembers = $this->cards->membersForCards($cardIds);
 
         return $this->render('boards/show', [
             'title'       => $board->name,
@@ -106,7 +107,8 @@ final class BoardController extends Controller
             'cardLabels'  => $this->labels->forCards($cardIds),
             'boardLabels' => $this->labels->forBoard($board->id),
             'activity'    => $activity,
-            'people'      => $this->users->findMany(array_map(static fn ($a) => $a->actorId, $activity)),
+            'cardMembers' => $cardMembers,
+            'people'      => $this->users->findMany([...array_merge([], ...array_values($cardMembers)), ...array_map(static fn ($a) => $a->actorId, $activity)]),
         ]);
     }
 

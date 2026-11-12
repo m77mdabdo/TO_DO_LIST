@@ -13,6 +13,8 @@ use App\Modules\Board\Contract\Events\ListCreated;
 use App\Modules\Card\Contract\Events\CardChanged;
 use App\Modules\Card\Contract\Events\CardCreated;
 use App\Modules\Card\Contract\Events\CardDeleted;
+use App\Modules\Card\Contract\Events\CardMemberChanged;
+use App\Modules\Identity\Contract\UserDirectory;
 use App\Modules\Card\Contract\Events\CardMoved;
 use App\Modules\Label\Contract\Events\LabelAttached;
 use App\Modules\Label\Contract\Events\LabelDetached;
@@ -25,7 +27,7 @@ use App\Shared\Events\DomainEvent;
  */
 final class ActivityRecorder
 {
-    public function __construct(private ActivityLog $log, private BoardDirectory $boards)
+    public function __construct(private ActivityLog $log, private BoardDirectory $boards, private UserDirectory $users)
     {
     }
 
@@ -34,7 +36,7 @@ final class ActivityRecorder
     {
         return [
             BoardCreated::name(), BoardChanged::name(), ListCreated::name(), ListChanged::name(),
-            CardCreated::name(), CardChanged::name(), CardMoved::name(), CardDeleted::name(),
+            CardCreated::name(), CardChanged::name(), CardMoved::name(), CardMemberChanged::name(), CardDeleted::name(),
             LabelAttached::name(), LabelDetached::name(),
         ];
     }
@@ -51,6 +53,9 @@ final class ActivityRecorder
             $event instanceof CardMoved     => $event->fromListId === $event->toListId ? null : $this->log->record($event->boardId, $event->cardId, $event->actorId, 'card.moved', $event->title, [
                 'from' => $this->listName($event->fromListId, $event->boardId),
                 'to'   => $this->listName($event->toListId, $event->boardId),
+            ]),
+            $event instanceof CardMemberChanged => $this->log->record($event->boardId, $event->cardId, $event->actorId, $event->added ? 'card.member_added' : 'card.member_removed', $event->title, [
+                'member' => $this->users->find($event->memberId)?->name ?? '',
             ]),
             $event instanceof CardDeleted   => $this->log->record($event->boardId, null, $event->actorId, 'card.deleted', $event->title),
             $event instanceof LabelAttached => $this->log->record($event->boardId, $event->cardId, $event->actorId, 'label.attached', $event->labelName),

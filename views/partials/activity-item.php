@@ -25,6 +25,9 @@ $templates = [
     'card.renamed'      => ':actor renamed :subject',
     'card.described'    => ':actor updated the description of :subject',
     'card.due_changed'  => ':actor changed the due date of :subject',
+    'card.start_changed' => ':actor changed the start date of :subject',
+    'card.member_added' => ':actor assigned :member to :subject',
+    'card.member_removed' => ':actor took :member off :subject',
     'card.completed'    => ':actor completed :subject',
     'card.reopened'     => ':actor reopened :subject',
     'card.moved'        => ':actor moved :subject from :from to :to',
@@ -43,6 +46,7 @@ $html = strtr($this->e($this->t($templates[$entry->type] ?? ':actor updated :sub
     ':list'    => $name((string) ($entry->data['list'] ?? '')),
     ':from'    => $name((string) ($entry->data['from'] ?? '')),
     ':to'      => $name((string) ($entry->data['to'] ?? '')),
+    ':member'  => $name((string) ($entry->data['member'] ?? '')),
 ]);
 ?>
 <li class="activity-item">

@@ -9,6 +9,7 @@
  * @var list<\App\Modules\Label\Contract\Label> $boardLabels
  * @var list<\App\Modules\Activity\Contract\ActivityEntry> $activity
  * @var array<int, \App\Modules\Identity\Contract\User> $people
+ * @var array<int, list<int>> $cardMembers card id => assigned user ids
  * @var \DateTimeImmutable $today
  */
 use App\Modules\Access\Contract\Permission;
@@ -138,6 +139,7 @@ $form = $this->form;
                     <?php foreach ($cards as $card): ?>
                         <?= $this->partial('partials/card-tile', [
                             'card' => $card, 'labels' => $cardLabels[$card->id] ?? [], 'canMove' => $canMove, 'canEdit' => $canEdit,
+                            'members' => array_values(array_filter(array_map(static fn (int $id) => $people[$id] ?? null, $cardMembers[$card->id] ?? []))),
                         ]) ?>
                     <?php endforeach; ?>
                 </div>

@@ -119,6 +119,41 @@ final class CardServiceTest extends TestCase
         $this->assertTrue($saved->isComplete());
     }
 
+    public function testStartDateMustNotBeAfterTheDueDate(): void
+    {
+        $card = $this->cards()->createCard($this->f->owner, $this->f->board->id, $this->f->todo->id, 'Plan');
+
+        $this->assertThrows(ValidationException::class, fn () => $this->cards()->update($this->f->owner, $card, ['title' => 'Plan', 'start_date' => '2026-03-05', 'due_date' => '2026-03-01']));
+
+        $this->cards()->update($this->f->owner, $card, ['title' => 'Plan', 'start_date' => '2026-02-20', 'due_date' => '2026-03-01']);
+        $this->assertSame('2026-02-20', $this->queries()->find($card->id)->startDate());
+    }
+
+    public function testOnlyPeopleWhoSeeTheBoardCanBeAssigned(): void
+    {
+        $card = $this->cards()->createCard($this->f->owner, $this->f->board->id, $this->f->todo->id, 'Plan');
+        $outsider = $this->f->colleague('omar@example.com');
+
+        // A private board: a workspace member who isn't on it can't be assigned.
+        $this->assertThrows(ValidationException::class, fn () => $this->cards()->toggleMember($this->f->owner, $card, $outsider));
+        $this->assertSame([], $this->cards()->membersOf($card));
+
+        $this->f->app->container->get(BoardMembers::class)->add($this->f->board->id, $outsider, BoardRole::Viewer);
+        $this->f->app->container->get(\App\Modules\Access\Application\Gate::class)->forget($outsider, $this->f->board->id);
+
+        $this->assertTrue($this->cards()->toggleMember($this->f->owner, $card, $outsider));
+        $this->assertTrue($this->cards()->toggleMember($this->f->owner, $card, $this->f->owner));
+        // Ordered by when they were added (same second here, so by user id).
+        $this->assertSame([$this->f->owner, $outsider], $this->queries()->membersForCards([$card->id])[$card->id]);
+
+        // The same call again takes them off.
+        $this->assertFalse($this->cards()->toggleMember($this->f->owner, $card, $outsider));
+        $this->assertSame([$this->f->owner], $this->cards()->membersOf($card));
+
+        // A viewer may not assign anyone.
+        $this->assertThrows(AccessDenied::class, fn () => $this->cards()->toggleMember($outsider, $card, $outsider));
+    }
+
     private function cards(): CardService
     {
         return $this->f->app->container->get(CardService::class);

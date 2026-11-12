@@ -3,6 +3,7 @@
  * @var \App\View\View $this
  * @var \App\Modules\Card\Contract\CardSummary $card
  * @var list<\App\Modules\Label\Contract\Label> $labels
+ * @var list<\App\Modules\Identity\Contract\User> $members
  * @var bool $canMove
  * @var bool $canEdit
  * @var \DateTimeImmutable $today
@@ -36,6 +37,15 @@ $dueClass = match (true) {
         <?php endif; ?>
         <?php if ($card->description): ?>
             <span class="muted" title="<?= $this->te('Has a description') ?>"><?= $this->icon('edit') ?></span>
+        <?php endif; ?>
+
+        <?php if ($members): ?>
+            <span class="tile-people">
+                <?php foreach (array_slice($members, 0, 3) as $member): ?>
+                    <span class="avatar avatar-xs" title="<?= $this->e($member->name) ?>"><?= $this->e(mb_strtoupper(mb_substr($member->name, 0, 1))) ?></span>
+                <?php endforeach; ?>
+                <?php if (count($members) > 3): ?><span class="avatar avatar-xs avatar-more">+<?= count($members) - 3 ?></span><?php endif; ?>
+            </span>
         <?php endif; ?>
 
         <?php if ($canEdit): ?>
