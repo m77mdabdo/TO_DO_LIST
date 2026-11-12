@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Identity\Http;
 
 use App\Controllers\Controller;
+use App\Http\Intended;
 use App\Http\Request;
 use App\Http\Response;
 use App\Http\Url;
@@ -36,7 +37,7 @@ final class LoginController extends Controller
             return $this->backWithErrors($e, $request, '/login');
         }
 
-        return $this->redirect('/');
+        return $this->redirect(Intended::pull($this->session));
     }
 
     public function destroy(): Response
