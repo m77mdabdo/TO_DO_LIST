@@ -50,6 +50,20 @@
         if (event.key === 'Escape') closeMenus(null);
     });
 
+    /* ---------- copy a link (invitations) ---------- */
+
+    $$('.js-copy').forEach((btn) => btn.addEventListener('click', async () => {
+        const source = $('.js-copy-source', btn.closest('.copy-row') || document);
+        if (!source) return;
+        try {
+            await navigator.clipboard.writeText(source.value);
+        } catch (e) {
+            source.select();
+            document.execCommand('copy');
+        }
+        toast(btn.dataset.copied || 'Copied', 'success');
+    }));
+
     /* ---------- keyboard shortcuts ----------
      * Each one is a faster way to something that has a visible control too.
      * Ignored while typing, and when a modifier key is held.
