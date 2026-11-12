@@ -223,7 +223,7 @@ final class InvitationService
         $inviter = $this->users->find($actorId);
         $workspace = $this->workspaces->describe($invitation->workspaceId);
         $t = fn (string $text, array $replace = []): string => $this->translator->t($text, $replace);
-        $replace = [':name' => $inviter?->name ?? $t('Someone'), ':company' => $workspace?->companyName ?? ''];
+        $replace = ['name' => $inviter?->name ?? $t('Someone'), 'company' => $workspace?->companyName ?? ''];
 
         $body = implode("\n", [
             $t(':name invited you to join :company on To Do List.', $replace),
@@ -231,7 +231,7 @@ final class InvitationService
             $t('Open this link to accept:'),
             $this->link($token),
             '',
-            $t('The link works once and expires in :days days.', [':days' => (string) self::VALID_DAYS]),
+            $t('The link works once and expires in :days days.', ['days' => (string) self::VALID_DAYS]),
             $t('If you did not expect this, you can ignore this email.'),
         ]);
 

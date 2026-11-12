@@ -5,7 +5,7 @@
  * @var \App\View\View $this
  * @var int $unread
  */
-$label = $unread > 0 ? $this->t(':count unread notifications', [':count' => (string) $unread]) : $this->t('Notifications');
+$label = $unread > 0 ? $this->t(':count unread notifications', ['count' => (string) $unread]) : $this->t('Notifications');
 ?>
 <a class="icon-btn bell" href="<?= $this->url('/notifications') ?>" title="<?= $this->e($label) ?>" aria-label="<?= $this->e($label) ?>">
     <?= $this->icon('bell') ?>

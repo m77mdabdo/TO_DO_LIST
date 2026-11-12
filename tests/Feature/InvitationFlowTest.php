@@ -39,6 +39,7 @@ final class InvitationFlowTest extends TestCase
         $app->post('/logout');
         $landing = $app->page($path);
         $this->assertTrue(str_contains($landing, 'Create an account'));
+        $this->assertFalse(str_contains($landing, ':company'), 'The company name is filled in.');
         $register = $app->post('/register', ['name' => 'Omar', 'email' => 'omar@example.com', 'password' => 'secret123', 'password_confirmation' => 'secret123']);
         $this->assertSame('/' . ltrim($path, '/'), $register->header('Location'));
 

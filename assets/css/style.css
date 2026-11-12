@@ -184,7 +184,7 @@ label > span { display: block; font-weight: 700; font-size: .85rem; margin-botto
     box-shadow: var(--shadow);
 }
 
-.stack { display: grid; gap: 1rem; }
+.stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
 
 /* ---------- top bar ---------- */
 
@@ -414,8 +414,8 @@ label > span { display: block; font-weight: 700; font-size: .85rem; margin-botto
 
 /* members */
 .member-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; }
-.member-list li { display: flex; align-items: center; gap: .8rem; padding: .6rem; border-radius: var(--radius-sm); background: var(--surface-2); }
-.member-name { display: grid; min-width: 0; }
+.member-list li { display: flex; flex-wrap: wrap; align-items: center; gap: .8rem; padding: .6rem; border-radius: var(--radius-sm); background: var(--surface-2); }
+.member-name { display: grid; min-width: 0; flex: 1 1 9rem; overflow-wrap: anywhere; }
 .member-list .pill { margin-inline-start: auto; }
 
 /* home: board tiles */
@@ -547,7 +547,7 @@ button.label { cursor: pointer; }
 .avatar-more { background: var(--surface-2); color: var(--muted); }
 .tile-people { display: inline-flex; }
 .tile-people .avatar + .avatar { margin-inline-start: -6px; }
-.field-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .8rem; }
+.field-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr)); gap: .8rem; }
 .date-range { display: flex; flex-wrap: wrap; gap: .4rem; }
 .people-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .4rem; }
 .people-list li { display: flex; align-items: center; gap: .55rem; }
@@ -663,10 +663,10 @@ kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fon
 .member-list .member-role { margin-inline-start: auto; display: flex; gap: .4rem; align-items: center; }
 .member-list .member-role select { width: auto; }
 .leave-form { text-align: center; }
-.stack-sm { display: grid; gap: .5rem; }
-fieldset.stack-sm { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: .8rem 1rem; margin: 0; }
+.stack-sm { display: grid; grid-template-columns: minmax(0, 1fr); gap: .5rem; }
+fieldset.stack-sm { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: .8rem 1rem; margin: 0; min-width: 0; }
 fieldset.stack-sm legend { padding: 0 .3rem; font-weight: 600; }
-.check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: .4rem .8rem; }
+.check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr)); gap: .4rem .8rem; }
 .check { display: flex; align-items: center; gap: .45rem; font-weight: 500; }
 .check input { width: auto; }
 .avatar-muted { background: var(--surface-2); color: var(--muted); }
