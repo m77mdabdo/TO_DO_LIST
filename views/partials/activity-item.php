@@ -34,18 +34,21 @@ $templates = [
     'label.attached'    => ':actor added the label :subject',
     'label.detached'    => ':actor removed the label :subject',
 ];
-$text = $this->t($templates[$entry->type] ?? ':actor updated :subject', [
-    'actor'   => "\u{2068}" . $actor . "\u{2069}",
-    'subject' => "\u{2068}" . $entry->subject . "\u{2069}",
-    'list'    => "\u{2068}" . (string) ($entry->data['list'] ?? '') . "\u{2069}",
-    'from'    => "\u{2068}" . (string) ($entry->data['from'] ?? '') . "\u{2069}",
-    'to'      => "\u{2068}" . (string) ($entry->data['to'] ?? '') . "\u{2069}",
+// Translate the sentence first, then drop the names in as isolated, bold
+// spans, so an English title inside an Arabic sentence keeps its place.
+$name = fn (string $value): string => '<bdi class="activity-name">' . $this->e($value) . '</bdi>';
+$html = strtr($this->e($this->t($templates[$entry->type] ?? ':actor updated :subject')), [
+    ':actor'   => $name($actor),
+    ':subject' => $name($entry->subject),
+    ':list'    => $name((string) ($entry->data['list'] ?? '')),
+    ':from'    => $name((string) ($entry->data['from'] ?? '')),
+    ':to'      => $name((string) ($entry->data['to'] ?? '')),
 ]);
 ?>
 <li class="activity-item">
     <span class="avatar avatar-sm"><?= $this->e(mb_strtoupper(mb_substr($actor, 0, 1))) ?></span>
     <span>
-        <?= $this->e($text) ?>
+        <?= $html ?>
         <small class="muted"><?= $this->e($timeAgo->format(new DateTimeImmutable($entry->createdAt))) ?></small>
     </span>
 </li>
