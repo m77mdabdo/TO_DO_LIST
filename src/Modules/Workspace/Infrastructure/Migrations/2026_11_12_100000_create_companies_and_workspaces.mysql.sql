@@ -22,6 +22,8 @@ CREATE TABLE workspace_members (
     user_id      INT UNSIGNED NOT NULL,
     role         ENUM('owner', 'admin', 'member', 'guest') NOT NULL,
     joined_at    DATETIME NOT NULL,
+    -- Set when the user switches to this workspace, so the next sign-in opens it again.
+    last_opened_at DATETIME NULL,
     PRIMARY KEY (workspace_id, user_id),
     KEY idx_workspace_members_user (user_id, joined_at),
     FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,

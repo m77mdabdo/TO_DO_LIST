@@ -16,6 +16,12 @@ interface WorkspaceRepository
 
     public function firstWorkspaceIdOf(int $userId): ?int;
 
+    /** Remembers that the user opened this workspace, for the next sign-in. */
+    public function markOpened(int $userId, int $workspaceId): void;
+
+    /** The public id of the workspace the user opened most recently, if any. */
+    public function lastOpenedOf(int $userId): ?string;
+
     /** @return list<WorkspaceSummary> */
     public function summariesOf(int $userId): array;
 
