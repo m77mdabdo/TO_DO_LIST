@@ -12,6 +12,7 @@
  * @var array<int, \App\Modules\Access\Contract\BoardRole> $audience user id => role on the board
  * @var list<int> $assigned
  * @var array<string, string> $query
+ * @var bool $moreActivity
  */
 use App\Modules\Access\Contract\Permission;
 use App\Modules\Label\Contract\Label;
@@ -88,13 +89,16 @@ $editErrors = $form->error('title') || $form->error('description') || $form->err
             <?= $this->slot('card.main', ['card' => $card, 'board' => $board, 'role' => $role, 'query' => $query]) ?>
 
             <?php if ($activity): ?>
-                <div>
+                <div id="activity">
                     <h2 class="section-title"><?= $this->icon('activity') ?> <?= $this->te('Activity') ?></h2>
                     <ul class="activity-list">
                         <?php foreach ($activity as $entry): ?>
                             <?= $this->partial('partials/activity-item', ['entry' => $entry, 'people' => $people]) ?>
                         <?php endforeach; ?>
                     </ul>
+                    <?php if ($moreActivity): ?>
+                        <a class="btn btn-ghost" href="<?= $this->url($cardPath . '?activity_before=' . end($activity)->id . '#activity') ?>"><?= $this->te('Older activity') ?></a>
+                    <?php endif; ?>
                 </div>
             <?php endif; ?>
         </section>

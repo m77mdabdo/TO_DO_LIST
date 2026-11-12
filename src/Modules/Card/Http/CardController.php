@@ -22,6 +22,8 @@ use App\View\View;
 
 final class CardController extends Controller
 {
+    private const ACTIVITY_PAGE = 20;
+
     public function __construct(
         View $view,
         Url $url,
@@ -64,7 +66,8 @@ final class CardController extends Controller
         $user = $this->user($request);
         [$card, $board] = $this->cards->cardFor($user->id, $params['card']);
         $role = $this->gate->roleOn($user->id, $board->id);
-        $activity = $role->allows(Permission::ViewActivity) ? $this->activity->forCard($card->id) : [];
+        $before = $request->input('activity_before');
+        $activity = $role->allows(Permission::ViewActivity) ? $this->activity->forCard($card->id, ctype_digit($before) ? (int) $before : null, self::ACTIVITY_PAGE) : [];
         $audience = $this->gate->peopleOn($board->id);
         $assigned = $this->cards->membersOf($card);
 
@@ -79,6 +82,7 @@ final class CardController extends Controller
             'activity'    => $activity,
             'people'      => $this->users->findMany([...array_keys($audience), ...array_map(static fn ($a) => $a->actorId, $activity)]),
             'audience'    => $audience,
+            'moreActivity' => count($activity) === self::ACTIVITY_PAGE,
             'query'       => ['comments_before' => $request->input('comments_before')],
             'assigned'    => $assigned,
         ]);
