@@ -26,100 +26,125 @@ final class Markdown
     /** @var list<string> finished HTML fragments kept out of later passes */
     private array $held = [];
 
+    /** @var list<string> blocks rendered so far */
+    private array $blocks = [];
+
+    /** @var list<string> raw lines of the paragraph being read */
+    private array $paragraph = [];
+
+    /** @var list<string> raw lines of the quote being read */
+    private array $quote = [];
+
+    /** @var list<string> raw text of the list items being read */
+    private array $items = [];
+
+    /** 'ul', 'ol', or '' when no list is open */
+    private string $list = '';
+
     public function toHtml(string $text): string
     {
         $text = str_replace(["\r\n", "\r"], "\n", mb_substr($text, 0, self::MAX_LENGTH));
         $lines = explode("\n", $text);
-        $html = [];
-        $paragraph = [];
-        $list = null;   // 'ul' | 'ol' | null
-        $items = [];
-        $quote = [];
-
-        $flushParagraph = function () use (&$paragraph, &$html): void {
-            if ($paragraph !== []) {
-                $html[] = '<p>' . implode('<br>', array_map([$this, 'inline'], $paragraph)) . '</p>';
-                $paragraph = [];
-            }
-        };
-        $flushList = function () use (&$list, &$items, &$html): void {
-            if ($list !== null) {
-                $html[] = "<$list>" . implode('', array_map(fn (string $item) => '<li>' . $this->inline($item) . '</li>', $items)) . "</$list>";
-                $list = null;
-                $items = [];
-            }
-        };
-        $flushQuote = function () use (&$quote, &$html): void {
-            if ($quote !== []) {
-                $html[] = '<blockquote>' . implode('<br>', array_map([$this, 'inline'], $quote)) . '</blockquote>';
-                $quote = [];
-            }
-        };
-        $flushAll = static function () use ($flushParagraph, $flushList, $flushQuote): void {
-            $flushParagraph();
-            $flushList();
-            $flushQuote();
-        };
+        $this->blocks = $this->paragraph = $this->quote = $this->items = [];
+        $this->list = '';
 
         for ($i = 0, $n = count($lines); $i < $n; $i++) {
             $line = rtrim($lines[$i]);
 
             if (str_starts_with(ltrim($line), '```')) {
-                $flushAll();
+                $this->flushAll();
                 $code = [];
                 for ($i++; $i < $n && !str_starts_with(ltrim($lines[$i]), '```'); $i++) {
                     $code[] = $lines[$i];
                 }
-                $html[] = '<pre><code>' . self::escape(implode("\n", $code)) . '</code></pre>';
+                $this->blocks[] = '<pre><code>' . self::escape(implode("\n", $code)) . '</code></pre>';
                 continue;
             }
 
             if (trim($line) === '') {
-                $flushAll();
+                $this->flushAll();
                 continue;
             }
 
             if (preg_match('/^(#{1,3})\s+(.+)$/', $line, $m)) {
-                $flushAll();
+                $this->flushAll();
                 $level = strlen($m[1]) + 2; // # -> h3: the card title is the page's main heading
-                $html[] = "<h$level>" . $this->inline($m[2]) . "</h$level>";
+                $this->blocks[] = "<h$level>" . $this->inline($m[2]) . "</h$level>";
                 continue;
             }
 
-            if (preg_match('/^\s*[-*+]\s+(.+)$/', $line, $m) || preg_match('/^\s*\d{1,9}[.)]\s+(.+)$/', $line, $n2)) {
-                $type = isset($m[1]) ? 'ul' : 'ol';
-                $flushParagraph();
-                $flushQuote();
-                if ($list !== $type) {
-                    $flushList();
-                    $list = $type;
+            $type = '';
+            if (preg_match('/^\s*[-*+]\s+(.+)$/', $line, $m)) {
+                $type = 'ul';
+            } elseif (preg_match('/^\s*\d{1,9}[.)]\s+(.+)$/', $line, $m)) {
+                $type = 'ol';
+            }
+            if ($type !== '') {
+                $this->flushParagraph();
+                $this->flushQuote();
+                if ($this->list !== $type) {
+                    $this->flushList();
+                    $this->list = $type;
                 }
-                $items[] = $m[1] ?? $n2[1];
-                unset($m, $n2);
+                $this->items[] = $m[1];
                 continue;
             }
 
             if (preg_match('/^>\s?(.*)$/', $line, $m)) {
-                $flushParagraph();
-                $flushList();
-                $quote[] = $m[1];
+                $this->flushParagraph();
+                $this->flushList();
+                $this->quote[] = $m[1];
                 continue;
             }
 
-            $flushList();
-            $flushQuote();
-            $paragraph[] = $line;
+            $this->flushList();
+            $this->flushQuote();
+            $this->paragraph[] = $line;
         }
 
-        $flushAll();
+        $this->flushAll();
+        $html = implode("\n", $this->blocks);
+        $this->blocks = [];
 
-        return implode("\n", $html);
+        return $html;
+    }
+
+    private function flushAll(): void
+    {
+        $this->flushParagraph();
+        $this->flushList();
+        $this->flushQuote();
+    }
+
+    private function flushParagraph(): void
+    {
+        if ($this->paragraph !== []) {
+            $this->blocks[] = '<p>' . implode('<br>', array_map($this->inline(...), $this->paragraph)) . '</p>';
+            $this->paragraph = [];
+        }
+    }
+
+    private function flushList(): void
+    {
+        if ($this->list !== '') {
+            $items = array_map(fn (string $item): string => '<li>' . $this->inline($item) . '</li>', $this->items);
+            $this->blocks[] = "<{$this->list}>" . implode('', $items) . "</{$this->list}>";
+            $this->list = '';
+            $this->items = [];
+        }
+    }
+
+    private function flushQuote(): void
+    {
+        if ($this->quote !== []) {
+            $this->blocks[] = '<blockquote>' . implode('<br>', array_map($this->inline(...), $this->quote)) . '</blockquote>';
+            $this->quote = [];
+        }
     }
 
     /** Inline markup on one line of raw text. */
     private function inline(string $raw): string
     {
-        $this->held = [];
         $text = self::escape($raw);
 
         // Code spans first: nothing inside them is formatted.
@@ -145,7 +170,10 @@ final class Markdown
         $text = preg_replace('/(?<![\w*])\*(?=\S)(.+?)(?<=\S)\*(?![\w*])/', '<em>$1</em>', $text);
         $text = preg_replace('/(?<!\w)_(?=\S)(.+?)(?<=\S)_(?!\w)/', '<em>$1</em>', $text);
 
-        return preg_replace_callback('/\x{E000}(\d+)\x{E001}/u', fn (array $m) => $this->held[(int) $m[1]], $text);
+        $html = preg_replace_callback('/\x{E000}(\d+)\x{E001}/u', fn (array $m): string => $this->held[(int) $m[1]] ?? '', $text);
+        $this->held = [];
+
+        return $html;
     }
 
     /** Parks a finished fragment behind a private-use marker until the end. */
