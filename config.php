@@ -13,6 +13,10 @@ return [
     // Show error details on the error page. Keep it off on a real server.
     'debug' => filter_var(getenv('APP_DEBUG') ?: false, FILTER_VALIDATE_BOOL),
 
+    // Apply pending database migrations on the first request.
+    // Fine locally; on a real server run `php database/migrate.php` on deploy instead.
+    'auto_migrate' => filter_var(getenv('APP_AUTO_MIGRATE') ?: true, FILTER_VALIDATE_BOOL),
+
     'db' => [
         // "sqlite" works out of the box, "mysql" for XAMPP / shared hosting
         'driver'      => getenv('DB_DRIVER') ?: 'sqlite',

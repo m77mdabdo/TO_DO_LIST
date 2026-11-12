@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Support;
 
 use App\Database\ConnectionFactory;
-use App\Database\Migrator;
+use App\Database\Migrations\MigrationRunner;
 use PDO;
 
 final class Database
@@ -14,7 +14,7 @@ final class Database
     public static function fresh(): PDO
     {
         $pdo = ConnectionFactory::sqlite(':memory:');
-        (new Migrator($pdo, BASE_PATH . '/database'))->migrate();
+        (new MigrationRunner($pdo, [BASE_PATH . '/database/migrations']))->migrate();
 
         return $pdo;
     }
