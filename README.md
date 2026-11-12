@@ -50,15 +50,21 @@ No framework, no Composer, no build step.
 - 🗂️ **Boards, lists and cards**, in any number of lists you like.
 - 🖱️ **Drag and drop** for cards (inside a list or across lists) and for whole lists. This also works right to left.
 - 🏷️ **Labels** in nine colors, set per board.
-- 📅 **Due dates** with overdue highlighting, and a done checkbox on every card.
+- 📅 **Start and due dates** with overdue highlighting, and a done checkbox on every card.
+- 🙋 **Assignees.** Put people from the board on a card and see their faces on the tile.
+- 📝 **Markdown descriptions**, rendered safely (no raw HTML, only http, https and mailto links).
+- ☑️ **Checklists** on a card, with progress on the board tile. Items can be dragged within and between checklists.
+- 💬 **Comments with @mentions** and **votes**. Each board decides who may comment and vote: no one, members only, or everyone who can see it.
+- 🔎 **Filters and search.** Filter a board by text, label, person, due date or status, and search cards across every board you can see.
 - 🗄️ **Archive, then delete.** Archived lists, cards and boards can be restored. Deleting a card is only possible once it is archived.
-- 📜 **Activity feed** for each board and each card: who did what, and when.
+- 📜 **Activity feed** for each board and each card, with a full page you can scroll back through.
 - ⬇️ **CSV export** of a board. It opens cleanly in Excel and is safe against formula injection.
 
 **Everyday comfort**
 - 🌍 **Arabic by default (RTL), English ready.** Mixed Arabic and English text lines up correctly.
 - 🌙 **Dark mode** that follows your system and remembers your choice.
 - 📱 **Responsive** down to phone width.
+- ⌨️ **Keyboard shortcuts**: `/` search, `f` filters, `n` new card, `e` edit card, `c` comment, `?` list them all.
 - 📦 **Old tasks come along.** Tasks from the single-board version are moved to "My Board" automatically on first sign-in.
 
 ## Screenshots
@@ -187,6 +193,8 @@ The app is a modular monolith. Each feature lives in `src/Modules/<Name>/` with 
 | **Board** | boards and their lists, ordering, archiving, CSV export |
 | **Card** | cards: create, edit, complete, move, archive, delete |
 | **Label** | board labels and which cards carry them |
+| **Checklist** | checklists and their items on a card, progress per card |
+| **Discussion** | comments, @mentions and votes on cards |
 | **Activity** | the activity feed, built only from other modules' events |
 | **LegacyImport** | moves tasks from the single-board version into boards |
 
@@ -247,6 +255,14 @@ Archived boards are read-only.
 | GET / POST | `/cards/{id}` | show / update a card |
 | POST | `/cards/{id}/complete`, `/move`, `/archive`, `/restore`, `/delete` | card actions (forms or `fetch()`) |
 | POST | `/cards/{id}/labels/{label}` | toggle a label on a card |
+| POST | `/cards/{id}/members` | add or remove a person on a card |
+| POST | `/cards/{id}/checklists` | add a checklist |
+| POST | `/checklists/{id}` (`/delete`, `/items`) | rename or delete a checklist, add an item |
+| POST | `/checklist-items/{id}` (`/toggle`, `/move`, `/delete`) | edit, tick, move or delete an item |
+| POST | `/cards/{id}/comments`, `/cards/{id}/vote` | comment on a card, vote for it |
+| POST | `/comments/{id}`, `/comments/{id}/delete` | edit or delete a comment |
+| GET | `/boards/{id}/activity` | the board's whole activity, page by page |
+| GET | `/search?q=` | search cards in the current workspace |
 
 Every state change is a POST route with a CSRF token. Other methods get 405.
 
@@ -315,8 +331,9 @@ for PHP 8.1 and 8.3, together with PHPStan.
 - [x] Arabic interface (RTL) with English
 - [x] Export a board as CSV
 - [ ] Invitations by email and member management
-- [ ] Checklists, comments and attachments on cards
-- [ ] Search and filters across boards
+- [x] Checklists, comments, mentions and votes on cards
+- [x] Search and filters
+- [ ] Attachments on cards
 - [ ] Notifications and due-date reminders
 - [ ] Import from CSV
 
