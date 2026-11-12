@@ -101,22 +101,23 @@ final class CardFilter
         }
 
         $todayDate = $today->format('Y-m-d');
+        // fromInput() lets only known values through, and '' means "any".
         $dueOk = match ($this->due) {
-            ''        => true,
             'none'    => $card->dueAt === null,
             'overdue' => $card->isOverdue($today),
             'today'   => $card->dueDate() === $todayDate && !$card->isComplete(),
             'week'    => $card->dueDate() !== null && !$card->isComplete()
                 && $card->dueDate() >= $todayDate && $card->dueDate() <= $today->modify('+7 days')->format('Y-m-d'),
+            default   => true,
         };
         if (!$dueOk) {
             return false;
         }
 
         return match ($this->status) {
-            ''     => true,
-            'open' => !$card->isComplete(),
-            'done' => $card->isComplete(),
+            'open'  => !$card->isComplete(),
+            'done'  => $card->isComplete(),
+            default => true,
         };
     }
 
