@@ -31,6 +31,19 @@ final class ContainerTest extends TestCase
         $this->assertSame($container->get(Clock::class), $container->get(Clock::class));
     }
 
+    public function testExtendersRunOnceWhenTheServiceIsBuilt(): void
+    {
+        $container = new Container();
+        $calls = 0;
+        $container->singleton(Clock::class, fn () => new FrozenClock());
+        $container->extend(Clock::class, function (object $clock) use (&$calls): void { $calls++; });
+
+        $container->get(Clock::class);
+        $container->get(Clock::class);
+
+        $this->assertSame(1, $calls);
+    }
+
     public function testInterfacesNeedABinding(): void
     {
         $this->assertThrows(RuntimeException::class, fn () => (new Container())->get(Clock::class));
