@@ -82,6 +82,18 @@ final class BoardPagesTest extends TestCase
         $this->assertTrue(str_contains($this->f->app->page('/boards/' . $this->f->board->publicId), 'avatar-xs'));
     }
 
+    public function testDescriptionIsRenderedAsSafeMarkdown(): void
+    {
+        $this->f->app->post('/boards/' . $this->f->board->publicId . '/cards', ['list_id' => (string) $this->f->todo->id, 'title' => 'Draft']);
+        $card = $this->openCards()[$this->f->todo->id][0];
+
+        $this->f->app->post('/cards/' . $card->publicId, ['title' => 'Draft', 'description' => "**Scope**\n<script>alert(1)</script>"]);
+
+        $html = $this->f->app->page('/cards/' . $card->publicId);
+        $this->assertTrue(str_contains($html, '<strong>Scope</strong>'));
+        $this->assertFalse(str_contains($html, '<script>alert'));
+    }
+
     public function testOtherCompaniesGetNotFoundForBoardsAndCards(): void
     {
         $this->f->app->post('/boards/' . $this->f->board->publicId . '/cards', ['list_id' => (string) $this->f->todo->id, 'title' => 'Secret']);

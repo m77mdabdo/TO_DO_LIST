@@ -22,6 +22,8 @@ final class View
     /** @var array<string, list<callable(array<string, mixed>): array<string, mixed>>> template => composers */
     private array $composers = [];
 
+    private ?Markdown $markdown = null;
+
     public function __construct(
         private string $directory,
         private Url $url,
@@ -60,6 +62,12 @@ final class View
     public function partial(string $template, array $data = []): string
     {
         return $this->renderFile($template, $data);
+    }
+
+    /** User-written Markdown as safe HTML (raw HTML in it is escaped, never run). */
+    public function markdown(?string $text): string
+    {
+        return ($this->markdown ??= new Markdown())->toHtml((string) $text);
     }
 
     public function e(mixed $value): string
