@@ -135,18 +135,20 @@ TO_DO_LIST/
 ├── config.php              # default settings (override with config.local.php or env vars)
 ├── bootstrap/
 │   ├── autoload.php        # App\ → src/ autoloader (no Composer needed)
-│   └── app.php             # wires every service together in the container
+│   ├── app.php             # wires every service together in the container
+│   └── modules.php         # the enabled modules, in boot order
 ├── routes/web.php          # the list of URLs and which controller handles them
 │
 ├── src/
 │   ├── Core/               # Container (dependency injection) and Config
 │   ├── Http/               # Request, Response, Router, Kernel, Url
 │   │   └── Middleware/     # VerifyCsrfToken, Authenticate, RedirectIfAuthenticated, SecurityHeaders
-│   ├── Controllers/        # Board, Task, Login, Register — thin, no SQL, no HTML
+│   ├── Controllers/        # Board, Task — thin, no SQL, no HTML
 │   ├── Task/               # Task, Status, Priority, DueDate, Board, BoardStats,
 │   │                       # TaskService, TaskRepository (interface) + PdoTaskRepository
-│   ├── Auth/               # User, AuthService, UserRepository + PDO version,
-│   │                       # LoginThrottle + PDO version, PasswordHasher
+│   ├── Modules/            # feature modules (see "Modules" below)
+│   │   └── Identity/       # accounts: Contract/, Domain/, Application/, Infrastructure/, Http/
+│   ├── Shared/             # Events (EventBus, DomainEvent) and Module (ModuleProvider, ModuleRegistry)
 │   ├── Validation/         # Validator, Rule interface and one class per rule
 │   ├── Session/            # Session interface, NativeSession, ArraySession (tests)
 │   ├── Security/Csrf.php
@@ -160,6 +162,27 @@ TO_DO_LIST/
 ├── storage/logs/           # error logs
 └── tests/                  # Unit, Integration and Feature tests + a tiny runner
 ```
+
+## Modules
+
+The app is a modular monolith. Each feature lives in `src/Modules/<Name>/` with the same layers:
+
+| Layer | Holds | May depend on |
+| --- | --- | --- |
+| `Contract/` | interfaces, read models and events other modules may use | `Shared` only |
+| `Domain/` | entities, value objects, repository interfaces, rules | `Contract`, `Shared` |
+| `Application/` | use cases that coordinate the domain | `Domain`, `Contract`, `Shared` |
+| `Infrastructure/` | PDO repositories, migrations | anything in the module |
+| `Http/` | controllers | anything in the module |
+
+A module talks to another one in exactly two ways: by calling its `Contract\` interfaces, or by
+listening to the domain events it publishes on the `EventBus`. `tests/Architecture/ModuleBoundaryTest.php`
+fails the build if any code reaches past that.
+
+Each module has a `<Name>Module` provider (listed in `bootstrap/modules.php`) that binds its services,
+adds its routes, subscribes its listeners and points to its migrations folder.
+Migrations are plain SQL files named `<timestamp>_<what>.<sqlite|mysql>.sql`; they run once each and
+are recorded in `schema_migrations`.
 
 ## How it works
 
