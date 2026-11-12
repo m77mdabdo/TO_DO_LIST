@@ -84,6 +84,8 @@ $editErrors = $form->error('title') || $form->error('description') || $form->err
                 </details>
             <?php endif; ?>
 
+            <?= $this->slot('card.main', ['card' => $card, 'board' => $board, 'role' => $role]) ?>
+
             <?php if ($activity): ?>
                 <div>
                     <h2 class="section-title"><?= $this->icon('activity') ?> <?= $this->te('Activity') ?></h2>

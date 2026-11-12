@@ -34,6 +34,11 @@ $templates = [
     'card.archived'     => ':actor archived :subject',
     'card.restored'     => ':actor restored :subject',
     'card.deleted'      => ':actor deleted :subject',
+    'checklist.added'   => ':actor added the checklist :subject to :card',
+    'checklist.renamed' => ':actor renamed a checklist on :card to :subject',
+    'checklist.removed' => ':actor removed the checklist :subject from :card',
+    'checklist.item_completed' => ':actor completed :subject on :card',
+    'checklist.item_reopened'  => ':actor reopened :subject on :card',
     'label.attached'    => ':actor added the label :subject',
     'label.detached'    => ':actor removed the label :subject',
 ];
@@ -47,6 +52,7 @@ $html = strtr($this->e($this->t($templates[$entry->type] ?? ':actor updated :sub
     ':from'    => $name((string) ($entry->data['from'] ?? '')),
     ':to'      => $name((string) ($entry->data['to'] ?? '')),
     ':member'  => $name((string) ($entry->data['member'] ?? '')),
+    ':card'    => $name((string) ($entry->data['card'] ?? '')),
 ]);
 ?>
 <li class="activity-item">

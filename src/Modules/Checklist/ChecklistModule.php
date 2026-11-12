@@ -1,0 +1,102 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Modules\Checklist;
+
+use App\Core\Container;
+use App\Http\Middleware\Authenticate;
+use App\Http\Router;
+use App\Modules\Access\Contract\AccessGate;
+use App\Modules\Access\Contract\Permission;
+use App\Modules\Checklist\Application\ChecklistService;
+use App\Modules\Checklist\Domain\ChecklistRepository;
+use App\Modules\Checklist\Http\ChecklistController;
+use App\Modules\Checklist\Infrastructure\PdoChecklists;
+use App\Modules\Identity\Contract\UserDirectory;
+use App\Shared\Events\EventBus;
+use App\Shared\Module\ModuleProvider;
+use App\Support\Clock;
+use App\View\View;
+use PDO;
+
+/**
+ * Checklists on cards: items with an assignee and a due date, reordering,
+ * and progress on the card tile.
+ * Publishes: checklist.changed.
+ * Adds to the card page (slot "card.main") and the board's card tiles.
+ */
+final class ChecklistModule implements ModuleProvider
+{
+    public function name(): string
+    {
+        return 'checklist';
+    }
+
+    public function register(Container $container): void
+    {
+        $container->singleton(ChecklistRepository::class, fn (Container $c) => new PdoChecklists($c->get(PDO::class), $c->get(Clock::class)));
+        $container->singleton(ChecklistService::class, fn (Container $c) => $c->build(ChecklistService::class));
+
+        $container->extend(View::class, function (object $view, Container $c): void {
+            /** @var View $view */
+            $view->addToSlot('card.main', 'checklists/panel');
+            $view->composer('checklists/panel', function (array $data) use ($c): array {
+                $card = $data['card'];
+                $gate = $c->get(AccessGate::class);
+                $audience = $gate->peopleOn($card->boardId);
+
+                return [
+                    'checklists' => $c->get(ChecklistService::class)->forCard($card->id),
+                    'audience'   => $c->get(UserDirectory::class)->findMany(array_keys($audience)),
+                    'canEditChecklists' => !$card->archived && !$data['board']->archived && $data['role']->allows(Permission::EditCards),
+                ];
+            });
+
+            // Progress on every tile of a board page, from one grouped query.
+            $view->composer('boards/show', function (array $data) use ($c): array {
+                $cardIds = [];
+                foreach ($data['cardsByList'] ?? [] as $cards) {
+                    foreach ($cards as $card) {
+                        $cardIds[] = $card->id;
+                    }
+                }
+
+                $badges = $data['cardBadges'] ?? [];
+                foreach ($c->get(ChecklistService::class)->progressForCards($cardIds) as $cardId => ['done' => $done, 'total' => $total]) {
+                    $badges[$cardId][] = [
+                        'icon'  => 'checklist',
+                        'text'  => $done . '/' . $total,
+                        'class' => $done === $total ? 'badge-complete' : '',
+                        'title' => 'Checklist items done',
+                    ];
+                }
+
+                return ['cardBadges' => $badges];
+            });
+        });
+    }
+
+    public function routes(Router $router): void
+    {
+        $router->group([Authenticate::class], function (Router $router): void {
+            $router->post('/cards/{card:ulid}/checklists', [ChecklistController::class, 'store']);
+            $router->post('/checklists/{id}', [ChecklistController::class, 'rename']);
+            $router->post('/checklists/{id}/delete', [ChecklistController::class, 'destroy']);
+            $router->post('/checklists/{id}/items', [ChecklistController::class, 'addItem']);
+            $router->post('/checklist-items/{id}', [ChecklistController::class, 'updateItem']);
+            $router->post('/checklist-items/{id}/toggle', [ChecklistController::class, 'toggleItem']);
+            $router->post('/checklist-items/{id}/move', [ChecklistController::class, 'moveItem']);
+            $router->post('/checklist-items/{id}/delete', [ChecklistController::class, 'destroyItem']);
+        });
+    }
+
+    public function listeners(EventBus $events, Container $container): void
+    {
+    }
+
+    public function migrationsPath(): ?string
+    {
+        return __DIR__ . '/Infrastructure/Migrations';
+    }
+}

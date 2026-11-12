@@ -50,15 +50,7 @@
         if (event.key === 'Escape') closeMenus(null);
     });
 
-    /* ---------- board: drag and drop ----------
-     * The server only needs the item's new neighbour: "put it after X".
-     * It computes one ordering key and writes one row, so a drop is cheap
-     * however long the list is. If the request fails, reload to show the
-     * true order rather than a guess.
-     */
-
-    const lists = $('.js-lists');
-    if (!lists) return;
+    /* ---------- fetch helper ---------- */
 
     async function post(url, fields) {
         const body = new FormData();
@@ -76,10 +68,11 @@
         return json;
     }
 
-    const refreshCounts = () => $$('.list[data-list-id]', lists).forEach((list) => {
-        const count = $('.count', list);
-        if (count) count.textContent = $$('.card-tile', list).length;
-    });
+    /** If a save fails, reload to show the true order rather than a guess. */
+    const failed = (error) => {
+        toast(error.message);
+        setTimeout(() => window.location.reload(), 900);
+    };
 
     /** The element the dragged item should go before, from the pointer position. */
     function insertBefore(container, selector, pointer, axis) {
@@ -91,65 +84,116 @@
         }) || null;
     }
 
-    let dragged = null;
+    /* ---------- drag and drop ----------
+     * The server only needs the item's new neighbour: "put it after X".
+     * It computes one ordering key and writes one row, so a drop is cheap
+     * however long the list is.
+     */
+
+    /**
+     * Vertical sorting of `item` elements across `zone` containers inside root.
+     * onDrop(element, zone, previousItem) saves the new place and returns a promise.
+     */
+    function sortable(root, { item, zone, onDrop }) {
+        let dragged = null;
+
+        root.addEventListener('dragstart', (event) => {
+            const el = event.target.closest(item + '[draggable="true"]');
+            if (!el || !root.contains(el)) return;
+            dragged = el;
+            el.classList.add('is-dragging');
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', '');
+        });
+
+        root.addEventListener('dragend', () => {
+            if (dragged) dragged.classList.remove('is-dragging');
+            $$(zone + '.is-over', root).forEach((el) => el.classList.remove('is-over'));
+            dragged = null;
+        });
+
+        root.addEventListener('dragover', (event) => {
+            if (!dragged) return;
+            const target = event.target.closest(zone);
+            if (!target || !root.contains(target)) return;
+            event.preventDefault();
+            $$(zone + '.is-over', root).forEach((el) => { if (el !== target) el.classList.remove('is-over'); });
+            target.classList.add('is-over');
+            target.insertBefore(dragged, insertBefore(target, item, event.clientY, 'y'));
+        });
+
+        root.addEventListener('drop', (event) => {
+            if (!dragged) return;
+            event.preventDefault();
+            const el = dragged;
+            const before = el.previousElementSibling;
+            onDrop(el, el.closest(zone), before && before.matches(item) ? before : null).catch(failed);
+        });
+    }
+
+    /* Checklist items, within and between the checklists of a card. */
+    const checklists = $('#checklists');
+    if (checklists) {
+        sortable(checklists, {
+            item: '.checklist-item',
+            zone: '.js-items',
+            onDrop: (el, zone, previous) => post(el.dataset.moveUrl, {
+                checklist_id: zone.dataset.checklistId,
+                after_id: previous ? previous.dataset.itemId : '',
+            }),
+        });
+    }
+
+    /* Board: cards between lists, and the lists themselves. */
+    const lists = $('.js-lists');
+    if (!lists) return;
+
+    const refreshCounts = () => $$('.list[data-list-id]', lists).forEach((list) => {
+        const count = $('.count', list);
+        if (count) count.textContent = $$('.card-tile', list).length;
+    });
+
+    sortable(lists, {
+        item: '.card-tile',
+        zone: '.js-cards',
+        onDrop: async (el, zone, previous) => {
+            await post(el.dataset.moveUrl, {
+                list_id: zone.dataset.listId,
+                after_id: previous ? previous.dataset.cardId : '',
+            });
+            refreshCounts();
+        },
+    });
+
+    let draggedList = null;
 
     lists.addEventListener('dragstart', (event) => {
-        const card = event.target.closest('.card-tile[draggable="true"]');
-        const list = card ? null : event.target.closest('.list[draggable="true"]');
-        dragged = card || list;
-        if (!dragged) return;
-
-        dragged.classList.add('is-dragging');
+        if (event.target.closest('.card-tile')) return;
+        draggedList = event.target.closest('.list[draggable="true"]');
+        if (!draggedList) return;
+        draggedList.classList.add('is-dragging');
         event.dataTransfer.effectAllowed = 'move';
         event.dataTransfer.setData('text/plain', '');
     });
 
     lists.addEventListener('dragend', () => {
-        if (dragged) dragged.classList.remove('is-dragging');
-        $$('.is-over', lists).forEach((el) => el.classList.remove('is-over'));
-        dragged = null;
+        if (draggedList) draggedList.classList.remove('is-dragging');
+        draggedList = null;
     });
 
     lists.addEventListener('dragover', (event) => {
-        if (!dragged) return;
-
-        if (dragged.matches('.card-tile')) {
-            const zone = event.target.closest('.js-cards');
-            if (!zone) return;
-            event.preventDefault();
-            $$('.js-cards.is-over', lists).forEach((el) => {
-                if (el !== zone) el.classList.remove('is-over');
-            });
-            zone.classList.add('is-over');
-            zone.insertBefore(dragged, insertBefore(zone, '.card-tile', event.clientY, 'y'));
-        } else {
-            event.preventDefault();
-            const before = insertBefore(lists, '.list[data-list-id]', event.clientX, 'x') || $('.list-new', lists);
-            lists.insertBefore(dragged, before);
-        }
+        if (!draggedList) return;
+        event.preventDefault();
+        const before = insertBefore(lists, '.list[data-list-id]', event.clientX, 'x') || $('.list-new', lists);
+        lists.insertBefore(draggedList, before);
     });
 
-    lists.addEventListener('drop', async (event) => {
-        if (!dragged) return;
+    lists.addEventListener('drop', (event) => {
+        if (!draggedList) return;
         event.preventDefault();
-        const item = dragged;
-        const previous = item.previousElementSibling;
-
-        try {
-            if (item.matches('.card-tile')) {
-                await post(item.dataset.moveUrl, {
-                    list_id: item.closest('.js-cards').dataset.listId,
-                    after_id: previous ? previous.dataset.cardId : '',
-                });
-                refreshCounts();
-            } else {
-                await post(item.dataset.moveUrl, {
-                    after_id: previous && previous.dataset.listId ? previous.dataset.listId : '',
-                });
-            }
-        } catch (error) {
-            toast(error.message);
-            setTimeout(() => window.location.reload(), 900);
-        }
+        const previous = draggedList.previousElementSibling;
+        post(draggedList.dataset.moveUrl, {
+            after_id: previous && previous.dataset.listId ? previous.dataset.listId : '',
+        }).catch(failed);
     });
 })();

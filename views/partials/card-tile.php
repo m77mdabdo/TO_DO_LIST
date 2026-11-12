@@ -4,6 +4,7 @@
  * @var \App\Modules\Card\Contract\CardSummary $card
  * @var list<\App\Modules\Label\Contract\Label> $labels
  * @var list<\App\Modules\Identity\Contract\User> $members
+ * @var list<array{icon: string, text: string, class: string, title: string}> $badges
  * @var bool $canMove
  * @var bool $canEdit
  * @var \DateTimeImmutable $today
@@ -35,6 +36,9 @@ $dueClass = match (true) {
         <?php if ($due !== null): ?>
             <span class="due <?= $dueClass ?>"><?= $this->icon('calendar') ?><?= $this->e($due) ?></span>
         <?php endif; ?>
+        <?php foreach ($badges as $badge): ?>
+            <span class="badge <?= $this->e($badge['class']) ?>" title="<?= $this->te($badge['title']) ?>"><?= $this->icon($badge['icon']) ?><?= $this->e($badge['text']) ?></span>
+        <?php endforeach; ?>
         <?php if ($card->description): ?>
             <span class="muted" title="<?= $this->te('Has a description') ?>"><?= $this->icon('edit') ?></span>
         <?php endif; ?>
