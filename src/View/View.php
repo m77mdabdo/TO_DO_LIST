@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\View;
 
 use App\Http\Url;
+use App\I18n\Translator;
 use App\Security\Csrf;
 use App\Session\Session;
 use RuntimeException;
@@ -24,6 +25,7 @@ final class View
         private Csrf $csrf,
         private Session $session,
         public readonly FormState $form,
+        private ?Translator $translator = null,
     ) {
     }
 
@@ -49,6 +51,39 @@ final class View
     public function e(mixed $value): string
     {
         return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
+
+    /**
+     * Translated text, NOT escaped: wrap it in e() when printing.
+     *
+     * @param array<string, string|int> $replace
+     */
+    public function t(string $text, array $replace = []): string
+    {
+        return $this->translator?->t($text, $replace) ?? strtr($text, array_combine(
+            array_map(static fn ($k) => ':' . $k, array_keys($replace)),
+            array_map('strval', $replace),
+        ) ?: []);
+    }
+
+    /**
+     * Translated and HTML-escaped, the common case in templates.
+     *
+     * @param array<string, string|int> $replace
+     */
+    public function te(string $text, array $replace = []): string
+    {
+        return $this->e($this->t($text, $replace));
+    }
+
+    public function locale(): string
+    {
+        return $this->translator?->locale() ?? 'en';
+    }
+
+    public function direction(): string
+    {
+        return $this->translator?->direction() ?? 'ltr';
     }
 
     public function url(string $path = '/'): string

@@ -12,6 +12,6 @@ final class Max implements Rule
     {
         $max = (int) ($params[0] ?? 255);
 
-        return mb_strlen((string) $value) <= $max ? null : "$label may not be longer than $max characters.";
+        return mb_strlen((string) $value) <= $max ? null : ":label may not be longer than :param characters.";
     }
 }

@@ -24,13 +24,14 @@ final class App
     public readonly Container $container;
     public readonly ArraySession $session;
 
-    public function __construct(string $now = '2026-01-20 10:00:00')
+    public function __construct(string $now = '2026-01-20 10:00:00', string $locale = 'en')
     {
         $boot = require BASE_PATH . '/bootstrap/app.php';
         $this->session = new ArraySession();
         $this->container = $boot(new Config([
             'app_name' => 'Todo Board',
             'timezone' => 'Asia/Riyadh',
+            'locale'   => $locale,
             'db'       => ['driver' => 'sqlite', 'sqlite_path' => ':memory:'],
         ]), $this->session);
         $this->container->singleton(Clock::class, fn () => new FrozenClock($now));

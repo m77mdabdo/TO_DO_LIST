@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Validation;
 
+use App\I18n\Translator;
 use App\Validation\Rules;
 use InvalidArgumentException;
 
@@ -21,7 +22,7 @@ final class Validator
     /** @var array<string, Rule> */
     private array $rules = [];
 
-    public function __construct()
+    public function __construct(private ?Translator $translator = null)
     {
         $this->extend('required', new Rules\Required())
             ->extend('text', new Rules\Text())
@@ -72,7 +73,7 @@ final class Validator
             $error = $this->rule($name)->check($label, $value, $params);
 
             if ($error !== null) {
-                return $error;
+                return $this->message($error, $label, $params);
             }
         }
 
@@ -90,5 +91,13 @@ final class Validator
     private function rule(string $name): Rule
     {
         return $this->rules[$name] ?? throw new InvalidArgumentException("Unknown validation rule [$name].");
+    }
+
+    /** @param list<string> $params */
+    private function message(string $template, string $label, array $params): string
+    {
+        $replace = ['label' => $this->translator?->t($label) ?? $label, 'param' => $params[0] ?? ''];
+
+        return $this->translator?->t($template, $replace) ?? strtr($template, [':label' => $replace['label'], ':param' => $replace['param']]);
     }
 }
