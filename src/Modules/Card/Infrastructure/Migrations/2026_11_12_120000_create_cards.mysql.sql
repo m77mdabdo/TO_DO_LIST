@@ -1,0 +1,22 @@
+CREATE TABLE cards (
+    id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    public_id    CHAR(26)     NOT NULL UNIQUE,
+    board_id     INT UNSIGNED NOT NULL,
+    list_id      INT UNSIGNED NOT NULL,
+    title        VARCHAR(200) NOT NULL,
+    description  TEXT NULL,
+    position     VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    start_at     DATETIME NULL,
+    due_at       DATETIME NULL,
+    completed_at DATETIME NULL,
+    archived_at  DATETIME NULL,
+    created_by   INT UNSIGNED NOT NULL,
+    created_at   DATETIME NOT NULL,
+    updated_at   DATETIME NOT NULL,
+    KEY idx_cards_list_position (list_id, position),
+    KEY idx_cards_board (board_id, archived_at),
+    KEY idx_cards_due (due_at),
+    FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE,
+    FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
