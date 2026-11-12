@@ -17,6 +17,8 @@ use App\Modules\Card\Contract\Events\CardMemberChanged;
 use App\Modules\Identity\Contract\UserDirectory;
 use App\Modules\Card\Contract\Events\CardMoved;
 use App\Modules\Checklist\Contract\Events\ChecklistChanged;
+use App\Modules\Discussion\Contract\Events\CommentPosted;
+use App\Modules\Discussion\Contract\Events\VoteChanged;
 use App\Modules\Label\Contract\Events\LabelAttached;
 use App\Modules\Label\Contract\Events\LabelDetached;
 use App\Shared\Events\DomainEvent;
@@ -39,6 +41,7 @@ final class ActivityRecorder
             BoardCreated::name(), BoardChanged::name(), ListCreated::name(), ListChanged::name(),
             CardCreated::name(), CardChanged::name(), CardMoved::name(), CardMemberChanged::name(), CardDeleted::name(),
             LabelAttached::name(), LabelDetached::name(), ChecklistChanged::name(),
+            CommentPosted::name(), VoteChanged::name(),
         ];
     }
 
@@ -62,6 +65,9 @@ final class ActivityRecorder
             $event instanceof LabelAttached => $this->log->record($event->boardId, $event->cardId, $event->actorId, 'label.attached', $event->labelName),
             $event instanceof LabelDetached => $this->log->record($event->boardId, $event->cardId, $event->actorId, 'label.detached', $event->labelName),
             $event instanceof ChecklistChanged => $this->log->record($event->boardId, $event->cardId, $event->actorId, 'checklist.' . $event->change, $event->subject, ['card' => $event->cardTitle]),
+            $event instanceof CommentPosted => $this->log->record($event->boardId, $event->cardId, $event->actorId, 'comment.posted', $event->cardTitle),
+            // Taking a vote back isn't worth a line in the history.
+            $event instanceof VoteChanged   => $event->added ? $this->log->record($event->boardId, $event->cardId, $event->actorId, 'vote.added', $event->cardTitle) : null,
             default => null,
         };
     }

@@ -79,6 +79,7 @@ final class CardController extends Controller
             'activity'    => $activity,
             'people'      => $this->users->findMany([...array_keys($audience), ...array_map(static fn ($a) => $a->actorId, $activity)]),
             'audience'    => $audience,
+            'query'       => ['comments_before' => $request->input('comments_before')],
             'assigned'    => $assigned,
         ]);
     }

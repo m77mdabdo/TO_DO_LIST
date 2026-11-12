@@ -11,6 +11,7 @@
  * @var array<int, \App\Modules\Identity\Contract\User> $people
  * @var array<int, \App\Modules\Access\Contract\BoardRole> $audience user id => role on the board
  * @var list<int> $assigned
+ * @var array<string, string> $query
  */
 use App\Modules\Access\Contract\Permission;
 use App\Modules\Label\Contract\Label;
@@ -84,7 +85,7 @@ $editErrors = $form->error('title') || $form->error('description') || $form->err
                 </details>
             <?php endif; ?>
 
-            <?= $this->slot('card.main', ['card' => $card, 'board' => $board, 'role' => $role]) ?>
+            <?= $this->slot('card.main', ['card' => $card, 'board' => $board, 'role' => $role, 'query' => $query]) ?>
 
             <?php if ($activity): ?>
                 <div>
@@ -99,6 +100,8 @@ $editErrors = $form->error('title') || $form->error('description') || $form->err
         </section>
 
         <aside class="card-side stack">
+            <?= $this->slot('card.side', ['card' => $card, 'board' => $board, 'role' => $role]) ?>
+
             <section class="card stack">
                 <h2 class="section-title"><?= $this->icon('users') ?> <?= $this->te('Members') ?></h2>
                 <?php if ($assigned): ?>
