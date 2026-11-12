@@ -19,6 +19,23 @@ interface CardQueries
      */
     public function openCardsByList(int $boardId): array;
 
+    /**
+     * Who is assigned to each card, in one query.
+     *
+     * @param list<int> $cardIds
+     * @return array<int, list<int>> card id => user ids
+     */
+    public function membersForCards(array $cardIds): array;
+
+    /**
+     * Open cards on these boards whose title or description contains $text,
+     * most recently changed first. The caller passes only boards the user may see.
+     *
+     * @param list<int> $boardIds
+     * @return list<CardSummary>
+     */
+    public function search(array $boardIds, string $text, int $limit = 50): array;
+
     /** @return list<CardSummary> */
     public function archivedCards(int $boardId): array;
 }

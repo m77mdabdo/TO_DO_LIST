@@ -9,6 +9,10 @@
  * @var list<\App\Modules\Label\Contract\Label> $cardLabels
  * @var list<\App\Modules\Activity\Contract\ActivityEntry> $activity
  * @var array<int, \App\Modules\Identity\Contract\User> $people
+ * @var array<int, \App\Modules\Access\Contract\BoardRole> $audience user id => role on the board
+ * @var list<int> $assigned
+ * @var array<string, string> $query
+ * @var bool $moreActivity
  */
 use App\Modules\Access\Contract\Permission;
 use App\Modules\Label\Contract\Label;
@@ -27,6 +31,7 @@ foreach ($lists as $list) {
 }
 $form = $this->form;
 $cardPath = '/cards/' . $card->publicId;
+$editErrors = $form->error('title') || $form->error('description') || $form->error('start_date') || $form->error('due_date');
 ?>
 <?= $this->partial('partials/app-header') ?>
 <main class="wrap card-page">
@@ -39,40 +44,107 @@ $cardPath = '/cards/' . $card->publicId;
                 <?php if ($card->isComplete()): ?><span class="pill pill-done"><?= $this->icon('check') ?><?= $this->te('Done') ?></span><?php endif; ?>
             </p>
 
-            <?php if ($canEdit): ?>
-                <form action="<?= $this->url($cardPath) ?>" method="post" class="stack" novalidate>
-                    <?= $this->csrfField() ?>
-                    <label><span><?= $this->te('Title') ?></span>
-                        <input name="title" required maxlength="200" dir="auto" value="<?= $this->e($form->old('title', $card->title)) ?>"
-                               aria-invalid="<?= $form->error('title') ? 'true' : 'false' ?>">
-                        <?= $this->partial('partials/field-error', ['field' => 'title']) ?></label>
-                    <label><span><?= $this->te('Description') ?></span>
-                        <textarea name="description" rows="6" maxlength="10000" dir="auto"><?= $this->e($form->old('description', (string) $card->description)) ?></textarea>
-                        <?= $this->partial('partials/field-error', ['field' => 'description']) ?></label>
-                    <label class="narrow-field"><span><?= $this->te('Due date') ?></span>
-                        <input type="date" name="due_date" value="<?= $this->e($form->old('due_date', (string) $card->dueDate())) ?>">
-                        <?= $this->partial('partials/field-error', ['field' => 'due_date']) ?></label>
-                    <div><button class="btn btn-primary" type="submit"><?= $this->te('Save') ?></button></div>
-                </form>
-            <?php else: ?>
-                <h1 dir="auto"><?= $this->e($card->title) ?></h1>
-                <?php if ($card->description): ?><p class="card-description" dir="auto"><?= nl2br($this->e($card->description)) ?></p><?php endif; ?>
-                <?php if ($card->dueDate()): ?><p><span class="due"><?= $this->icon('calendar') ?><?= $this->e($card->dueDate()) ?></span></p><?php endif; ?>
+            <?php if (!$canEdit || !$editErrors): ?>
+                <h1 class="card-heading" dir="auto"><?= $this->e($card->title) ?></h1>
+                <?php if ($card->startDate() || $card->dueDate()): ?>
+                    <p class="date-range">
+                        <?php if ($card->startDate()): ?><span class="due"><?= $this->te('Starts') ?> <?= $this->e($card->startDate()) ?></span><?php endif; ?>
+                        <?php if ($card->dueDate()): ?><span class="due"><?= $this->icon('calendar') ?><?= $this->e($card->dueDate()) ?></span><?php endif; ?>
+                    </p>
+                <?php endif; ?>
+                <?php if ($card->description): ?>
+                    <div class="prose" dir="auto"><?= $this->markdown($card->description) ?></div>
+                <?php elseif (!$canEdit): ?>
+                    <p class="muted"><?= $this->te('No description.') ?></p>
+                <?php endif; ?>
             <?php endif; ?>
 
+            <?php if ($canEdit): ?>
+                <details class="edit-card js-edit-card" <?= $editErrors || !$card->description ? 'open' : '' ?>>
+                    <summary class="btn btn-ghost"><?= $this->icon('edit') ?><?= $this->te('Edit card') ?></summary>
+                    <form action="<?= $this->url($cardPath) ?>" method="post" class="stack" novalidate>
+                        <?= $this->csrfField() ?>
+                        <label><span><?= $this->te('Title') ?></span>
+                            <input name="title" required maxlength="200" dir="auto" value="<?= $this->e($form->old('title', $card->title)) ?>"
+                                   aria-invalid="<?= $form->error('title') ? 'true' : 'false' ?>">
+                            <?= $this->partial('partials/field-error', ['field' => 'title']) ?></label>
+                        <label><span><?= $this->te('Description') ?></span>
+                            <textarea name="description" rows="7" maxlength="10000" dir="auto" class="js-description"><?= $this->e($form->old('description', (string) $card->description)) ?></textarea>
+                            <small class="muted"><?= $this->te('Markdown works: **bold**, *italic*, - lists, [links](https://…), `code`.') ?></small>
+                            <?= $this->partial('partials/field-error', ['field' => 'description']) ?></label>
+                        <div class="field-row">
+                            <label><span><?= $this->te('Start date') ?></span>
+                                <input type="date" name="start_date" value="<?= $this->e($form->old('start_date', (string) $card->startDate())) ?>"
+                                       aria-invalid="<?= $form->error('start_date') ? 'true' : 'false' ?>">
+                                <?= $this->partial('partials/field-error', ['field' => 'start_date']) ?></label>
+                            <label><span><?= $this->te('Due date') ?></span>
+                                <input type="date" name="due_date" value="<?= $this->e($form->old('due_date', (string) $card->dueDate())) ?>">
+                                <?= $this->partial('partials/field-error', ['field' => 'due_date']) ?></label>
+                        </div>
+                        <div><button class="btn btn-primary" type="submit"><?= $this->te('Save') ?></button></div>
+                    </form>
+                </details>
+            <?php endif; ?>
+
+            <?= $this->slot('card.main', ['card' => $card, 'board' => $board, 'role' => $role, 'query' => $query]) ?>
+
             <?php if ($activity): ?>
-                <div>
+                <div id="activity">
                     <h2 class="section-title"><?= $this->icon('activity') ?> <?= $this->te('Activity') ?></h2>
                     <ul class="activity-list">
                         <?php foreach ($activity as $entry): ?>
                             <?= $this->partial('partials/activity-item', ['entry' => $entry, 'people' => $people]) ?>
                         <?php endforeach; ?>
                     </ul>
+                    <?php if ($moreActivity): ?>
+                        <a class="btn btn-ghost" href="<?= $this->url($cardPath . '?activity_before=' . end($activity)->id . '#activity') ?>"><?= $this->te('Older activity') ?></a>
+                    <?php endif; ?>
                 </div>
             <?php endif; ?>
         </section>
 
         <aside class="card-side stack">
+            <?= $this->slot('card.side', ['card' => $card, 'board' => $board, 'role' => $role]) ?>
+
+            <section class="card stack">
+                <h2 class="section-title"><?= $this->icon('users') ?> <?= $this->te('Members') ?></h2>
+                <?php if ($assigned): ?>
+                    <ul class="people-list">
+                        <?php foreach ($assigned as $memberId): ?>
+                            <?php $person = $people[$memberId] ?? null; if ($person === null) continue; ?>
+                            <li>
+                                <span class="avatar avatar-sm" aria-hidden="true"><?= $this->e(mb_strtoupper(mb_substr($person->name, 0, 1))) ?></span>
+                                <bdi><?= $this->e($person->name) ?></bdi>
+                                <?php if ($canEdit): ?>
+                                    <form action="<?= $this->url($cardPath . '/members') ?>" method="post">
+                                        <?= $this->csrfField() ?>
+                                        <input type="hidden" name="user_id" value="<?= $memberId ?>">
+                                        <button class="icon-btn" type="submit" title="<?= $this->te('Remove from card') ?>" aria-label="<?= $this->te('Remove from card') ?>"><?= $this->icon('close') ?></button>
+                                    </form>
+                                <?php endif; ?>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php else: ?>
+                    <p class="muted small"><?= $this->te('Nobody is assigned yet.') ?></p>
+                <?php endif; ?>
+                <?php $unassigned = array_diff(array_keys($audience), $assigned); ?>
+                <?php if ($canEdit && $unassigned): ?>
+                    <form action="<?= $this->url($cardPath . '/members') ?>" method="post" class="inline-form">
+                        <?= $this->csrfField() ?>
+                        <select name="user_id" aria-label="<?= $this->te('Assign someone') ?>">
+                            <?php foreach ($unassigned as $userId): ?>
+                                <?php if (isset($people[$userId])): ?>
+                                    <option value="<?= $userId ?>"><?= $this->e($people[$userId]->name) ?></option>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </select>
+                        <button class="btn btn-ghost" type="submit"><?= $this->icon('plus') ?><?= $this->te('Assign') ?></button>
+                    </form>
+                    <?= $this->partial('partials/field-error', ['field' => 'member']) ?>
+                <?php endif; ?>
+            </section>
+
             <section class="card stack">
                 <h2 class="section-title"><?= $this->icon('tag') ?> <?= $this->te('Labels') ?></h2>
                 <div class="label-picker">

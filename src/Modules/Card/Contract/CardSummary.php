@@ -20,6 +20,7 @@ final class CardSummary
         public readonly ?string $completedAt,
         public readonly bool $archived,
         public readonly string $createdAt,
+        public readonly ?string $startAt = null,
     ) {
     }
 
@@ -38,6 +39,7 @@ final class CardSummary
             $row['completed_at'] !== null ? (string) $row['completed_at'] : null,
             $row['archived_at'] !== null,
             (string) $row['created_at'],
+            isset($row['start_at']) ? (string) $row['start_at'] : null,
         );
     }
 
@@ -50,6 +52,12 @@ final class CardSummary
     public function dueDate(): ?string
     {
         return $this->dueAt !== null ? substr($this->dueAt, 0, 10) : null;
+    }
+
+    /** Start date as Y-m-d. */
+    public function startDate(): ?string
+    {
+        return $this->startAt !== null ? substr($this->startAt, 0, 10) : null;
     }
 
     public function isOverdue(DateTimeImmutable $today): bool

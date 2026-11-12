@@ -13,10 +13,10 @@ use PDO;
 
 final class PdoCardRepository implements CardRepository
 {
-    private const COLUMNS = 'id, public_id, board_id, list_id, title, description, position, due_at, completed_at, archived_at, created_at';
+    private const COLUMNS = 'id, public_id, board_id, list_id, title, description, position, start_at, due_at, completed_at, archived_at, created_at';
 
     /** Columns update() may write: an allow-list, never names from the request. */
-    private const UPDATABLE = ['title', 'description', 'due_at', 'completed_at', 'list_id', 'position'];
+    private const UPDATABLE = ['title', 'description', 'start_at', 'due_at', 'completed_at', 'list_id', 'position'];
 
     private OrderedRows $order;
 
@@ -95,12 +95,75 @@ final class PdoCardRepository implements CardRepository
         return $byList;
     }
 
+    public function search(array $boardIds, string $text, int $limit): array
+    {
+        // LIKE wildcards in the user's text are escaped with "!" (portable across SQLite and MySQL).
+        $pattern = '%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $text) . '%';
+        $marks = implode(', ', array_fill(0, count($boardIds), '?'));
+        $limit = (int) $limit;
+
+        // board_id IN (...) uses idx_cards_board; the text match then runs on those boards' cards only.
+        $stmt = $this->db->prepare('SELECT ' . self::COLUMNS . " FROM cards
+            WHERE board_id IN ($marks) AND archived_at IS NULL
+              AND (title LIKE ? ESCAPE '!' OR description LIKE ? ESCAPE '!')
+            ORDER BY updated_at DESC, id DESC LIMIT $limit");
+        $stmt->execute([...array_values($boardIds), $pattern, $pattern]);
+
+        return array_map([CardSummary::class, 'fromRow'], $stmt->fetchAll());
+    }
+
     public function archivedCards(int $boardId): array
     {
         $stmt = $this->db->prepare('SELECT ' . self::COLUMNS . ' FROM cards WHERE board_id = ? AND archived_at IS NOT NULL ORDER BY archived_at DESC, id DESC');
         $stmt->execute([$boardId]);
 
         return array_map([CardSummary::class, 'fromRow'], $stmt->fetchAll());
+    }
+
+    public function membersOf(int $cardId): array
+    {
+        return $this->membersForCards([$cardId])[$cardId] ?? [];
+    }
+
+    public function membersForCards(array $cardIds): array
+    {
+        if ($cardIds === []) {
+            return [];
+        }
+
+        // One query for any number of cards; grouped in a hash map (no N+1).
+        $marks = implode(', ', array_fill(0, count($cardIds), '?'));
+        $stmt = $this->db->prepare("SELECT card_id, user_id FROM card_members WHERE card_id IN ($marks) ORDER BY created_at, user_id");
+        $stmt->execute(array_values($cardIds));
+
+        $byCard = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $byCard[(int) $row['card_id']][] = (int) $row['user_id'];
+        }
+
+        return $byCard;
+    }
+
+    public function addMember(int $cardId, int $userId): bool
+    {
+        $exists = $this->db->prepare('SELECT 1 FROM card_members WHERE card_id = ? AND user_id = ?');
+        $exists->execute([$cardId, $userId]);
+        if ($exists->fetchColumn()) {
+            return false;
+        }
+
+        $this->db->prepare('INSERT INTO card_members (card_id, user_id, created_at) VALUES (?, ?, ?)')
+            ->execute([$cardId, $userId, $this->now()]);
+
+        return true;
+    }
+
+    public function removeMember(int $cardId, int $userId): bool
+    {
+        $stmt = $this->db->prepare('DELETE FROM card_members WHERE card_id = ? AND user_id = ?');
+        $stmt->execute([$cardId, $userId]);
+
+        return $stmt->rowCount() > 0;
     }
 
     public function positionAfter(int $listId, ?int $afterCardId, ?int $movingId = null): string

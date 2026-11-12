@@ -9,12 +9,15 @@
  * @var list<\App\Modules\Label\Contract\Label> $boardLabels
  * @var list<\App\Modules\Activity\Contract\ActivityEntry> $activity
  * @var array<int, \App\Modules\Identity\Contract\User> $people
+ * @var array<int, list<int>> $cardMembers card id => assigned user ids
+ * @var array<int, list<array{icon: string, text: string, class: string, title: string}>> $cardBadges added by other modules
  * @var \DateTimeImmutable $today
  */
 use App\Modules\Access\Contract\Permission;
 use App\Modules\Board\Contract\BoardSummary;
 
 $open = !$board->archived;
+$cardBadges ??= [];
 $canEdit = $open && $role->allows(Permission::EditCards);
 $canMove = $open && $role->allows(Permission::MoveCards);
 $canArchive = $open && $role->allows(Permission::ArchiveItems);
@@ -51,6 +54,21 @@ $form = $this->form;
                                     <option value="private" <?= $board->visibility->value === 'private' ? 'selected' : '' ?>><?= $this->te('Private: only board members') ?></option>
                                     <option value="workspace" <?= $board->visibility->value === 'workspace' ? 'selected' : '' ?>><?= $this->te('Workspace: every member can view') ?></option>
                                 </select></label>
+                            <?php $choices = ['off' => 'Nobody', 'members' => 'Board members (not viewers)', 'everyone' => 'Everyone who can see the board']; ?>
+                            <div class="field-row">
+                                <label><span><?= $this->te('Who can comment') ?></span>
+                                    <select name="commenting">
+                                        <?php foreach ($choices as $value => $text): ?>
+                                            <option value="<?= $value ?>" <?= $board->commenting->value === $value ? 'selected' : '' ?>><?= $this->te($text) ?></option>
+                                        <?php endforeach; ?>
+                                    </select></label>
+                                <label><span><?= $this->te('Who can vote') ?></span>
+                                    <select name="voting">
+                                        <?php foreach ($choices as $value => $text): ?>
+                                            <option value="<?= $value ?>" <?= $board->voting->value === $value ? 'selected' : '' ?>><?= $this->te($text) ?></option>
+                                        <?php endforeach; ?>
+                                    </select></label>
+                            </div>
                             <fieldset class="swatches">
                                 <legend><?= $this->te('Color') ?></legend>
                                 <?php foreach (BoardSummary::COLORS as $color): ?>
@@ -72,6 +90,10 @@ $form = $this->form;
             </details>
         <?php endif; ?>
     </div>
+</div>
+
+<div class="board-tools">
+    <?= $this->partial('boards/filters', compact('board', 'filter', 'boardLabels', 'audience', 'people', 'totalCards', 'shownCards')) ?>
 </div>
 
 <?php if (!$open): ?>
@@ -138,6 +160,8 @@ $form = $this->form;
                     <?php foreach ($cards as $card): ?>
                         <?= $this->partial('partials/card-tile', [
                             'card' => $card, 'labels' => $cardLabels[$card->id] ?? [], 'canMove' => $canMove, 'canEdit' => $canEdit,
+                            'badges' => $cardBadges[$card->id] ?? [],
+                            'members' => array_values(array_filter(array_map(static fn (int $id) => $people[$id] ?? null, $cardMembers[$card->id] ?? []))),
                         ]) ?>
                     <?php endforeach; ?>
                 </div>
@@ -146,7 +170,7 @@ $form = $this->form;
                     <form class="add-card" action="<?= $this->url($base . '/cards') ?>" method="post">
                         <?= $this->csrfField() ?>
                         <input type="hidden" name="list_id" value="<?= $list->id ?>">
-                        <input name="title" required maxlength="200" dir="auto" placeholder="<?= $this->te('Add a card') ?>" aria-label="<?= $this->te('Add a card') ?>">
+                        <input name="title" required maxlength="200" dir="auto" class="js-add-card" placeholder="<?= $this->te('Add a card') ?>" aria-label="<?= $this->te('Add a card') ?>">
                         <button class="icon-btn" type="submit" title="<?= $this->te('Add card') ?>"><?= $this->icon('plus') ?></button>
                     </form>
                 <?php endif; ?>
@@ -176,6 +200,7 @@ $form = $this->form;
                     <?= $this->partial('partials/activity-item', ['entry' => $entry, 'people' => $people]) ?>
                 <?php endforeach; ?>
             </ul>
+            <a class="btn btn-ghost btn-block" href="<?= $this->url('/boards/' . $board->publicId . '/activity') ?>"><?= $this->te('All activity') ?></a>
         </aside>
     <?php endif; ?>
 </div>

@@ -21,7 +21,7 @@ use PDO;
 
 /**
  * Cards: create, edit, complete, move between lists, archive, delete.
- * Publishes: card.created, card.changed, card.moved, card.deleted.
+ * Publishes: card.created, card.changed, card.moved, card.member_changed, card.deleted.
  * Offers: Contract\CardQueries, Contract\CardWriter.
  */
 final class CardModule implements ModuleProvider
@@ -45,6 +45,7 @@ final class CardModule implements ModuleProvider
             $router->post('/boards/{board:ulid}/cards', [CardController::class, 'store']);
             $router->get('/cards/{card:ulid}', [CardController::class, 'show']);
             $router->post('/cards/{card:ulid}', [CardController::class, 'update']);
+            $router->post('/cards/{card:ulid}/members', [CardController::class, 'members']);
             $router->post('/cards/{card:ulid}/complete', [CardController::class, 'complete']);
             $router->post('/cards/{card:ulid}/move', [CardController::class, 'move']);
             $router->post('/cards/{card:ulid}/archive', [CardController::class, 'archive']);

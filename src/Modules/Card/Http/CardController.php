@@ -22,6 +22,8 @@ use App\View\View;
 
 final class CardController extends Controller
 {
+    private const ACTIVITY_PAGE = 20;
+
     public function __construct(
         View $view,
         Url $url,
@@ -64,7 +66,10 @@ final class CardController extends Controller
         $user = $this->user($request);
         [$card, $board] = $this->cards->cardFor($user->id, $params['card']);
         $role = $this->gate->roleOn($user->id, $board->id);
-        $activity = $role->allows(Permission::ViewActivity) ? $this->activity->forCard($card->id) : [];
+        $before = $request->input('activity_before');
+        $activity = $role->allows(Permission::ViewActivity) ? $this->activity->forCard($card->id, ctype_digit($before) ? (int) $before : null, self::ACTIVITY_PAGE) : [];
+        $audience = $this->gate->peopleOn($board->id);
+        $assigned = $this->cards->membersOf($card);
 
         return $this->render('cards/show', [
             'title'       => $card->title,
@@ -75,8 +80,34 @@ final class CardController extends Controller
             'boardLabels' => $this->labels->forBoard($board->id),
             'cardLabels'  => $this->labels->forCards([$card->id])[$card->id] ?? [],
             'activity'    => $activity,
-            'people'      => $this->users->findMany(array_map(static fn ($a) => $a->actorId, $activity)),
+            'people'      => $this->users->findMany([...array_keys($audience), ...array_map(static fn ($a) => $a->actorId, $activity)]),
+            'audience'    => $audience,
+            'moreActivity' => count($activity) === self::ACTIVITY_PAGE,
+            'query'       => ['comments_before' => $request->input('comments_before')],
+            'assigned'    => $assigned,
         ]);
+    }
+
+    /**
+     * Body: user_id. Assigns that person, or takes them off when already assigned.
+     *
+     * @param array{card: string} $params
+     */
+    public function members(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        [$card] = $this->cards->cardFor($user->id, $params['card'], Permission::EditCards);
+        $memberId = $request->input('user_id');
+
+        try {
+            $this->cards->toggleMember($user->id, $card, ctype_digit($memberId) ? (int) $memberId : 0);
+        } catch (ValidationException $e) {
+            return $this->backWithErrors($e, $request, '/cards/' . $card->publicId);
+        }
+
+        return $request->wantsJson()
+            ? Response::json(['ok' => true])
+            : $this->redirect('/cards/' . $card->publicId);
     }
 
     /** @param array{card: string} $params */
@@ -86,7 +117,7 @@ final class CardController extends Controller
         [$card] = $this->cards->cardFor($user->id, $params['card'], Permission::EditCards);
 
         try {
-            $this->cards->update($user->id, $card, $request->only(['title', 'description', 'due_date']));
+            $this->cards->update($user->id, $card, $request->only(['title', 'description', 'start_date', 'due_date']));
         } catch (ValidationException $e) {
             return $this->backWithErrors($e, $request, '/cards/' . $card->publicId);
         }

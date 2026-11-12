@@ -67,6 +67,30 @@ final class Gate implements AccessGate
         return $role;
     }
 
+    public function peopleOn(int $boardId): array
+    {
+        $board = $this->boards->find($boardId);
+        if ($board === null) {
+            return [];
+        }
+
+        $people = $this->members->membersOf($boardId);
+
+        foreach ($this->workspaces->members($board->workspaceId) as ['userId' => $userId, 'role' => $workspaceRole]) {
+            if ($workspaceRole->managesAllBoards()) {
+                $people[$userId] = BoardRole::Manager;
+            } elseif (!isset($people[$userId]) && $board->visibility === BoardVisibility::Workspace && $workspaceRole->isFullMember()) {
+                $people[$userId] = BoardRole::Viewer;
+            }
+        }
+
+        foreach ($people as $userId => $role) {
+            $this->cache[$userId . ':' . $boardId] = $role;
+        }
+
+        return $people;
+    }
+
     /** Called after membership changes so later checks in this request see them. */
     public function forget(int $userId, int $boardId): void
     {

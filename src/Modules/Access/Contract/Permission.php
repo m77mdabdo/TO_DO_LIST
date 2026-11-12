@@ -23,6 +23,7 @@ enum Permission: int
     case ManageSettings = 1 << 10; // name, privacy, archive the board
     case Export         = 1 << 11;
     case ViewActivity   = 1 << 12;
+    case ModerateComments = 1 << 13; // delete other people's comments
 
     /** @param list<self> $permissions */
     public static function mask(array $permissions): int

@@ -71,6 +71,70 @@ final class BoardPagesTest extends TestCase
         $this->assertTrue(str_contains($this->f->app->page('/boards/' . $this->f->board->publicId), 'label-red'));
     }
 
+    public function testAssigningSomeoneShowsThemOnTheCardAndTheBoard(): void
+    {
+        $this->f->app->post('/boards/' . $this->f->board->publicId . '/cards', ['list_id' => (string) $this->f->todo->id, 'title' => 'Draft']);
+        $card = $this->openCards()[$this->f->todo->id][0];
+
+        $this->f->app->post('/cards/' . $card->publicId . '/members', ['user_id' => (string) $this->f->owner]);
+
+        $this->assertTrue(str_contains($this->f->app->page('/cards/' . $card->publicId), 'Remove from card'));
+        $this->assertTrue(str_contains($this->f->app->page('/boards/' . $this->f->board->publicId), 'avatar-xs'));
+    }
+
+    public function testDescriptionIsRenderedAsSafeMarkdown(): void
+    {
+        $this->f->app->post('/boards/' . $this->f->board->publicId . '/cards', ['list_id' => (string) $this->f->todo->id, 'title' => 'Draft']);
+        $card = $this->openCards()[$this->f->todo->id][0];
+
+        $this->f->app->post('/cards/' . $card->publicId, ['title' => 'Draft', 'description' => "**Scope**\n<script>alert(1)</script>"]);
+
+        $html = $this->f->app->page('/cards/' . $card->publicId);
+        $this->assertTrue(str_contains($html, '<strong>Scope</strong>'));
+        $this->assertFalse(str_contains($html, '<script>alert'));
+    }
+
+    public function testChecklistShowsOnTheCardAndItsProgressOnTheBoard(): void
+    {
+        $this->f->app->post('/boards/' . $this->f->board->publicId . '/cards', ['list_id' => (string) $this->f->todo->id, 'title' => 'Draft']);
+        $card = $this->openCards()[$this->f->todo->id][0];
+
+        $this->f->app->post('/cards/' . $card->publicId . '/checklists', ['title' => 'Steps']);
+        $html = $this->f->app->page('/cards/' . $card->publicId);
+        $this->assertTrue(str_contains($html, 'Steps'));
+        preg_match('#/checklists/(\d+)/items#', $html, $m);
+
+        $this->f->app->post('/checklists/' . $m[1] . '/items', ['text' => 'Write intro']);
+        $this->f->app->post('/checklists/' . $m[1] . '/items', ['text' => 'Proofread']);
+        preg_match('#/checklist-items/(\d+)/toggle#', $this->f->app->page('/cards/' . $card->publicId), $item);
+        $toggle = $this->f->app->post('/checklist-items/' . $item[1] . '/toggle', [], json: true);
+
+        $this->assertSame(200, $toggle->status);
+        $this->assertTrue(str_contains($this->f->app->page('/boards/' . $this->f->board->publicId), '1/2'));
+    }
+
+    public function testCommentsAndVotesShowOnTheCardAndTheBoard(): void
+    {
+        $this->f->app->post('/boards/' . $this->f->board->publicId . '/cards', ['list_id' => (string) $this->f->todo->id, 'title' => 'Draft']);
+        $card = $this->openCards()[$this->f->todo->id][0];
+        $mona = $this->f->app->signUp('Mona Hassan', 'mona@example.com');
+        $this->f->app->container->get(\App\Modules\Access\Contract\BoardMembers::class)->add($this->f->board->id, $mona, \App\Modules\Access\Contract\BoardRole::Member);
+        $this->f->app->loginAs('sara@example.com');
+
+        $this->f->app->post('/cards/' . $card->publicId . '/comments', ['body' => 'Ready for @Mona? Thanks @Mona Hassan <img src=x onerror=alert(1)>']);
+        $this->f->app->post('/cards/' . $card->publicId . '/vote');
+
+        $html = $this->f->app->page('/cards/' . $card->publicId);
+        $this->assertTrue(str_contains($html, '<span class="mention">@Mona</span>?'));
+        $this->assertTrue(str_contains($html, '<span class="mention">@Mona Hassan</span>'));
+        $this->assertFalse(str_contains($html, '<img src=x'));
+        $this->assertTrue(str_contains($html, 'Remove my vote'));
+
+        $board = $this->f->app->page('/boards/' . $this->f->board->publicId);
+        $this->assertTrue(str_contains($board, 'title="Comments"'));
+        $this->assertTrue(str_contains($board, 'title="Votes"'));
+    }
+
     public function testOtherCompaniesGetNotFoundForBoardsAndCards(): void
     {
         $this->f->app->post('/boards/' . $this->f->board->publicId . '/cards', ['list_id' => (string) $this->f->todo->id, 'title' => 'Secret']);

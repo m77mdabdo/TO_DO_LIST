@@ -29,6 +29,18 @@ final class CardQueryService implements CardQueries
         return $this->cards->openCardsByList($boardId);
     }
 
+    public function membersForCards(array $cardIds): array
+    {
+        return $this->cards->membersForCards($cardIds);
+    }
+
+    public function search(array $boardIds, string $text, int $limit = 50): array
+    {
+        $text = trim($text);
+
+        return $boardIds === [] || mb_strlen($text) < 2 ? [] : $this->cards->search($boardIds, mb_substr($text, 0, 100), max(1, min($limit, 100)));
+    }
+
     public function archivedCards(int $boardId): array
     {
         return $this->cards->archivedCards($boardId);

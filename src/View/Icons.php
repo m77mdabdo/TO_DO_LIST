@@ -37,6 +37,12 @@ final class Icons
         'globe'    => '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
         'close'    => '<path d="M6 6l12 12M18 6 6 18"/>',
         'keyboard' => '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>',
+        'comment'  => '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-5.1A8 8 0 1 1 21 12z"/>',
+        'vote'     => '<path d="M7 11v9H4a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3zm0 0 4-8a2.5 2.5 0 0 1 2.5 2.5V9h5.2a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.5 20H7"/>',
+        'checklist' => '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="m8 12 3 3 5-6"/>',
+        'filter'   => '<path d="M4 5h16l-6 8v6l-4-2v-4z"/>',
+        'up'       => '<path d="m6 15 6-6 6 6"/>',
+        'down'     => '<path d="m6 9 6 6 6-6"/>',
     ];
 
     public static function svg(string $name, string $class = ''): string

@@ -15,6 +15,7 @@ use App\Modules\Card\Contract\CardWriter;
 use App\Modules\Card\Contract\Events\CardChanged;
 use App\Modules\Card\Contract\Events\CardCreated;
 use App\Modules\Card\Contract\Events\CardDeleted;
+use App\Modules\Card\Contract\Events\CardMemberChanged;
 use App\Modules\Card\Contract\Events\CardMoved;
 use App\Modules\Card\Domain\CardRepository;
 use App\Shared\Events\EventBus;
@@ -81,7 +82,7 @@ final class CardService implements CardWriter
         });
     }
 
-    /** @param array<string, mixed> $input title, description, due_date */
+    /** @param array<string, mixed> $input title, description, start_date, due_date */
     public function update(int $actorId, CardSummary $card, array $input): void
     {
         $this->gate->authorize($actorId, $card->boardId, Permission::EditCards);
@@ -89,18 +90,25 @@ final class CardService implements CardWriter
         $this->assertValid($input, [
             'title'       => ['Title', 'required|max:' . self::TITLE_MAX],
             'description' => ['Description', 'max:' . self::DESCRIPTION_MAX],
+            'start_date'  => ['Start date', 'date'],
             'due_date'    => ['Due date', 'date'],
         ]);
 
         $fields = [
             'title'       => trim((string) $input['title']),
             'description' => trim((string) ($input['description'] ?? '')) ?: null,
+            'start_at'    => array_key_exists('start_date', $input) ? self::dueAt((string) $input['start_date']) : $card->startAt,
             'due_at'      => self::dueAt((string) ($input['due_date'] ?? '')),
         ];
+
+        if ($fields['start_at'] !== null && $fields['due_at'] !== null && $fields['start_at'] > $fields['due_at']) {
+            throw new ValidationException(new ValidationResult(['start_date' => 'The start date must be on or before the due date.']));
+        }
 
         $changes = array_filter([
             'renamed'     => $fields['title'] !== $card->title ? ['from' => $card->title] : null,
             'described'   => $fields['description'] !== $card->description ? [] : null,
+            'start_changed' => $fields['start_at'] !== $card->startAt ? ['to' => $fields['start_at'] ? substr($fields['start_at'], 0, 10) : null] : null,
             'due_changed' => $fields['due_at'] !== $card->dueAt ? ['to' => $fields['due_at'] ? substr($fields['due_at'], 0, 10) : null] : null,
         ], static fn ($change) => $change !== null);
 
@@ -114,6 +122,37 @@ final class CardService implements CardWriter
             foreach ($changes as $change => $details) {
                 $this->events->publish(new CardChanged($card->id, $card->boardId, $actorId, $change, $fields['title'], $details, $this->clock->now()));
             }
+        });
+    }
+
+    /** @return list<int> user ids on the card */
+    public function membersOf(CardSummary $card): array
+    {
+        return $this->cards->membersOf($card->id);
+    }
+
+    /**
+     * Assigns $memberId to the card, or takes them off if already on it.
+     * Only people who can see the board can be assigned.
+     */
+    public function toggleMember(int $actorId, CardSummary $card, int $memberId): bool
+    {
+        $this->gate->authorize($actorId, $card->boardId, Permission::EditCards);
+        $this->assertBoardOpen($card->boardId);
+
+        return $this->transactions->run(function () use ($actorId, $card, $memberId): bool {
+            $added = !$this->cards->removeMember($card->id, $memberId);
+
+            if ($added) {
+                if (!$this->gate->can($memberId, $card->boardId, Permission::ViewBoard)) {
+                    throw new ValidationException(new ValidationResult(['member' => 'That person can\'t see this board.']));
+                }
+                $this->cards->addMember($card->id, $memberId);
+            }
+
+            $this->events->publish(new CardMemberChanged($card->id, $card->boardId, $actorId, $memberId, $added, $card->title, $this->clock->now()));
+
+            return $added;
         });
     }
 
