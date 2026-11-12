@@ -678,3 +678,15 @@ fieldset.stack-sm legend { padding: 0 .3rem; font-weight: 600; }
 .invite-page { text-align: center; }
 .invite-page .actions { display: flex; gap: .6rem; justify-content: center; flex-wrap: wrap; }
 .field-row-end { align-self: end; }
+.bell { position: relative; }
+.bell-count { position: absolute; top: -2px; inset-inline-end: -2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--coral); color: #fff; font-size: .7rem; font-weight: 700; line-height: 18px; text-align: center; }
+.notification-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .4rem; }
+.notification { position: relative; border-radius: var(--radius-sm); background: var(--surface-2); }
+.notification.is-unread { background: color-mix(in srgb, var(--violet) 10%, var(--surface-2)); }
+.notification form { margin: 0; }
+.notification-open { all: unset; box-sizing: border-box; display: grid; gap: .2rem; width: 100%; padding: .7rem 2rem .7rem .9rem; cursor: pointer; border-radius: var(--radius-sm); color: var(--text); text-align: start; }
+.notification-open:focus-visible { outline: 2px solid var(--violet); outline-offset: 2px; }
+.notification-excerpt { font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.unread-dot { position: absolute; top: 1rem; inset-inline-end: .9rem; width: 9px; height: 9px; border-radius: 50%; background: var(--violet); }
+.watch-box p { margin: 0; }
+.section-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
