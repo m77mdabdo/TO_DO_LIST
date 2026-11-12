@@ -8,6 +8,8 @@
 
 return [
     'app_name' => getenv('APP_NAME') ?: 'Todo Board',
+    // Interface language: "ar" (right-to-left, the default) or "en".
+    'locale'   => getenv('APP_LOCALE') ?: 'ar',
     'timezone' => getenv('APP_TIMEZONE') ?: 'Asia/Riyadh',
 
     // Show error details on the error page. Keep it off on a real server.

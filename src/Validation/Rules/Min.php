@@ -13,6 +13,6 @@ final class Min implements Rule
     {
         $min = (int) ($params[0] ?? 1);
 
-        return mb_strlen((string) $value) >= $min ? null : "$label must be at least $min characters.";
+        return mb_strlen((string) $value) >= $min ? null : ":label must be at least :param characters.";
     }
 }

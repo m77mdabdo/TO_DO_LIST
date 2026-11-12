@@ -13,6 +13,7 @@ use App\Core\Container;
 use App\Database\ConnectionFactory;
 use App\Database\Migrations\MigrationRunner;
 use App\Http\Kernel;
+use App\I18n\Translator;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\VerifyCsrfToken;
 use App\Http\Router;
@@ -67,12 +68,17 @@ return static function (Config $config, Session $session, string $basePath = '',
 
     $container->singleton(TaskRepository::class, fn (Container $c) => new PdoTaskRepository($c->get(PDO::class), $c->get(Clock::class)));
 
+    $container->singleton(Translator::class, fn (Container $c) => new Translator(
+        $root . '/lang',
+        (string) $config->get('locale', 'ar'),
+        $c->get(Session::class),
+    ));
     $container->singleton(Url::class, fn () => new Url($basePath, $root));
     $container->singleton(Csrf::class, fn (Container $c) => new Csrf($c->get(Session::class)));
     $container->singleton(FormState::class, fn (Container $c) => new FormState($c->get(Session::class)));
 
     $container->singleton(View::class, function (Container $c) use ($config, $root): View {
-        $view = new View($root . '/views', $c->get(Url::class), $c->get(Csrf::class), $c->get(Session::class), $c->get(FormState::class));
+        $view = new View($root . '/views', $c->get(Url::class), $c->get(Csrf::class), $c->get(Session::class), $c->get(FormState::class), $c->get(Translator::class));
         $view->share('appName', (string) $config->get('app_name', 'Todo Board'));
         $view->share('today', $c->get(Clock::class)->now());
         $view->share('timeAgo', $c->get(TimeAgo::class));
