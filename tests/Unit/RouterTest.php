@@ -34,6 +34,26 @@ final class RouterTest extends TestCase
         $this->assertSame(['Auth'], $route->middleware);
     }
 
+    public function testUlidParametersStayStrings(): void
+    {
+        $this->router->get('/boards/{board:ulid}/cards/{id}', ['Cards', 'show']);
+
+        [, $params] = $this->router->match(new Request('GET', '/boards/01JCQ2ZK8S6M3X0V4T9N7B5R2D/cards/7'));
+
+        $this->assertSame(['board' => '01JCQ2ZK8S6M3X0V4T9N7B5R2D', 'id' => 7], $params);
+        $this->assertSame(404, $this->statusFor(new Request('GET', '/boards/not-a-ulid/cards/7')));
+        $this->assertSame(404, $this->statusFor(new Request('GET', '/boards/01jcq2zk8s6m3x0v4t9n7b5r2d/cards/7')));
+    }
+
+    public function testStaticRoutesWinOverDynamicOnes(): void
+    {
+        $this->router->get('/tasks/export', ['Tasks', 'export']);
+
+        [$route] = $this->router->match(new Request('GET', '/tasks/export'));
+
+        $this->assertSame(['Tasks', 'export'], $route->action);
+    }
+
     public function testUnknownPathsAre404AndWrongMethodsAre405(): void
     {
         $this->assertSame(404, $this->statusFor(new Request('GET', '/nope')));

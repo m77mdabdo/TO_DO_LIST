@@ -6,7 +6,8 @@ namespace App\Http;
 
 use RuntimeException;
 
-final class HttpException extends RuntimeException
+/** Ends the request with an HTTP status; modules may subclass it for their own failures. */
+class HttpException extends RuntimeException
 {
     public function __construct(public readonly int $status, string $message)
     {

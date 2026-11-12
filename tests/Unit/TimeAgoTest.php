@@ -21,7 +21,7 @@ final class TimeAgoTest extends TestCase
         $this->assertSame('5m ago', $ago->format(new DateTimeImmutable('2026-01-20 11:55:00')));
         $this->assertSame('3h ago', $ago->format(new DateTimeImmutable('2026-01-20 09:00:00')));
         $this->assertSame('2d ago', $ago->format(new DateTimeImmutable('2026-01-18 12:00:00')));
-        $this->assertSame('Jan 2', $ago->format(new DateTimeImmutable('2026-01-02 12:00:00')));
+        $this->assertSame('2026-01-02', $ago->format(new DateTimeImmutable('2026-01-02 12:00:00')));
         $this->assertSame('', $ago->format(null));
     }
 

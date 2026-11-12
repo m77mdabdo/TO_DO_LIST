@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 /*
  | PSR-4 style autoloading without Composer:
- |   App\Task\TaskService  ->  src/Task/TaskService.php
+ |   App\Modules\Card\CardModule  ->  src/Modules/Card/CardModule.php
  */
 spl_autoload_register(static function (string $class): void {
     $prefix = 'App\\';

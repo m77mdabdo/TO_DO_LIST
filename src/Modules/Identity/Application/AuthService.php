@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Identity\Application;
 
 use App\Modules\Identity\Contract\Authenticator;
+use App\Modules\Identity\Contract\Events\UserLoggedIn;
 use App\Modules\Identity\Contract\Events\UserRegistered;
 use App\Modules\Identity\Contract\User;
 use App\Modules\Identity\Domain\LoginThrottle;
@@ -80,7 +81,10 @@ final class AuthService implements Authenticator
             $this->users->updatePassword($credentials->userId, $this->hasher->hash($password));
         }
 
-        return $this->startSession($credentials->userId);
+        $user = $this->startSession($credentials->userId);
+        $this->events->publish(new UserLoggedIn($user->id, $user->name, $this->clock->now()));
+
+        return $user;
     }
 
     /**

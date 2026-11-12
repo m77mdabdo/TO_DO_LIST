@@ -24,7 +24,7 @@ use PDO;
 
 /**
  * Accounts, sign up, log in, log out and login throttling.
- * Publishes: identity.user_registered.
+ * Publishes: identity.user_registered, identity.user_logged_in.
  * Offers: Contract\Authenticator, Contract\UserDirectory.
  */
 final class IdentityModule implements ModuleProvider
