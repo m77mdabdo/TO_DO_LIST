@@ -13,4 +13,5 @@ return [
     App\Modules\Workspace\WorkspaceModule::class,
     App\Modules\Board\BoardModule::class,
     App\Modules\Access\AccessModule::class,
+    App\Modules\Card\CardModule::class,
 ];
