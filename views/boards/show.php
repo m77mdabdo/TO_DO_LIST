@@ -170,7 +170,7 @@ $form = $this->form;
                     <form class="add-card" action="<?= $this->url($base . '/cards') ?>" method="post">
                         <?= $this->csrfField() ?>
                         <input type="hidden" name="list_id" value="<?= $list->id ?>">
-                        <input name="title" required maxlength="200" dir="auto" placeholder="<?= $this->te('Add a card') ?>" aria-label="<?= $this->te('Add a card') ?>">
+                        <input name="title" required maxlength="200" dir="auto" class="js-add-card" placeholder="<?= $this->te('Add a card') ?>" aria-label="<?= $this->te('Add a card') ?>">
                         <button class="icon-btn" type="submit" title="<?= $this->te('Add card') ?>"><?= $this->icon('plus') ?></button>
                     </form>
                 <?php endif; ?>

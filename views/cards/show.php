@@ -60,7 +60,7 @@ $editErrors = $form->error('title') || $form->error('description') || $form->err
             <?php endif; ?>
 
             <?php if ($canEdit): ?>
-                <details class="edit-card" <?= $editErrors || !$card->description ? 'open' : '' ?>>
+                <details class="edit-card js-edit-card" <?= $editErrors || !$card->description ? 'open' : '' ?>>
                     <summary class="btn btn-ghost"><?= $this->icon('edit') ?><?= $this->te('Edit card') ?></summary>
                     <form action="<?= $this->url($cardPath) ?>" method="post" class="stack" novalidate>
                         <?= $this->csrfField() ?>

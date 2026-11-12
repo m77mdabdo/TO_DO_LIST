@@ -58,6 +58,9 @@ $currentWorkspace ??= null;
     <?php endif; ?>
 
     <div class="topbar-actions">
+        <?php if (isset($user)): ?>
+            <button class="icon-btn hide-sm js-shortcuts" type="button" title="<?= $this->te('Keyboard shortcuts') ?> (?)" aria-label="<?= $this->te('Keyboard shortcuts') ?>"><?= $this->icon('keyboard') ?></button>
+        <?php endif; ?>
         <button class="icon-btn js-theme" type="button" title="<?= $this->te('Toggle dark mode') ?>">
             <span class="show-light"><?= $this->icon('moon') ?></span><span class="show-dark"><?= $this->icon('sun') ?></span>
         </button>
