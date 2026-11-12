@@ -44,13 +44,17 @@ $templates = [
     'vote.added'        => ':actor voted for :subject',
     'label.attached'    => ':actor added the label :subject',
     'label.detached'    => ':actor removed the label :subject',
+    'board.member_added'   => ':actor added :member to the board as :subject',
+    'board.member_role'    => ':actor made :member a board :subject',
+    'board.member_removed' => ':actor took :member off the board',
 ];
 // Translate the sentence first, then drop the names in as isolated, bold
 // spans, so an English title inside an Arabic sentence keeps its place.
 $name = fn (string $value): string => '<bdi class="activity-name">' . $this->e($value) . '</bdi>';
 $html = strtr($this->e($this->t($templates[$entry->type] ?? ':actor updated :subject')), [
     ':actor'   => $name($actor),
-    ':subject' => $name($entry->subject),
+    // For board roles the subject is a role name, which is translated too.
+    ':subject' => $name(str_starts_with($entry->type, 'board.member_') ? $this->t($entry->subject) : $entry->subject),
     ':list'    => $name((string) ($entry->data['list'] ?? '')),
     ':from'    => $name((string) ($entry->data['from'] ?? '')),
     ':to'      => $name((string) ($entry->data['to'] ?? '')),

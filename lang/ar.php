@@ -373,4 +373,17 @@ return [
     'The link works once and expires in :days days.' => 'الرابط يعمل مرة واحدة وتنتهي صلاحيته بعد :days أيام.',
     'If you did not expect this, you can ignore this email.' => 'إذا لم تكن تتوقع هذه الرسالة، يمكنك تجاهلها.',
     'Invitation to join :company' => 'دعوة للانضمام إلى :company',
+
+    // Board members
+    'Board members' => 'أعضاء اللوحة',
+    'Take this person off the board?' => 'إزالة هذا الشخص من اللوحة؟',
+    'Add someone from the workspace' => 'أضف شخصًا من مساحة العمل',
+    'Someone from outside the company? Invite them from the workspace members page.' => 'شخص من خارج الشركة؟ ادعُه من صفحة أعضاء مساحة العمل.',
+    'Also on this board through the workspace' => 'موجودون في اللوحة أيضًا عبر مساحة العمل',
+    'Board members updated.' => 'تم تحديث أعضاء اللوحة.',
+    'Choose someone from this workspace.' => 'اختر شخصًا من مساحة العمل هذه.',
+    'A guest cannot manage a board.' => 'لا يمكن للضيف إدارة لوحة.',
+    ':actor added :member to the board as :subject' => ':actor أضاف :member إلى اللوحة بدور :subject',
+    ':actor made :member a board :subject' => ':actor جعل :member بدور :subject في اللوحة',
+    ':actor took :member off the board' => ':actor أزال :member من اللوحة',
 ];

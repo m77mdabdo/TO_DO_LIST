@@ -677,3 +677,4 @@ fieldset.stack-sm legend { padding: 0 .3rem; font-weight: 600; }
 .copy-row input { flex: 1; min-width: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .85rem; }
 .invite-page { text-align: center; }
 .invite-page .actions { display: flex; gap: .6rem; justify-content: center; flex-wrap: wrap; }
+.field-row-end { align-self: end; }
