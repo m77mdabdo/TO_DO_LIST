@@ -22,6 +22,11 @@ final class View
     /** @var array<string, list<callable(array<string, mixed>): array<string, mixed>>> template => composers */
     private array $composers = [];
 
+    /** @var array<string, list<string>> slot name => templates, in the order modules added them */
+    private array $slots = [];
+
+    private ?Markdown $markdown = null;
+
     public function __construct(
         private string $directory,
         private Url $url,
@@ -48,6 +53,27 @@ final class View
         $this->composers[$template][] = $composer;
     }
 
+    /**
+     * Lets a module add a section to a page it doesn't own, e.g. checklists
+     * on the card page. The page renders the slot; it doesn't know who fills it.
+     * Pair it with composer() on the same template to load the section's data.
+     */
+    public function addToSlot(string $slot, string $template): void
+    {
+        $this->slots[$slot][] = $template;
+    }
+
+    /** @param array<string, mixed> $data */
+    public function slot(string $slot, array $data = []): string
+    {
+        $html = '';
+        foreach ($this->slots[$slot] ?? [] as $template) {
+            $html .= $this->renderFile($template, $data);
+        }
+
+        return $html;
+    }
+
     /** @param array<string, mixed> $data */
     public function render(string $template, array $data = [], ?string $layout = 'layout'): string
     {
@@ -60,6 +86,12 @@ final class View
     public function partial(string $template, array $data = []): string
     {
         return $this->renderFile($template, $data);
+    }
+
+    /** User-written Markdown as safe HTML (raw HTML in it is escaped, never run). */
+    public function markdown(?string $text): string
+    {
+        return ($this->markdown ??= new Markdown())->toHtml((string) $text);
     }
 
     public function e(mixed $value): string

@@ -17,6 +17,8 @@ final class BoardSummary
         public readonly string $color,
         public readonly BoardVisibility $visibility,
         public readonly bool $archived,
+        public readonly Participation $commenting = Participation::Everyone,
+        public readonly Participation $voting = Participation::Members,
     ) {
     }
 
@@ -32,6 +34,8 @@ final class BoardSummary
             (string) $row['color'],
             BoardVisibility::from((string) $row['visibility']),
             $row['archived_at'] !== null,
+            Participation::tryFrom((string) ($row['commenting'] ?? '')) ?? Participation::Everyone,
+            Participation::tryFrom((string) ($row['voting'] ?? '')) ?? Participation::Members,
         );
     }
 }

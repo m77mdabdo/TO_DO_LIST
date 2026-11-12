@@ -10,16 +10,20 @@ declare(strict_types=1);
  | Logins (password demo1234 for both):
  |   demo@todo.test  owner of "Nile Studio", plus a few old-style tasks that
  |                   are imported into "My Board" on the first login
- |   mona@todo.test  a member of "Nile Studio" (views the team board)
+ |   mona@todo.test  a member of "Nile Studio" who works on the team board
  |
  | Everything goes through the same services the app uses, so the data
  | passes the same validation and permission checks.
  */
 
 use App\Core\Config;
+use App\Modules\Access\Contract\BoardMembers;
+use App\Modules\Access\Contract\BoardRole;
 use App\Modules\Board\Application\BoardService;
 use App\Modules\Board\Contract\BoardVisibility;
 use App\Modules\Card\Application\CardService;
+use App\Modules\Checklist\Application\ChecklistService;
+use App\Modules\Discussion\Application\DiscussionService;
 use App\Modules\Identity\Application\AuthService;
 use App\Modules\Label\Application\LabelService;
 use App\Modules\Workspace\Application\WorkspaceService;
@@ -65,6 +69,9 @@ $cards = $app->get(CardService::class);
 $labels = $app->get(LabelService::class);
 
 $board = $boards->createBoard($demo, $workspace->id, 'Website launch', BoardVisibility::Workspace, 'sky');
+// Mona works on this board (a board member, not just a viewer).
+$app->get(BoardMembers::class)->add($board->id, $mona, BoardRole::Member);
+
 $lists = [];
 foreach (['Backlog', 'In progress', 'Review', 'Done'] as $name) {
     $lists[$name] = $boards->addList($demo, $board->id, $name)->id;
@@ -90,8 +97,9 @@ $samples = [
     ['Done', 'Moodboard', null, null, [$design], true],
 ];
 
+$created = [];
 foreach ($samples as [$list, $title, $description, $due, $cardLabels, $done]) {
-    $card = $cards->createCard($demo, $board->id, $lists[$list], $title, ['description' => $description, 'due_date' => $due]);
+    $card = $created[$title] = $cards->createCard($demo, $board->id, $lists[$list], $title, ['description' => $description, 'due_date' => $due]);
     foreach ($cardLabels as $cardLabel) {
         $labels->attach($demo, $card->id, $cardLabel->id);
     }
@@ -99,6 +107,34 @@ foreach ($samples as [$list, $title, $description, $due, $cardLabels, $done]) {
         $cards->setComplete($demo, $card, true);
     }
 }
+
+// Card details: people, a start date, a checklist, a conversation and votes.
+$pricing = $created['Design the pricing page'];
+$cards->update($demo, $pricing, [
+    'title'       => $pricing->title,
+    'description' => "Three plans with a **yearly toggle** and an FAQ at the bottom.\n\n- Starter\n- Team\n- Business\n\nReference: https://example.com/pricing-ideas",
+    'start_date'  => $day(-2),
+    'due_date'    => $day(1),
+]);
+$cards->toggleMember($demo, $pricing, $demo);
+$cards->toggleMember($demo, $pricing, $mona);
+$cards->toggleMember($demo, $created['Build the contact form'], $mona);
+
+$checklists = $app->get(ChecklistService::class);
+$steps = $checklists->addChecklist($demo, $pricing, 'Before review');
+foreach (['Write plan names', 'Pick prices', 'Draft the FAQ', 'Mobile layout'] as $i => $text) {
+    $checklists->addItem($demo, $steps, $text);
+}
+foreach (array_slice($checklists->forCard($pricing->id)[0]->items, 0, 2) as $item) {
+    $checklists->toggleItem($demo, $item->id);
+}
+
+$discussion = $app->get(DiscussionService::class);
+$discussion->post($demo, $pricing, '@Mona can you check the yearly prices before Thursday?');
+$discussion->post($mona, $pricing, 'Done. I think **Team** should be the highlighted plan.');
+$discussion->toggleVote($demo, $pricing);
+$discussion->toggleVote($mona, $pricing);
+$discussion->toggleVote($mona, $created['Write the About page']);
 
 // A private board only the owner sees (Mona is not a member).
 $private = $boards->createBoard($demo, $workspace->id, 'Hiring', BoardVisibility::Private, 'coral');

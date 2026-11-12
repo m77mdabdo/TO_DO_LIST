@@ -34,6 +34,7 @@ $errors = $this->form->errors();
 
 <?= $content ?>
 
+<?= $this->partial('partials/shortcuts') ?>
 <?= $this->partial('partials/locale-switch') ?>
 
 <script src="<?= $this->asset('js/app.js') ?>" defer></script>

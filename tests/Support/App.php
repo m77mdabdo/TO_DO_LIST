@@ -47,7 +47,9 @@ final class App
 
     public function get(string $path): Response
     {
-        return $this->send(new Request('GET', $path, [], [], [], '10.0.0.1'));
+        parse_str((string) parse_url($path, PHP_URL_QUERY), $query);
+
+        return $this->send(new Request('GET', (string) parse_url($path, PHP_URL_PATH), $query, [], [], '10.0.0.1'));
     }
 
     public function send(Request $request): Response

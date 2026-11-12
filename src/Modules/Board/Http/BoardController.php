@@ -14,12 +14,14 @@ use App\Modules\Access\Contract\Permission;
 use App\Modules\Activity\Contract\ActivityFeed;
 use App\Modules\Board\Application\BoardService;
 use App\Modules\Board\Contract\BoardSummary;
+use App\Modules\Board\Contract\CardFilter;
 use App\Modules\Board\Contract\BoardVisibility;
 use App\Modules\Card\Contract\CardQueries;
 use App\Modules\Identity\Contract\UserDirectory;
 use App\Modules\Label\Contract\LabelCatalog;
 use App\Modules\Workspace\Contract\WorkspaceDirectory;
 use App\Session\Session;
+use App\Support\Clock;
 use App\Support\Greeting;
 use App\Validation\ValidationException;
 use App\View\View;
@@ -38,6 +40,7 @@ final class BoardController extends Controller
         private ActivityFeed $activity,
         private UserDirectory $users,
         private Greeting $greeting,
+        private Clock $clock,
     ) {
         parent::__construct($view, $url, $session);
     }
@@ -95,6 +98,12 @@ final class BoardController extends Controller
             }
         }
         $activity = $role->allows(Permission::ViewActivity) ? $this->activity->forBoard($board->id, null, 15) : [];
+        $cardMembers = $this->cards->membersForCards($cardIds);
+        $cardLabels = $this->labels->forCards($cardIds);
+        $audience = $this->gate->peopleOn($board->id);
+
+        $filter = CardFilter::fromInput(static fn (string $key) => $request->input($key));
+        $shown = $filter->apply($cardsByList, $cardLabels, $cardMembers, $user->id, $this->clock->now());
 
         return $this->render('boards/show', [
             'title'       => $board->name,
@@ -102,11 +111,16 @@ final class BoardController extends Controller
             'board'       => $board,
             'role'        => $role,
             'lists'       => $lists,
-            'cardsByList' => $cardsByList,
-            'cardLabels'  => $this->labels->forCards($cardIds),
+            'cardsByList' => $shown,
+            'filter'      => $filter,
+            'totalCards'  => count($cardIds),
+            'shownCards'  => array_sum(array_map('count', $shown)),
+            'cardLabels'  => $cardLabels,
             'boardLabels' => $this->labels->forBoard($board->id),
             'activity'    => $activity,
-            'people'      => $this->users->findMany(array_map(static fn ($a) => $a->actorId, $activity)),
+            'cardMembers' => $cardMembers,
+            'people'      => $this->users->findMany([...array_keys($audience), ...array_merge([], ...array_values($cardMembers)), ...array_map(static fn ($a) => $a->actorId, $activity)]),
+            'audience'    => array_keys($audience),
         ]);
     }
 
@@ -117,7 +131,7 @@ final class BoardController extends Controller
         $board = $this->boards->boardFor($user->id, $params['board'], Permission::ManageSettings);
 
         try {
-            $this->boards->updateBoard($user->id, $board, $request->only(['name', 'description', 'color', 'visibility']));
+            $this->boards->updateBoard($user->id, $board, $request->only(['name', 'description', 'color', 'visibility', 'commenting', 'voting']));
         } catch (ValidationException $e) {
             return $this->backWithErrors($e, $request, '/boards/' . $board->publicId);
         }

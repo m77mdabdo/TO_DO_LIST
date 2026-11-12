@@ -14,6 +14,7 @@ use App\Modules\Board\Contract\BoardDirectory;
 use App\Modules\Board\Domain\BoardRepository;
 use App\Modules\Board\Http\BoardController;
 use App\Modules\Board\Http\ListController;
+use App\Modules\Board\Http\SearchController;
 use App\Modules\Board\Infrastructure\PdoBoardRepository;
 use App\Shared\Events\EventBus;
 use App\Shared\Module\ModuleProvider;
@@ -45,6 +46,7 @@ final class BoardModule implements ModuleProvider
     {
         $router->group([Authenticate::class], function (Router $router): void {
             $router->get('/', [BoardController::class, 'index']);
+            $router->get('/search', [SearchController::class, 'index']);
             $router->post('/boards', [BoardController::class, 'store']);
             $router->get('/boards/{board:ulid}', [BoardController::class, 'show']);
             $router->post('/boards/{board:ulid}', [BoardController::class, 'update']);

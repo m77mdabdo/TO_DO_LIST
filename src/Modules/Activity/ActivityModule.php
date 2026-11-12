@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Activity;
 
 use App\Core\Container;
+use App\Http\Middleware\Authenticate;
 use App\Http\Router;
+use App\Modules\Activity\Http\ActivityController;
 use App\Modules\Activity\Application\ActivityRecorder;
 use App\Modules\Activity\Contract\ActivityFeed;
 use App\Modules\Activity\Domain\ActivityLog;
@@ -35,6 +37,9 @@ final class ActivityModule implements ModuleProvider
 
     public function routes(Router $router): void
     {
+        $router->group([Authenticate::class], function (Router $router): void {
+            $router->get('/boards/{board:ulid}/activity', [ActivityController::class, 'board']);
+        });
     }
 
     public function listeners(EventBus $events, Container $container): void

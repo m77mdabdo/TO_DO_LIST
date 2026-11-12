@@ -13,7 +13,12 @@ use App\Modules\Board\Contract\Events\ListCreated;
 use App\Modules\Card\Contract\Events\CardChanged;
 use App\Modules\Card\Contract\Events\CardCreated;
 use App\Modules\Card\Contract\Events\CardDeleted;
+use App\Modules\Card\Contract\Events\CardMemberChanged;
+use App\Modules\Identity\Contract\UserDirectory;
 use App\Modules\Card\Contract\Events\CardMoved;
+use App\Modules\Checklist\Contract\Events\ChecklistChanged;
+use App\Modules\Discussion\Contract\Events\CommentPosted;
+use App\Modules\Discussion\Contract\Events\VoteChanged;
 use App\Modules\Label\Contract\Events\LabelAttached;
 use App\Modules\Label\Contract\Events\LabelDetached;
 use App\Shared\Events\DomainEvent;
@@ -25,7 +30,7 @@ use App\Shared\Events\DomainEvent;
  */
 final class ActivityRecorder
 {
-    public function __construct(private ActivityLog $log, private BoardDirectory $boards)
+    public function __construct(private ActivityLog $log, private BoardDirectory $boards, private UserDirectory $users)
     {
     }
 
@@ -34,8 +39,9 @@ final class ActivityRecorder
     {
         return [
             BoardCreated::name(), BoardChanged::name(), ListCreated::name(), ListChanged::name(),
-            CardCreated::name(), CardChanged::name(), CardMoved::name(), CardDeleted::name(),
-            LabelAttached::name(), LabelDetached::name(),
+            CardCreated::name(), CardChanged::name(), CardMoved::name(), CardMemberChanged::name(), CardDeleted::name(),
+            LabelAttached::name(), LabelDetached::name(), ChecklistChanged::name(),
+            CommentPosted::name(), VoteChanged::name(),
         ];
     }
 
@@ -52,9 +58,16 @@ final class ActivityRecorder
                 'from' => $this->listName($event->fromListId, $event->boardId),
                 'to'   => $this->listName($event->toListId, $event->boardId),
             ]),
+            $event instanceof CardMemberChanged => $this->log->record($event->boardId, $event->cardId, $event->actorId, $event->added ? 'card.member_added' : 'card.member_removed', $event->title, [
+                'member' => $this->users->find($event->memberId)?->name ?? '',
+            ]),
             $event instanceof CardDeleted   => $this->log->record($event->boardId, null, $event->actorId, 'card.deleted', $event->title),
             $event instanceof LabelAttached => $this->log->record($event->boardId, $event->cardId, $event->actorId, 'label.attached', $event->labelName),
             $event instanceof LabelDetached => $this->log->record($event->boardId, $event->cardId, $event->actorId, 'label.detached', $event->labelName),
+            $event instanceof ChecklistChanged => $this->log->record($event->boardId, $event->cardId, $event->actorId, 'checklist.' . $event->change, $event->subject, ['card' => $event->cardTitle]),
+            $event instanceof CommentPosted => $this->log->record($event->boardId, $event->cardId, $event->actorId, 'comment.posted', $event->cardTitle),
+            // Taking a vote back isn't worth a line in the history.
+            $event instanceof VoteChanged   => $event->added ? $this->log->record($event->boardId, $event->cardId, $event->actorId, 'vote.added', $event->cardTitle) : null,
             default => null,
         };
     }
