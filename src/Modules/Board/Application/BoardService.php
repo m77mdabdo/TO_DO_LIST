@@ -75,6 +75,12 @@ final class BoardService implements BoardCatalog
         );
     }
 
+    /** @return list<ListSummary> open lists, in order (the caller already authorized the board) */
+    public function listsOf(BoardSummary $board): array
+    {
+        return $this->boards->lists($board->id);
+    }
+
     /** @return list<ListSummary> */
     public function archivedLists(int $userId, BoardSummary $board): array
     {

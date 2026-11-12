@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use App\I18n\Translator;
 use DateTimeImmutable;
 
 final class TimeAgo
 {
-    public function __construct(private Clock $clock)
+    public function __construct(private Clock $clock, private ?Translator $translator = null)
     {
     }
 
@@ -20,12 +21,14 @@ final class TimeAgo
 
         $seconds = $this->clock->now()->getTimestamp() - $moment->getTimestamp();
 
-        return match (true) {
-            $seconds < 60     => 'just now',
-            $seconds < 3600   => intdiv($seconds, 60) . 'm ago',
-            $seconds < 86400  => intdiv($seconds, 3600) . 'h ago',
-            $seconds < 604800 => intdiv($seconds, 86400) . 'd ago',
-            default           => $moment->format('M j'),
+        [$text, $n] = match (true) {
+            $seconds < 60     => ['just now', 0],
+            $seconds < 3600   => [':nm ago', intdiv($seconds, 60)],
+            $seconds < 86400  => [':nh ago', intdiv($seconds, 3600)],
+            $seconds < 604800 => [':nd ago', intdiv($seconds, 86400)],
+            default           => [$moment->format('Y-m-d'), 0],
         };
+
+        return $this->translator?->t($text, ['n' => $n]) ?? str_replace(':n', (string) $n, $text);
     }
 }

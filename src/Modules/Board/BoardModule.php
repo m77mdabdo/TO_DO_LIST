@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Modules\Board;
 
 use App\Core\Container;
+use App\Http\Middleware\Authenticate;
 use App\Http\Router;
 use App\Modules\Board\Application\BoardQueries;
 use App\Modules\Board\Application\BoardService;
 use App\Modules\Board\Contract\BoardCatalog;
 use App\Modules\Board\Contract\BoardDirectory;
 use App\Modules\Board\Domain\BoardRepository;
+use App\Modules\Board\Http\BoardController;
+use App\Modules\Board\Http\ListController;
 use App\Modules\Board\Infrastructure\PdoBoardRepository;
 use App\Shared\Events\EventBus;
 use App\Shared\Module\ModuleProvider;
@@ -40,6 +43,22 @@ final class BoardModule implements ModuleProvider
 
     public function routes(Router $router): void
     {
+        $router->group([Authenticate::class], function (Router $router): void {
+            $router->get('/', [BoardController::class, 'index']);
+            $router->post('/boards', [BoardController::class, 'store']);
+            $router->get('/boards/{board:ulid}', [BoardController::class, 'show']);
+            $router->post('/boards/{board:ulid}', [BoardController::class, 'update']);
+            $router->post('/boards/{board:ulid}/archive', [BoardController::class, 'archive']);
+            $router->post('/boards/{board:ulid}/restore', [BoardController::class, 'restore']);
+            $router->get('/boards/{board:ulid}/archived', [BoardController::class, 'archived']);
+            $router->get('/boards/{board:ulid}/export', [BoardController::class, 'export']);
+
+            $router->post('/boards/{board:ulid}/lists', [ListController::class, 'store']);
+            $router->post('/boards/{board:ulid}/lists/{id}', [ListController::class, 'update']);
+            $router->post('/boards/{board:ulid}/lists/{id}/move', [ListController::class, 'move']);
+            $router->post('/boards/{board:ulid}/lists/{id}/archive', [ListController::class, 'archive']);
+            $router->post('/boards/{board:ulid}/lists/{id}/restore', [ListController::class, 'restore']);
+        });
     }
 
     public function listeners(EventBus $events, Container $container): void
