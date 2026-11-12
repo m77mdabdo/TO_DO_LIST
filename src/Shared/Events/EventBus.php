@@ -10,7 +10,13 @@ namespace App\Shared\Events;
  */
 interface EventBus
 {
-    /** @param callable(DomainEvent): void $listener */
+    /**
+     * The listener names the concrete event it handles, e.g. fn (CardMoved $e) => ...
+     * It is only ever called with events published under $eventName.
+     *
+     * @template TEvent of DomainEvent
+     * @param callable(TEvent): void $listener
+     */
     public function listen(string $eventName, callable $listener): void;
 
     public function publish(DomainEvent $event): void;
