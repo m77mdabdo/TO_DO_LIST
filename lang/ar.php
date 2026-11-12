@@ -199,4 +199,17 @@ return [
     'Doing'                     => 'قيد التنفيذ',
     'High priority'             => 'أولوية عالية',
     'Low priority'              => 'أولوية منخفضة',
+
+    // Card people and dates
+    'Start date'                => 'تاريخ البداية',
+    'Starts'                    => 'يبدأ',
+    'Remove from card'          => 'إزالة من البطاقة',
+    'Nobody is assigned yet.'   => 'لم يُسند أحد بعد.',
+    'Assign someone'            => 'إسناد لشخص',
+    'Assign'                    => 'إسناد',
+    'The start date must be on or before the due date.' => 'يجب أن يكون تاريخ البداية قبل تاريخ التسليم أو في نفس اليوم.',
+    "That person can't see this board." => 'هذا الشخص لا يستطيع رؤية هذه اللوحة.',
+    ':actor changed the start date of :subject' => ':actor غيّر تاريخ بداية :subject',
+    ':actor assigned :member to :subject' => ':actor أسند :subject إلى :member',
+    ':actor took :member off :subject' => ':actor أزال :member من :subject',
 ];

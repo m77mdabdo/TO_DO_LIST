@@ -71,6 +71,17 @@ final class BoardPagesTest extends TestCase
         $this->assertTrue(str_contains($this->f->app->page('/boards/' . $this->f->board->publicId), 'label-red'));
     }
 
+    public function testAssigningSomeoneShowsThemOnTheCardAndTheBoard(): void
+    {
+        $this->f->app->post('/boards/' . $this->f->board->publicId . '/cards', ['list_id' => (string) $this->f->todo->id, 'title' => 'Draft']);
+        $card = $this->openCards()[$this->f->todo->id][0];
+
+        $this->f->app->post('/cards/' . $card->publicId . '/members', ['user_id' => (string) $this->f->owner]);
+
+        $this->assertTrue(str_contains($this->f->app->page('/cards/' . $card->publicId), 'Remove from card'));
+        $this->assertTrue(str_contains($this->f->app->page('/boards/' . $this->f->board->publicId), 'avatar-xs'));
+    }
+
     public function testOtherCompaniesGetNotFoundForBoardsAndCards(): void
     {
         $this->f->app->post('/boards/' . $this->f->board->publicId . '/cards', ['list_id' => (string) $this->f->todo->id, 'title' => 'Secret']);

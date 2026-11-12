@@ -9,6 +9,8 @@
  * @var list<\App\Modules\Label\Contract\Label> $cardLabels
  * @var list<\App\Modules\Activity\Contract\ActivityEntry> $activity
  * @var array<int, \App\Modules\Identity\Contract\User> $people
+ * @var array<int, \App\Modules\Access\Contract\BoardRole> $audience user id => role on the board
+ * @var list<int> $assigned
  */
 use App\Modules\Access\Contract\Permission;
 use App\Modules\Label\Contract\Label;
@@ -49,15 +51,26 @@ $cardPath = '/cards/' . $card->publicId;
                     <label><span><?= $this->te('Description') ?></span>
                         <textarea name="description" rows="6" maxlength="10000" dir="auto"><?= $this->e($form->old('description', (string) $card->description)) ?></textarea>
                         <?= $this->partial('partials/field-error', ['field' => 'description']) ?></label>
-                    <label class="narrow-field"><span><?= $this->te('Due date') ?></span>
-                        <input type="date" name="due_date" value="<?= $this->e($form->old('due_date', (string) $card->dueDate())) ?>">
-                        <?= $this->partial('partials/field-error', ['field' => 'due_date']) ?></label>
+                    <div class="field-row">
+                        <label><span><?= $this->te('Start date') ?></span>
+                            <input type="date" name="start_date" value="<?= $this->e($form->old('start_date', (string) $card->startDate())) ?>"
+                                   aria-invalid="<?= $form->error('start_date') ? 'true' : 'false' ?>">
+                            <?= $this->partial('partials/field-error', ['field' => 'start_date']) ?></label>
+                        <label><span><?= $this->te('Due date') ?></span>
+                            <input type="date" name="due_date" value="<?= $this->e($form->old('due_date', (string) $card->dueDate())) ?>">
+                            <?= $this->partial('partials/field-error', ['field' => 'due_date']) ?></label>
+                    </div>
                     <div><button class="btn btn-primary" type="submit"><?= $this->te('Save') ?></button></div>
                 </form>
             <?php else: ?>
                 <h1 dir="auto"><?= $this->e($card->title) ?></h1>
                 <?php if ($card->description): ?><p class="card-description" dir="auto"><?= nl2br($this->e($card->description)) ?></p><?php endif; ?>
-                <?php if ($card->dueDate()): ?><p><span class="due"><?= $this->icon('calendar') ?><?= $this->e($card->dueDate()) ?></span></p><?php endif; ?>
+                <?php if ($card->startDate() || $card->dueDate()): ?>
+                    <p class="date-range">
+                        <?php if ($card->startDate()): ?><span class="due"><?= $this->te('Starts') ?> <?= $this->e($card->startDate()) ?></span><?php endif; ?>
+                        <?php if ($card->dueDate()): ?><span class="due"><?= $this->icon('calendar') ?><?= $this->e($card->dueDate()) ?></span><?php endif; ?>
+                    </p>
+                <?php endif; ?>
             <?php endif; ?>
 
             <?php if ($activity): ?>
@@ -73,6 +86,45 @@ $cardPath = '/cards/' . $card->publicId;
         </section>
 
         <aside class="card-side stack">
+            <section class="card stack">
+                <h2 class="section-title"><?= $this->icon('users') ?> <?= $this->te('Members') ?></h2>
+                <?php if ($assigned): ?>
+                    <ul class="people-list">
+                        <?php foreach ($assigned as $memberId): ?>
+                            <?php $person = $people[$memberId] ?? null; if ($person === null) continue; ?>
+                            <li>
+                                <span class="avatar avatar-sm" aria-hidden="true"><?= $this->e(mb_strtoupper(mb_substr($person->name, 0, 1))) ?></span>
+                                <bdi><?= $this->e($person->name) ?></bdi>
+                                <?php if ($canEdit): ?>
+                                    <form action="<?= $this->url($cardPath . '/members') ?>" method="post">
+                                        <?= $this->csrfField() ?>
+                                        <input type="hidden" name="user_id" value="<?= $memberId ?>">
+                                        <button class="icon-btn" type="submit" title="<?= $this->te('Remove from card') ?>" aria-label="<?= $this->te('Remove from card') ?>"><?= $this->icon('close') ?></button>
+                                    </form>
+                                <?php endif; ?>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php else: ?>
+                    <p class="muted small"><?= $this->te('Nobody is assigned yet.') ?></p>
+                <?php endif; ?>
+                <?php $unassigned = array_diff(array_keys($audience), $assigned); ?>
+                <?php if ($canEdit && $unassigned): ?>
+                    <form action="<?= $this->url($cardPath . '/members') ?>" method="post" class="inline-form">
+                        <?= $this->csrfField() ?>
+                        <select name="user_id" aria-label="<?= $this->te('Assign someone') ?>">
+                            <?php foreach ($unassigned as $userId): ?>
+                                <?php if (isset($people[$userId])): ?>
+                                    <option value="<?= $userId ?>"><?= $this->e($people[$userId]->name) ?></option>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </select>
+                        <button class="btn btn-ghost" type="submit"><?= $this->icon('plus') ?><?= $this->te('Assign') ?></button>
+                    </form>
+                    <?= $this->partial('partials/field-error', ['field' => 'member']) ?>
+                <?php endif; ?>
+            </section>
+
             <section class="card stack">
                 <h2 class="section-title"><?= $this->icon('tag') ?> <?= $this->te('Labels') ?></h2>
                 <div class="label-picker">
