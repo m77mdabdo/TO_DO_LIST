@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\View;
 
 use App\Http\Url;
+use App\I18n\Translator;
 use App\Security\Csrf;
 use App\Session\Session;
 use RuntimeException;
@@ -18,18 +19,33 @@ final class View
     /** @var array<string, mixed> shared with every template */
     private array $shared = [];
 
+    /** @var array<string, list<callable(array<string, mixed>): array<string, mixed>>> template => composers */
+    private array $composers = [];
+
     public function __construct(
         private string $directory,
         private Url $url,
         private Csrf $csrf,
         private Session $session,
         public readonly FormState $form,
+        private ?Translator $translator = null,
     ) {
     }
 
     public function share(string $key, mixed $value): void
     {
         $this->shared[$key] = $value;
+    }
+
+    /**
+     * Lets a module add data to a template every time it renders, e.g. the
+     * workspace switcher in the header, without each controller passing it.
+     *
+     * @param callable(array<string, mixed>): array<string, mixed> $composer
+     */
+    public function composer(string $template, callable $composer): void
+    {
+        $this->composers[$template][] = $composer;
     }
 
     /** @param array<string, mixed> $data */
@@ -49,6 +65,39 @@ final class View
     public function e(mixed $value): string
     {
         return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
+
+    /**
+     * Translated text, NOT escaped: wrap it in e() when printing.
+     *
+     * @param array<string, string|int> $replace
+     */
+    public function t(string $text, array $replace = []): string
+    {
+        return $this->translator?->t($text, $replace) ?? strtr($text, array_combine(
+            array_map(static fn ($k) => ':' . $k, array_keys($replace)),
+            array_map('strval', $replace),
+        ) ?: []);
+    }
+
+    /**
+     * Translated and HTML-escaped, the common case in templates.
+     *
+     * @param array<string, string|int> $replace
+     */
+    public function te(string $text, array $replace = []): string
+    {
+        return $this->e($this->t($text, $replace));
+    }
+
+    public function locale(): string
+    {
+        return $this->translator?->locale() ?? 'en';
+    }
+
+    public function direction(): string
+    {
+        return $this->translator?->direction() ?? 'ltr';
     }
 
     public function url(string $path = '/'): string
@@ -83,12 +132,6 @@ final class View
         return is_string($value) ? $value : null;
     }
 
-    /** Stable color class for a list name, so "Work" always has the same color. */
-    public function categoryClass(?string $category): string
-    {
-        return 'cat-' . (crc32(mb_strtolower((string) $category)) % 8);
-    }
-
     /** @param array<string, mixed> $data */
     private function renderFile(string $template, array $data): string
     {
@@ -96,6 +139,10 @@ final class View
 
         if (!is_file($file)) {
             throw new RuntimeException("View [$template] not found.");
+        }
+
+        foreach ($this->composers[$template] ?? [] as $composer) {
+            $data = $composer($data) + $data;
         }
 
         extract($this->shared + $data, EXTR_SKIP);

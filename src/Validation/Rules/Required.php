@@ -10,6 +10,6 @@ final class Required implements Rule
 {
     public function check(string $label, mixed $value, array $params): ?string
     {
-        return is_string($value) && trim($value) !== '' ? null : "$label is required.";
+        return is_string($value) && trim($value) !== '' ? null : ":label is required.";
     }
 }

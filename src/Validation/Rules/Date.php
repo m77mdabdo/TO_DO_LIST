@@ -14,6 +14,6 @@ final class Date implements Rule
     {
         $date = DateTimeImmutable::createFromFormat('!Y-m-d', (string) $value);
 
-        return $date && $date->format('Y-m-d') === $value ? null : "$label must be a valid date.";
+        return $date && $date->format('Y-m-d') === $value ? null : ":label must be a valid date.";
     }
 }

@@ -11,6 +11,6 @@ final class In implements Rule
 {
     public function check(string $label, mixed $value, array $params): ?string
     {
-        return in_array($value, $params, true) ? null : "$label has an invalid value.";
+        return in_array($value, $params, true) ? null : ":label has an invalid value.";
     }
 }

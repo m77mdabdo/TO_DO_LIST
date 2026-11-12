@@ -24,13 +24,14 @@ final class App
     public readonly Container $container;
     public readonly ArraySession $session;
 
-    public function __construct(string $now = '2026-01-20 10:00:00')
+    public function __construct(string $now = '2026-01-20 10:00:00', string $locale = 'en')
     {
         $boot = require BASE_PATH . '/bootstrap/app.php';
         $this->session = new ArraySession();
         $this->container = $boot(new Config([
             'app_name' => 'Todo Board',
             'timezone' => 'Asia/Riyadh',
+            'locale'   => $locale,
             'db'       => ['driver' => 'sqlite', 'sqlite_path' => ':memory:'],
         ]), $this->session);
         $this->container->singleton(Clock::class, fn () => new FrozenClock($now));
@@ -52,6 +53,41 @@ final class App
     public function send(Request $request): Response
     {
         return $this->container->get(Kernel::class)->handle($request);
+    }
+
+    /** Registers through the real form and returns the new user's id. */
+    public function signUp(string $name = 'Sara Ali', string $email = 'sara@example.com'): int
+    {
+        $this->post('/logout');
+        $this->post('/register', [
+            'name' => $name,
+            'email' => $email,
+            'password' => 'secret123',
+            'password_confirmation' => 'secret123',
+        ]);
+
+        return (int) $this->session->get('user_id');
+    }
+
+    /** Switches the session to another (already registered) user. */
+    public function loginAs(string $email): int
+    {
+        $this->post('/logout');
+        $this->post('/login', ['email' => $email, 'password' => 'secret123']);
+
+        return (int) $this->session->get('user_id');
+    }
+
+    /** The body of a GET, failing loudly on anything but 200. */
+    public function page(string $path): string
+    {
+        $response = $this->get($path);
+
+        if ($response->status !== 200) {
+            throw new \RuntimeException("GET $path gave {$response->status}, expected 200.");
+        }
+
+        return $response->body;
     }
 
     public function pdo(): PDO

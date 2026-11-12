@@ -11,6 +11,6 @@ final class Text implements Rule
 {
     public function check(string $label, mixed $value, array $params): ?string
     {
-        return is_string($value) && !is_numeric($value) ? null : "$label must be text, not just a number.";
+        return is_string($value) && !is_numeric($value) ? null : ":label must be text, not just a number.";
     }
 }

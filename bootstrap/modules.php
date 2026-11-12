@@ -3,11 +3,18 @@
 declare(strict_types=1);
 
 /*
- | The modules this app runs, in boot order.
- | A module can only use modules listed before it at boot time,
- | and only through their Contract\ namespace or their events.
+ | The modules this app runs. The order is the order their event listeners
+ | run in (Workspace gives a user a workspace before LegacyImport fills it).
+ | Modules only use each other through Contract\ namespaces or events.
  */
 
 return [
     App\Modules\Identity\IdentityModule::class,
+    App\Modules\Workspace\WorkspaceModule::class,
+    App\Modules\Board\BoardModule::class,
+    App\Modules\Access\AccessModule::class,
+    App\Modules\Card\CardModule::class,
+    App\Modules\Label\LabelModule::class,
+    App\Modules\Activity\ActivityModule::class,
+    App\Modules\LegacyImport\LegacyImportModule::class,
 ];
