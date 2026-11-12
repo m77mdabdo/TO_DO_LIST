@@ -11,7 +11,9 @@ use App\Modules\Access\Contract\AccessGate;
 use App\Modules\Access\Contract\BoardMembers;
 use App\Modules\Access\Contract\BoardRole;
 use App\Modules\Access\Infrastructure\PdoBoardMembers;
+use App\Modules\Board\Contract\BoardDirectory;
 use App\Modules\Board\Contract\Events\BoardCreated;
+use App\Modules\Workspace\Contract\Events\MemberRemoved;
 use App\Shared\Events\EventBus;
 use App\Shared\Module\ModuleProvider;
 use App\Support\Clock;
@@ -19,7 +21,8 @@ use PDO;
 
 /**
  * Board roles, permissions and the gate every board action goes through.
- * Listens to: board.created (the creator becomes the board's manager).
+ * Listens to: board.created (the creator becomes the board's manager),
+ *   workspace.member_removed (someone who leaves a workspace leaves its boards too).
  * Offers: Contract\AccessGate, Contract\BoardMembers.
  */
 final class AccessModule implements ModuleProvider
@@ -45,6 +48,15 @@ final class AccessModule implements ModuleProvider
         $events->listen(BoardCreated::name(), static function (BoardCreated $event) use ($container): void {
             $container->get(BoardMembers::class)->add($event->boardId, $event->actorId, BoardRole::Manager);
             $container->get(Gate::class)->forget($event->actorId, $event->boardId);
+        });
+
+        // Board roles must never outlive the workspace membership they came with.
+        $events->listen(MemberRemoved::name(), static function (MemberRemoved $event) use ($container): void {
+            $members = $container->get(BoardMembers::class);
+            foreach ($container->get(BoardDirectory::class)->allInWorkspace($event->workspaceId) as $board) {
+                $members->remove($board->id, $event->userId);
+                $container->get(Gate::class)->forget($event->userId, $board->id);
+            }
         });
     }
 
