@@ -11,4 +11,6 @@ declare(strict_types=1);
 return [
     App\Modules\Identity\IdentityModule::class,
     App\Modules\Workspace\WorkspaceModule::class,
+    App\Modules\Board\BoardModule::class,
+    App\Modules\Access\AccessModule::class,
 ];
