@@ -1,7 +1,7 @@
 <?php
 /**
  * @var \App\View\View $this
- * @var \App\Auth\User $user
+ * @var \App\Modules\Identity\Contract\User $user
  * @var \App\Task\Board $board
  * @var \App\Task\BoardStats $stats
  * @var list<string> $categories

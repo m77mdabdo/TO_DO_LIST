@@ -8,10 +8,6 @@ declare(strict_types=1);
  | in-memory session) only needs a change here, nowhere else.
  */
 
-use App\Auth\LoginThrottle;
-use App\Auth\PdoLoginThrottle;
-use App\Auth\PdoUserRepository;
-use App\Auth\UserRepository;
 use App\Core\Config;
 use App\Core\Container;
 use App\Database\ConnectionFactory;
@@ -70,8 +66,6 @@ return static function (Config $config, Session $session, string $basePath = '',
     });
 
     $container->singleton(TaskRepository::class, fn (Container $c) => new PdoTaskRepository($c->get(PDO::class), $c->get(Clock::class)));
-    $container->singleton(UserRepository::class, fn (Container $c) => new PdoUserRepository($c->get(PDO::class), $c->get(Clock::class)));
-    $container->singleton(LoginThrottle::class, fn (Container $c) => new PdoLoginThrottle($c->get(PDO::class), $c->get(Clock::class)));
 
     $container->singleton(Url::class, fn () => new Url($basePath, $root));
     $container->singleton(Csrf::class, fn (Container $c) => new Csrf($c->get(Session::class)));

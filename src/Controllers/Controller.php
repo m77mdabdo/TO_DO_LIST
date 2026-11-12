@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
-use App\Auth\User;
+use App\Modules\Identity\Contract\User;
 use App\Http\Request;
 use App\Http\Response;
 use App\Http\Url;

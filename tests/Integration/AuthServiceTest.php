@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Integration;
 
-use App\Auth\AuthService;
-use App\Auth\PasswordHasher;
-use App\Auth\PdoLoginThrottle;
-use App\Auth\PdoUserRepository;
+use App\Modules\Identity\Application\AuthService;
+use App\Modules\Identity\Domain\PasswordHasher;
+use App\Modules\Identity\Infrastructure\PdoLoginThrottle;
+use App\Modules\Identity\Infrastructure\PdoUserRepository;
+use App\Modules\Identity\Contract\Events\UserRegistered;
 use App\Session\ArraySession;
+use App\Shared\Events\RecordingEventBus;
 use App\Support\FrozenClock;
 use App\Validation\ValidationException;
 use App\Validation\Validator;
@@ -20,18 +22,22 @@ final class AuthServiceTest extends TestCase
     private AuthService $auth;
     private ArraySession $session;
     private FrozenClock $clock;
+    private RecordingEventBus $events;
 
     public function setUp(): void
     {
         $pdo = Database::fresh();
         $this->clock = new FrozenClock('2026-01-20 10:00:00');
         $this->session = new ArraySession();
+        $this->events = new RecordingEventBus();
         $this->auth = new AuthService(
             new PdoUserRepository($pdo, $this->clock),
             new PasswordHasher(),
             new PdoLoginThrottle($pdo, $this->clock),
             $this->session,
             new Validator(),
+            $this->events,
+            $this->clock,
         );
     }
 
@@ -42,6 +48,22 @@ final class AuthServiceTest extends TestCase
         $this->assertSame('sara@example.com', $user->email);
         $this->assertTrue($this->auth->check());
         $this->assertSame(1, $this->session->regenerated);
+    }
+
+    public function testRegisteringAnnouncesTheNewUser(): void
+    {
+        $user = $this->auth->register($this->signup());
+
+        [$event] = $this->events->published(UserRegistered::name());
+        $this->assertSame($user->id, $event->userId);
+        $this->assertSame('sara@example.com', $event->email);
+    }
+
+    public function testAFailedSignupAnnouncesNothing(): void
+    {
+        $this->errorsFrom(fn () => $this->auth->register($this->signup(['email' => 'nope'])));
+
+        $this->assertCount(0, $this->events->published());
     }
 
     public function testRegistrationRules(): void

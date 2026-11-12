@@ -2,14 +2,22 @@
 
 declare(strict_types=1);
 
-namespace App\Auth;
+namespace App\Modules\Identity\Application;
 
+use App\Modules\Identity\Contract\Authenticator;
+use App\Modules\Identity\Contract\Events\UserRegistered;
+use App\Modules\Identity\Contract\User;
+use App\Modules\Identity\Domain\LoginThrottle;
+use App\Modules\Identity\Domain\PasswordHasher;
+use App\Modules\Identity\Domain\UserRepository;
 use App\Session\Session;
+use App\Shared\Events\EventBus;
+use App\Support\Clock;
 use App\Validation\ValidationException;
 use App\Validation\ValidationResult;
 use App\Validation\Validator;
 
-final class AuthService
+final class AuthService implements Authenticator
 {
     private const SESSION_KEY = 'user_id';
 
@@ -21,6 +29,8 @@ final class AuthService
         private LoginThrottle $throttle,
         private Session $session,
         private Validator $validator,
+        private EventBus $events,
+        private Clock $clock,
     ) {
     }
 
@@ -105,6 +115,8 @@ final class AuthService
             $input['email'],
             $this->hasher->hash((string) $input['password']),
         );
+
+        $this->events->publish(new UserRegistered($user->id, $user->name, $user->email, $this->clock->now()));
 
         return $this->startSession($user->id);
     }

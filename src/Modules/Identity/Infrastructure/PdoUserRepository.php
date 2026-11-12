@@ -2,12 +2,16 @@
 
 declare(strict_types=1);
 
-namespace App\Auth;
+namespace App\Modules\Identity\Infrastructure;
 
+use App\Modules\Identity\Contract\User;
+use App\Modules\Identity\Contract\UserDirectory;
+use App\Modules\Identity\Domain\Credentials;
+use App\Modules\Identity\Domain\UserRepository;
 use App\Support\Clock;
 use PDO;
 
-final class PdoUserRepository implements UserRepository
+final class PdoUserRepository implements UserRepository, UserDirectory
 {
     public function __construct(private PDO $db, private Clock $clock)
     {
@@ -20,6 +24,26 @@ final class PdoUserRepository implements UserRepository
         $row = $stmt->fetch();
 
         return $row ? User::fromRow($row) : null;
+    }
+
+    public function findMany(array $ids): array
+    {
+        $ids = array_values(array_unique(array_map('intval', $ids)));
+
+        if ($ids === []) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $this->db->prepare("SELECT id, name, email FROM users WHERE id IN ($placeholders)");
+        $stmt->execute($ids);
+
+        $users = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $users[(int) $row['id']] = User::fromRow($row);
+        }
+
+        return $users;
     }
 
     public function emailExists(string $email): bool

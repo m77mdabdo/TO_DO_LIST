@@ -54,7 +54,11 @@ final class Container
         return $this->build($id);
     }
 
-    private function build(string $class): object
+    /**
+     * Builds a fresh instance by auto-wiring its constructor, ignoring any
+     * binding for that id. Lets a factory say "build it the normal way".
+     */
+    public function build(string $class): object
     {
         if (!class_exists($class)) {
             throw new RuntimeException("Cannot resolve [$class]: no binding and no such class.");

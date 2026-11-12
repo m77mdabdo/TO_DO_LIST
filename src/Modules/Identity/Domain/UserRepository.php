@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Auth;
+namespace App\Modules\Identity\Domain;
+
+use App\Modules\Identity\Contract\User;
 
 interface UserRepository
 {

@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Auth;
+namespace App\Modules\Identity\Infrastructure;
 
+use App\Modules\Identity\Domain\LoginThrottle;
 use App\Support\Clock;
 use PDO;
 

@@ -10,7 +10,7 @@ declare(strict_types=1);
  | Login: demo@todo.test / demo1234
  */
 
-use App\Auth\PasswordHasher;
+use App\Modules\Identity\Domain\PasswordHasher;
 use App\Core\Config;
 use App\Session\ArraySession;
 
