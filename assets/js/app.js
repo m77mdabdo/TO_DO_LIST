@@ -50,6 +50,55 @@
         if (event.key === 'Escape') closeMenus(null);
     });
 
+    /* ---------- keyboard shortcuts ----------
+     * Each one is a faster way to something that has a visible control too.
+     * Ignored while typing, and when a modifier key is held.
+     */
+
+    const shortcuts = $('#shortcuts');
+    $$('.js-shortcuts').forEach((btn) => btn.addEventListener('click', () => shortcuts?.showModal()));
+
+    const focusField = (field) => {
+        if (!field) return false;
+        field.closest('details')?.setAttribute('open', '');
+        field.focus();
+        if (field.select) field.select();
+        return true;
+    };
+
+    document.addEventListener('keydown', (event) => {
+        const target = event.target;
+        const typing = target.closest && target.closest('input, textarea, select, [contenteditable="true"]');
+
+        if (event.key === 'Escape' && typing) {
+            target.blur();
+            return;
+        }
+        if (typing || event.ctrlKey || event.metaKey || event.altKey || (shortcuts && shortcuts.open)) return;
+
+        const actions = {
+            '/': () => focusField($('.js-filter-search')) || focusField($('.js-global-search')),
+            f: () => {
+                const filters = $('details.filters');
+                if (!filters) return false;
+                filters.open = !filters.open;
+                if (filters.open) $('.js-filter-search')?.focus();
+                return true;
+            },
+            n: () => focusField($('.js-add-card')),
+            e: () => focusField($('.js-edit-card input[name="title"]')),
+            c: () => focusField($('.js-comment')),
+            '?': () => {
+                if (!shortcuts) return false;
+                shortcuts.showModal();
+                return true;
+            },
+        };
+
+        const action = actions[event.key.length === 1 ? event.key.toLowerCase() : event.key];
+        if (action && action()) event.preventDefault();
+    });
+
     /* ---------- fetch helper ---------- */
 
     async function post(url, fields) {

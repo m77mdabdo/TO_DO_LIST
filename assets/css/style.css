@@ -643,3 +643,14 @@ kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fon
     .topbar-search { max-width: none; }
     .topbar-search kbd { display: none; }
 }
+
+/* ---------- keyboard shortcuts dialog ---------- */
+
+.shortcuts-dialog { width: min(440px, calc(100vw - 2rem)); border: 0; padding: 1.4rem; color: var(--text); }
+.shortcuts-dialog::backdrop { background: rgba(18, 16, 38, .45); backdrop-filter: blur(2px); }
+.dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.dialog-head h2 { display: flex; align-items: center; gap: .5rem; font-size: 1.15rem; }
+.dialog-head form { margin: 0; }
+.shortcut-list { display: grid; grid-template-columns: auto 1fr; gap: .6rem 1rem; margin: 0; align-items: center; }
+.shortcut-list dt { text-align: center; }
+.shortcut-list dd { margin: 0; }

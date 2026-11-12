@@ -298,4 +298,15 @@ return [
     'Search boards and cards in :workspace' => 'ابحث في لوحات وبطاقات :workspace',
     'Type at least two letters.' => 'اكتب حرفين على الأقل.',
     'Nothing matches :q.' => 'لا توجد نتائج لـ :q.',
+
+    // Keyboard shortcuts
+    'Search (the board filter on a board page)' => 'البحث (فلتر اللوحة عند فتح لوحة)',
+    'Show or hide the board filters' => 'إظهار أو إخفاء فلاتر اللوحة',
+    'Add a card to the first list' => 'إضافة بطاقة إلى أول قائمة',
+    'Edit the open card' => 'تعديل البطاقة المفتوحة',
+    'Comment on the open card' => 'التعليق على البطاقة المفتوحة',
+    'Show these shortcuts' => 'عرض هذه الاختصارات',
+    'Close menus and dialogs, leave a field' => 'إغلاق القوائم والنوافذ، والخروج من الحقل',
+    'Keyboard shortcuts' => 'اختصارات لوحة المفاتيح',
+    'Close' => 'إغلاق',
 ];
