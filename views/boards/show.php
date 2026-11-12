@@ -92,6 +92,10 @@ $form = $this->form;
     </div>
 </div>
 
+<div class="board-tools">
+    <?= $this->partial('boards/filters', compact('board', 'filter', 'boardLabels', 'audience', 'people', 'totalCards', 'shownCards')) ?>
+</div>
+
 <?php if (!$open): ?>
     <div class="banner">
         <?= $this->icon('archive') ?>

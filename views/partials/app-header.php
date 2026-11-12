@@ -8,6 +8,7 @@
  * @var \App\Modules\Identity\Contract\User $user
  * @var list<\App\Modules\Workspace\Contract\WorkspaceSummary> $workspaces
  * @var ?\App\Modules\Workspace\Contract\WorkspaceSummary $currentWorkspace
+ * @var ?string $searchQuery
  */
 $workspaces ??= [];
 $currentWorkspace ??= null;
@@ -45,6 +46,16 @@ $currentWorkspace ??= null;
             </details>
         <?php endif; ?>
     </div>
+
+    <?php if (isset($user)): ?>
+        <form action="<?= $this->url('/search') ?>" method="get" class="topbar-search" role="search">
+            <label class="visually-hidden" for="topbar-search"><?= $this->te('Search') ?></label>
+            <?= $this->icon('search') ?>
+            <input type="search" id="topbar-search" name="q" value="<?= $this->e($searchQuery ?? '') ?>" maxlength="100" dir="auto"
+                   class="js-global-search" placeholder="<?= $this->te('Search') ?>">
+            <kbd class="hide-sm">/</kbd>
+        </form>
+    <?php endif; ?>
 
     <div class="topbar-actions">
         <button class="icon-btn js-theme" type="button" title="<?= $this->te('Toggle dark mode') ?>">
