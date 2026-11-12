@@ -58,6 +58,7 @@ $mona = $register('Mona Hassan', 'mona@todo.test');
 // A company workspace with a team board everyone in it can see.
 $workspace = $app->get(WorkspaceService::class)->create($demo, ['company_name' => 'Nile Studio']);
 $app->get(WorkspaceRepository::class)->addMember($workspace->id, $mona, WorkspaceRole::Member);
+$app->get(WorkspaceService::class)->switchTo($mona, $workspace->id); // so Mona's first login opens it
 
 $boards = $app->get(BoardService::class);
 $cards = $app->get(CardService::class);

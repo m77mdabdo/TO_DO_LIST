@@ -73,6 +73,7 @@ final class WorkspaceService implements WorkspaceDirectory, WorkspaceProvisionin
         }
 
         $this->session->put(self::CURRENT_KEY, $summary->publicId);
+        $this->workspaces->markOpened($userId, $summary->id);
 
         return true;
     }
@@ -106,7 +107,17 @@ final class WorkspaceService implements WorkspaceDirectory, WorkspaceProvisionin
             return $summary;
         }
 
-        return $this->workspaces->summariesOf($userId)[0] ?? null;
+        // A new session: reopen the workspace the user was last in, else their first one.
+        $last = $this->workspaces->lastOpenedOf($userId);
+        $summary = ($last !== null ? $this->workspaces->findForUser($last, $userId) : null)
+            ?? $this->workspaces->summariesOf($userId)[0]
+            ?? null;
+
+        if ($summary !== null) {
+            $this->session->put(self::CURRENT_KEY, $summary->publicId);
+        }
+
+        return $summary;
     }
 
     public function members(int $workspaceId): array

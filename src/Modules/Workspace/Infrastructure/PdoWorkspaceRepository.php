@@ -54,6 +54,23 @@ final class PdoWorkspaceRepository implements WorkspaceRepository
         return $id === false ? null : (int) $id;
     }
 
+    public function markOpened(int $userId, int $workspaceId): void
+    {
+        $this->db->prepare('UPDATE workspace_members SET last_opened_at = ? WHERE workspace_id = ? AND user_id = ?')
+            ->execute([$this->now(), $workspaceId, $userId]);
+    }
+
+    public function lastOpenedOf(int $userId): ?string
+    {
+        // The user's rows come from the (user_id, ...) index; a user is in a handful of workspaces.
+        $stmt = $this->db->prepare('SELECT w.public_id FROM workspace_members m JOIN workspaces w ON w.id = m.workspace_id
+            WHERE m.user_id = ? AND m.last_opened_at IS NOT NULL ORDER BY m.last_opened_at DESC, m.workspace_id DESC LIMIT 1');
+        $stmt->execute([$userId]);
+        $id = $stmt->fetchColumn();
+
+        return $id === false ? null : (string) $id;
+    }
+
     public function summariesOf(int $userId): array
     {
         $stmt = $this->db->prepare(self::SUMMARY_SELECT . ' WHERE m.user_id = ? ORDER BY m.joined_at, w.id');

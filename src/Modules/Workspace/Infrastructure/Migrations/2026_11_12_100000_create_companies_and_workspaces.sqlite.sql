@@ -20,6 +20,8 @@ CREATE TABLE workspace_members (
     user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     role         TEXT    NOT NULL CHECK (role IN ('owner', 'admin', 'member', 'guest')),
     joined_at    TEXT    NOT NULL,
+    -- Set when the user switches to this workspace, so the next sign-in opens it again.
+    last_opened_at TEXT,
     PRIMARY KEY (workspace_id, user_id)
 );
 
