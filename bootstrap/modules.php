@@ -19,6 +19,7 @@ return [
     App\Modules\Discussion\DiscussionModule::class,
     App\Modules\Invitation\InvitationModule::class,
     App\Modules\Notification\NotificationModule::class,
+    App\Modules\Audit\AuditModule::class,
     App\Modules\Activity\ActivityModule::class,
     App\Modules\LegacyImport\LegacyImportModule::class,
 ];
