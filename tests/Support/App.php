@@ -32,6 +32,8 @@ final class App
             'app_name' => 'Todo Board',
             'timezone' => 'Asia/Riyadh',
             'locale'   => $locale,
+            'url'      => 'https://todo.test',
+            'mail'     => ['driver' => 'memory', 'from_address' => 'team@todo.test', 'from_name' => 'To Do List'],
             'db'       => ['driver' => 'sqlite', 'sqlite_path' => ':memory:'],
         ]), $this->session);
         $this->container->singleton(Clock::class, fn () => new FrozenClock($now));
