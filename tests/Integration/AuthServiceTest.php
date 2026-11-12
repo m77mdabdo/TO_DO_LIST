@@ -8,6 +8,7 @@ use App\Modules\Identity\Application\AuthService;
 use App\Modules\Identity\Domain\PasswordHasher;
 use App\Modules\Identity\Infrastructure\PdoLoginThrottle;
 use App\Modules\Identity\Infrastructure\PdoUserRepository;
+use App\Modules\Identity\Contract\Events\UserLoggedIn;
 use App\Modules\Identity\Contract\Events\UserRegistered;
 use App\Session\ArraySession;
 use App\Shared\Events\RecordingEventBus;
@@ -57,6 +58,17 @@ final class AuthServiceTest extends TestCase
         [$event] = $this->events->published(UserRegistered::name());
         $this->assertSame($user->id, $event->userId);
         $this->assertSame('sara@example.com', $event->email);
+    }
+
+    public function testLoggingInIsAnnounced(): void
+    {
+        $user = $this->auth->register($this->signup());
+        $this->auth->logout();
+
+        $this->auth->login(['email' => 'sara@example.com', 'password' => 'secret123'], '10.0.0.1');
+
+        [$event] = $this->events->published(UserLoggedIn::name());
+        $this->assertSame($user->id, $event->userId);
     }
 
     public function testAFailedSignupAnnouncesNothing(): void
