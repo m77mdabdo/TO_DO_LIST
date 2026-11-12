@@ -15,17 +15,25 @@
  */
 $cardPath = '/cards/' . $card->publicId;
 
-/** Safe Markdown, with the people it mentions highlighted. */
+/**
+ * Safe Markdown, with the people it mentions highlighted. All spellings go
+ * into one pattern, longest first, so "@Mona Hassan" is wrapped once and
+ * never again as "@Mona".
+ */
 $render = function (\App\Modules\Discussion\Contract\Comment $comment) use ($handles): string {
     $html = $this->markdown($comment->body);
+    $spellings = [];
     foreach ($comment->mentions as $userId) {
         foreach ($handles[$userId] ?? [] as $spelling) {
-            $pattern = '/' . preg_quote('@' . $this->e($spelling), '/') . '(?![\p{L}\p{N}_])/iu';
-            $html = (string) preg_replace($pattern, '<span class="mention">$0</span>', $html);
+            $spellings[] = preg_quote($this->e($spelling), '/');
         }
     }
+    if (!$spellings) {
+        return $html;
+    }
+    usort($spellings, static fn (string $a, string $b): int => mb_strlen($b) <=> mb_strlen($a));
 
-    return $html;
+    return (string) preg_replace('/@(?:' . implode('|', $spellings) . ')(?![\p{L}\p{N}_])/iu', '<span class="mention">$0</span>', $html);
 };
 ?>
 <section class="comments stack" id="comments" aria-label="<?= $this->te('Comments') ?>">
