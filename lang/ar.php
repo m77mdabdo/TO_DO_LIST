@@ -386,4 +386,7 @@ return [
     ':actor added :member to the board as :subject' => ':actor أضاف :member إلى اللوحة بدور :subject',
     ':actor made :member a board :subject' => ':actor جعل :member بدور :subject في اللوحة',
     ':actor took :member off the board' => ':actor أزال :member من اللوحة',
+
+    // Checklist assignment
+    ':actor gave :subject on :card to :member' => ':actor أسند :subject في :card إلى :member',
 ];

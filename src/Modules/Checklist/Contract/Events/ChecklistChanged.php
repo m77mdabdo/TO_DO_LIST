@@ -10,6 +10,7 @@ use DateTimeImmutable;
 /**
  * change: added | renamed | removed (a checklist; $subject is its title)
  *       | item_completed | item_reopened (an item; $subject is its text)
+ *       | item_assigned (an item was given to $assigneeId)
  */
 final class ChecklistChanged implements DomainEvent
 {
@@ -21,6 +22,7 @@ final class ChecklistChanged implements DomainEvent
         public readonly string $subject,
         public readonly string $cardTitle,
         private readonly DateTimeImmutable $at,
+        public readonly ?int $assigneeId = null,
     ) {
     }
 

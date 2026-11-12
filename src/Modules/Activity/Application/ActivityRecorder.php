@@ -74,7 +74,10 @@ final class ActivityRecorder
             $event instanceof CardDeleted   => $this->log->record($event->boardId, null, $event->actorId, 'card.deleted', $event->title),
             $event instanceof LabelAttached => $this->log->record($event->boardId, $event->cardId, $event->actorId, 'label.attached', $event->labelName),
             $event instanceof LabelDetached => $this->log->record($event->boardId, $event->cardId, $event->actorId, 'label.detached', $event->labelName),
-            $event instanceof ChecklistChanged => $this->log->record($event->boardId, $event->cardId, $event->actorId, 'checklist.' . $event->change, $event->subject, ['card' => $event->cardTitle]),
+            $event instanceof ChecklistChanged => $this->log->record($event->boardId, $event->cardId, $event->actorId, 'checklist.' . $event->change, $event->subject, array_filter([
+                'card'   => $event->cardTitle,
+                'member' => $event->assigneeId !== null ? ($this->users->find($event->assigneeId)?->name ?? '') : null,
+            ], static fn ($v) => $v !== null)),
             $event instanceof CommentPosted => $this->log->record($event->boardId, $event->cardId, $event->actorId, 'comment.posted', $event->cardTitle),
             // Taking a vote back isn't worth a line in the history.
             $event instanceof VoteChanged   => $event->added ? $this->log->record($event->boardId, $event->cardId, $event->actorId, 'vote.added', $event->cardTitle) : null,
