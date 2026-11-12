@@ -40,6 +40,7 @@ $templates = [
     'checklist.removed' => ':actor removed the checklist :subject from :card',
     'checklist.item_completed' => ':actor completed :subject on :card',
     'checklist.item_reopened'  => ':actor reopened :subject on :card',
+    'checklist.item_assigned'  => ':actor gave :subject on :card to :member',
     'comment.posted'    => ':actor commented on :subject',
     'vote.added'        => ':actor voted for :subject',
     'label.attached'    => ':actor added the label :subject',

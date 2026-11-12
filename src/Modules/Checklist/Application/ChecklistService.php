@@ -141,11 +141,16 @@ final class ChecklistService
         }
 
         $due = (string) ($input['due_date'] ?? '');
+        $text = trim((string) $input['text']);
         $this->checklists->updateItem($item->id, [
-            'text'        => trim((string) $input['text']),
+            'text'        => $text,
             'assignee_id' => $assigneeId,
             'due_at'      => $due !== '' ? $due . ' 00:00:00' : null,
         ]);
+
+        if ($assigneeId !== null && $assigneeId !== $item->assigneeId) {
+            $this->announce($card, $actorId, 'item_assigned', $text, $assigneeId);
+        }
 
         return $card;
     }
@@ -245,9 +250,9 @@ final class ChecklistService
         }
     }
 
-    private function announce(CardSummary $card, int $actorId, string $change, string $subject): void
+    private function announce(CardSummary $card, int $actorId, string $change, string $subject, ?int $assigneeId = null): void
     {
-        $this->events->publish(new ChecklistChanged($card->id, $card->boardId, $actorId, $change, $subject, $card->title, $this->clock->now()));
+        $this->events->publish(new ChecklistChanged($card->id, $card->boardId, $actorId, $change, $subject, $card->title, $this->clock->now(), $assigneeId));
     }
 
     private function validTitle(string $title): string
