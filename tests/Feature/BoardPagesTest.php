@@ -117,15 +117,16 @@ final class BoardPagesTest extends TestCase
     {
         $this->f->app->post('/boards/' . $this->f->board->publicId . '/cards', ['list_id' => (string) $this->f->todo->id, 'title' => 'Draft']);
         $card = $this->openCards()[$this->f->todo->id][0];
-        $mona = $this->f->colleague('mona@example.com');
+        $mona = $this->f->app->signUp('Mona Hassan', 'mona@example.com');
         $this->f->app->container->get(\App\Modules\Access\Contract\BoardMembers::class)->add($this->f->board->id, $mona, \App\Modules\Access\Contract\BoardRole::Member);
         $this->f->app->loginAs('sara@example.com');
 
-        $this->f->app->post('/cards/' . $card->publicId . '/comments', ['body' => 'Ready for @Mona? <img src=x onerror=alert(1)>']);
+        $this->f->app->post('/cards/' . $card->publicId . '/comments', ['body' => 'Ready for @Mona? Thanks @Mona Hassan <img src=x onerror=alert(1)>']);
         $this->f->app->post('/cards/' . $card->publicId . '/vote');
 
         $html = $this->f->app->page('/cards/' . $card->publicId);
-        $this->assertTrue(str_contains($html, '<span class="mention">@Mona</span>'));
+        $this->assertTrue(str_contains($html, '<span class="mention">@Mona</span>?'));
+        $this->assertTrue(str_contains($html, '<span class="mention">@Mona Hassan</span>'));
         $this->assertFalse(str_contains($html, '<img src=x'));
         $this->assertTrue(str_contains($html, 'Remove my vote'));
 
