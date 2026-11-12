@@ -95,6 +95,23 @@ final class PdoCardRepository implements CardRepository
         return $byList;
     }
 
+    public function search(array $boardIds, string $text, int $limit): array
+    {
+        // LIKE wildcards in the user's text are escaped with "!" (portable across SQLite and MySQL).
+        $pattern = '%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $text) . '%';
+        $marks = implode(', ', array_fill(0, count($boardIds), '?'));
+        $limit = (int) $limit;
+
+        // board_id IN (...) uses idx_cards_board; the text match then runs on those boards' cards only.
+        $stmt = $this->db->prepare('SELECT ' . self::COLUMNS . " FROM cards
+            WHERE board_id IN ($marks) AND archived_at IS NULL
+              AND (title LIKE ? ESCAPE '!' OR description LIKE ? ESCAPE '!')
+            ORDER BY updated_at DESC, id DESC LIMIT $limit");
+        $stmt->execute([...array_values($boardIds), $pattern, $pattern]);
+
+        return array_map([CardSummary::class, 'fromRow'], $stmt->fetchAll());
+    }
+
     public function archivedCards(int $boardId): array
     {
         $stmt = $this->db->prepare('SELECT ' . self::COLUMNS . ' FROM cards WHERE board_id = ? AND archived_at IS NOT NULL ORDER BY archived_at DESC, id DESC');

@@ -25,6 +25,12 @@ interface CardRepository
     /** @return array<int, list<CardSummary>> */
     public function openCardsByList(int $boardId): array;
 
+    /**
+     * @param list<int> $boardIds
+     * @return list<CardSummary>
+     */
+    public function search(array $boardIds, string $text, int $limit): array;
+
     /** @return list<CardSummary> */
     public function archivedCards(int $boardId): array;
 
