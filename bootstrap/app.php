@@ -11,6 +11,7 @@ declare(strict_types=1);
 use App\Core\Config;
 use App\Core\Container;
 use App\Database\ConnectionFactory;
+use App\Database\Transactions;
 use App\Database\Migrations\MigrationRunner;
 use App\Http\Kernel;
 use App\I18n\Translator;
@@ -73,6 +74,7 @@ return static function (Config $config, Session $session, string $basePath = '',
         (string) $config->get('locale', 'ar'),
         $c->get(Session::class),
     ));
+    $container->singleton(Transactions::class, fn (Container $c) => new Transactions($c->get(PDO::class)));
     $container->singleton(Url::class, fn () => new Url($basePath, $root));
     $container->singleton(Csrf::class, fn (Container $c) => new Csrf($c->get(Session::class)));
     $container->singleton(FormState::class, fn (Container $c) => new FormState($c->get(Session::class)));
