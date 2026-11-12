@@ -25,24 +25,24 @@ $mismatch = $valid && $user !== null && !$found['invitation']->isFor($user->emai
             <div class="actions"><a class="btn btn-primary" href="<?= $this->url('/login') ?>"><?= $this->te('Log in') ?></a></div>
         <?php else: ?>
             <?php $invitation = $found['invitation']; ?>
-            <h1><?= $this->te('You are invited to :company', [':company' => $found['workspace']->companyName]) ?></h1>
+            <h1><?= $this->te('You are invited to :company', ['company' => $found['workspace']->companyName]) ?></h1>
             <p class="muted">
                 <?= $this->te(':name invited you as :role.', [
-                    ':name' => $found['inviter']->name ?? $this->t('Someone'),
-                    ':role' => $this->t($invitation->role->label()),
+                    'name' => $found['inviter']->name ?? $this->t('Someone'),
+                    'role' => $this->t($invitation->role->label()),
                 ]) ?>
-                <?php if ($invitation->boardIds): ?><?= $this->te('You will also join :count boards.', [':count' => (string) count($invitation->boardIds)]) ?><?php endif; ?>
+                <?php if ($invitation->boardIds): ?><?= $this->te('You will also join :count boards.', ['count' => (string) count($invitation->boardIds)]) ?><?php endif; ?>
             </p>
             <?= $this->partial('partials/field-error', ['field' => 'invitation']) ?>
 
             <?php if ($user === null): ?>
-                <p class="small"><?= $this->te('Log in or create an account with :email to accept.', [':email' => $invitation->email]) ?></p>
+                <p class="small"><?= $this->te('Log in or create an account with :email to accept.', ['email' => $invitation->email]) ?></p>
                 <div class="actions">
                     <a class="btn btn-primary" href="<?= $this->url('/register') ?>"><?= $this->te('Create an account') ?></a>
                     <a class="btn btn-ghost" href="<?= $this->url('/login') ?>"><?= $this->te('Log in') ?></a>
                 </div>
             <?php elseif ($mismatch): ?>
-                <div class="alert"><?= $this->icon('flag') ?><?= $this->te('This invitation is for :email, but you are signed in as :current.', [':email' => $invitation->email, ':current' => $user->email]) ?></div>
+                <div class="alert"><?= $this->icon('flag') ?><?= $this->te('This invitation is for :email, but you are signed in as :current.', ['email' => $invitation->email, 'current' => $user->email]) ?></div>
                 <form action="<?= $this->url('/logout') ?>" method="post">
                     <?= $this->csrfField() ?>
                     <button class="btn btn-ghost" type="submit"><?= $this->te('Log out and use the right account') ?></button>
@@ -50,7 +50,7 @@ $mismatch = $valid && $user !== null && !$found['invitation']->isFor($user->emai
             <?php else: ?>
                 <form action="<?= $this->url('/invitations/' . $token . '/accept') ?>" method="post">
                     <?= $this->csrfField() ?>
-                    <button class="btn btn-primary btn-block" type="submit"><?= $this->te('Join :company', [':company' => $found['workspace']->companyName]) ?></button>
+                    <button class="btn btn-primary btn-block" type="submit"><?= $this->te('Join :company', ['company' => $found['workspace']->companyName]) ?></button>
                 </form>
             <?php endif; ?>
         <?php endif; ?>

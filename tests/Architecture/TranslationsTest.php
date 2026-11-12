@@ -23,8 +23,8 @@ final class TranslationsTest extends TestCase
         foreach ($files as $file) {
             $code = (string) file_get_contents($file->getPathname());
             preg_match_all("/->te?\\(\\s*'((?:[^'\\\\]|\\\\.)*)'/", $code, $matches);
-            // Activity sentences are kept in an array and translated through a variable.
-            preg_match_all("/'(:actor [^']*)'/", $code, $sentences);
+            // Activity, audit and notification sentences are kept in arrays and translated through a variable.
+            preg_match_all("/'(:(?:actor|target|subject) [^']*)'/", $code, $sentences);
 
             foreach ([...$matches[1], ...$sentences[1]] as $raw) {
                 $key = stripslashes($raw);
@@ -35,6 +35,23 @@ final class TranslationsTest extends TestCase
         }
 
         $this->assertSame([], $missing);
+    }
+
+    /** t() takes placeholder names without the colon: ['count' => 3], not [':count' => 3]. */
+    public function testPlaceholdersArePassedWithoutTheColon(): void
+    {
+        $wrong = [];
+        foreach (['views', 'src'] as $dir) {
+            $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(BASE_PATH . '/' . $dir, RecursiveDirectoryIterator::SKIP_DOTS));
+            foreach ($files as $file) {
+                $code = (string) file_get_contents($file->getPathname());
+                if (preg_match("/(?:->|\\$)te?\\(\\s*'(?:[^'\\\\]|\\\\.)*'\\s*,\\s*\\[\\s*':/", $code) === 1) {
+                    $wrong[] = $file->getFilename();
+                }
+            }
+        }
+
+        $this->assertSame([], $wrong);
     }
 
     public function testArabicIsTheDefaultAndRightToLeft(): void

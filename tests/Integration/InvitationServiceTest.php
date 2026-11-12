@@ -38,6 +38,7 @@ final class InvitationServiceTest extends TestCase
         $mail = $this->mailer()->sent[0];
         $this->assertSame('omar@example.com', $mail->to);
         $this->assertTrue(str_contains($mail->body, $link));
+        $this->assertSame(0, preg_match('/:[a-z]+/', $mail->subject . $mail->body), 'Every placeholder is filled in.');
         $this->assertSame(1, preg_match('#^https://todo\.test/invitations/[A-Za-z0-9_-]{43}$#', $link));
         // Only the hash is stored.
         $this->assertSame(0, (int) $this->f->app->pdo()->query("SELECT COUNT(*) FROM invitations WHERE token_hash = '" . basename($link) . "'")->fetchColumn());

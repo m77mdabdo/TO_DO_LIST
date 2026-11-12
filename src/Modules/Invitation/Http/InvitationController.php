@@ -111,7 +111,7 @@ final class InvitationController extends Controller
             return $this->backWithErrors($e, $request, '/invitations/' . $params['token']);
         }
 
-        return $this->redirect('/', $this->view->t('Welcome to :company!', [':company' => $workspace->companyName]));
+        return $this->redirect('/', $this->view->t('Welcome to :company!', ['company' => $workspace->companyName]));
     }
 
     /** Back to the members page the form was on (a local path only), else home. */

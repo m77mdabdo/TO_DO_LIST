@@ -88,9 +88,9 @@ $oldBoards = $this->form->oldArray('boards');
                         <strong><bdi><?= $this->e($invitation->email) ?></bdi></strong>
                         <small class="muted">
                             <?= $this->te($invitation->role->label()) ?>
-                            <?php if ($invitation->boardIds): ?> · <?= $this->te(':count boards', [':count' => (string) count($invitation->boardIds)]) ?><?php endif; ?>
-                            · <?= $this->te('invited by :name', [':name' => $inviters[$invitation->invitedBy]->name ?? '?']) ?>
-                            · <?= $expired ? '<span class="danger">' . $this->te('expired') . '</span>' : $this->te('expires :date', [':date' => substr($invitation->expiresAt, 0, 10)]) ?>
+                            <?php if ($invitation->boardIds): ?> · <?= $this->te(':count boards', ['count' => (string) count($invitation->boardIds)]) ?><?php endif; ?>
+                            · <?= $this->te('invited by :name', ['name' => $inviters[$invitation->invitedBy]->name ?? '?']) ?>
+                            · <?= $expired ? '<span class="danger">' . $this->te('expired') . '</span>' : $this->te('expires :date', ['date' => substr($invitation->expiresAt, 0, 10)]) ?>
                         </small>
                     </span>
                     <span class="row-actions">
