@@ -23,6 +23,9 @@ use App\Http\Router;
 use App\Http\Url;
 use App\Security\Csrf;
 use App\Session\Session;
+use App\Shared\Events\EventBus;
+use App\Shared\Events\SyncEventBus;
+use App\Shared\Module\ModuleRegistry;
 use App\Support\Clock;
 use App\Support\FileLogger;
 use App\Support\Logger;
@@ -49,8 +52,11 @@ return static function (Config $config, Session $session, string $basePath = '',
     $container->instance(Session::class, $session);
     $container->singleton(Clock::class, fn () => new SystemClock());
 
+    $modules = ModuleRegistry::fromClasses(require __DIR__ . '/modules.php');
+    $container->instance(ModuleRegistry::class, $modules);
+
     $autoMigrate ??= (bool) $config->get('auto_migrate', true);
-    $migrationDirs = [$root . '/database/migrations'];
+    $migrationDirs = [$root . '/database/migrations', ...$modules->migrationPaths()];
 
     $container->singleton(MigrationRunner::class, fn (Container $c) => new MigrationRunner($c->get(PDO::class), $migrationDirs));
     $container->singleton(PDO::class, function (Container $c) use ($config, $autoMigrate, $migrationDirs): PDO {
@@ -80,9 +86,17 @@ return static function (Config $config, Session $session, string $basePath = '',
         return $view;
     });
 
-    $container->singleton(Router::class, function () use ($root): Router {
+    $container->singleton(EventBus::class, function (Container $c) use ($modules): EventBus {
+        $events = new SyncEventBus();
+        $modules->listeners($events, $c);
+
+        return $events;
+    });
+
+    $container->singleton(Router::class, function () use ($root, $modules): Router {
         $router = new Router();
         (require $root . '/routes/web.php')($router);
+        $modules->routes($router);
 
         return $router;
     });
@@ -96,6 +110,9 @@ return static function (Config $config, Session $session, string $basePath = '',
         $c->get(Logger::class),
         (bool) $config->get('debug', false),
     ));
+
+    // Modules bind last, so they can build on the shared services above.
+    $modules->register($container);
 
     return $container;
 };
