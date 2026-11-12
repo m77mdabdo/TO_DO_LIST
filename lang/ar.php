@@ -212,4 +212,9 @@ return [
     ':actor changed the start date of :subject' => ':actor غيّر تاريخ بداية :subject',
     ':actor assigned :member to :subject' => ':actor أسند :subject إلى :member',
     ':actor took :member off :subject' => ':actor أزال :member من :subject',
+
+    // Markdown description
+    'No description.' => 'لا يوجد وصف.',
+    'Edit card' => 'تعديل البطاقة',
+    'Markdown works: **bold**, *italic*, - lists, [links](https://…), `code`.' => 'يمكنك استخدام Markdown: **عريض**، *مائل*، - قوائم، [روابط](https://…)، `كود`.',
 ];

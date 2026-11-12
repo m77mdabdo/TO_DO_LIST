@@ -554,3 +554,19 @@ button.label { cursor: pointer; }
 .people-list form { margin: 0; margin-inline-start: auto; }
 .inline-form { display: flex; gap: .5rem; align-items: center; margin: 0; }
 .inline-form select, .inline-form input { flex: 1; min-width: 0; }
+
+/* ---------- Markdown text ---------- */
+
+.card-heading { font-size: 1.5rem; word-break: break-word; }
+.prose { line-height: 1.65; word-break: break-word; }
+.prose > * { margin: 0 0 .7em; }
+.prose > :last-child { margin-bottom: 0; }
+.prose h3, .prose h4, .prose h5 { margin-top: 1em; }
+.prose ul, .prose ol { padding-inline-start: 1.4em; }
+.prose blockquote { margin-inline: 0; padding-inline-start: .9em; border-inline-start: 3px solid var(--border); color: var(--muted); }
+.prose code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .88em; background: var(--surface-2); padding: .1em .35em; border-radius: 6px; }
+.prose pre { overflow-x: auto; background: var(--surface-2); padding: .8rem 1rem; border-radius: var(--radius-sm); direction: ltr; text-align: left; }
+.prose pre code { background: none; padding: 0; }
+.edit-card > summary { list-style: none; width: fit-content; cursor: pointer; }
+.edit-card > summary::-webkit-details-marker { display: none; }
+.edit-card[open] > summary { margin-bottom: 1rem; }

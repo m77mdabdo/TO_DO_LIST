@@ -29,6 +29,7 @@ foreach ($lists as $list) {
 }
 $form = $this->form;
 $cardPath = '/cards/' . $card->publicId;
+$editErrors = $form->error('title') || $form->error('description') || $form->error('start_date') || $form->error('due_date');
 ?>
 <?= $this->partial('partials/app-header') ?>
 <main class="wrap card-page">
@@ -41,36 +42,46 @@ $cardPath = '/cards/' . $card->publicId;
                 <?php if ($card->isComplete()): ?><span class="pill pill-done"><?= $this->icon('check') ?><?= $this->te('Done') ?></span><?php endif; ?>
             </p>
 
-            <?php if ($canEdit): ?>
-                <form action="<?= $this->url($cardPath) ?>" method="post" class="stack" novalidate>
-                    <?= $this->csrfField() ?>
-                    <label><span><?= $this->te('Title') ?></span>
-                        <input name="title" required maxlength="200" dir="auto" value="<?= $this->e($form->old('title', $card->title)) ?>"
-                               aria-invalid="<?= $form->error('title') ? 'true' : 'false' ?>">
-                        <?= $this->partial('partials/field-error', ['field' => 'title']) ?></label>
-                    <label><span><?= $this->te('Description') ?></span>
-                        <textarea name="description" rows="6" maxlength="10000" dir="auto"><?= $this->e($form->old('description', (string) $card->description)) ?></textarea>
-                        <?= $this->partial('partials/field-error', ['field' => 'description']) ?></label>
-                    <div class="field-row">
-                        <label><span><?= $this->te('Start date') ?></span>
-                            <input type="date" name="start_date" value="<?= $this->e($form->old('start_date', (string) $card->startDate())) ?>"
-                                   aria-invalid="<?= $form->error('start_date') ? 'true' : 'false' ?>">
-                            <?= $this->partial('partials/field-error', ['field' => 'start_date']) ?></label>
-                        <label><span><?= $this->te('Due date') ?></span>
-                            <input type="date" name="due_date" value="<?= $this->e($form->old('due_date', (string) $card->dueDate())) ?>">
-                            <?= $this->partial('partials/field-error', ['field' => 'due_date']) ?></label>
-                    </div>
-                    <div><button class="btn btn-primary" type="submit"><?= $this->te('Save') ?></button></div>
-                </form>
-            <?php else: ?>
-                <h1 dir="auto"><?= $this->e($card->title) ?></h1>
-                <?php if ($card->description): ?><p class="card-description" dir="auto"><?= nl2br($this->e($card->description)) ?></p><?php endif; ?>
+            <?php if (!$canEdit || !$editErrors): ?>
+                <h1 class="card-heading" dir="auto"><?= $this->e($card->title) ?></h1>
                 <?php if ($card->startDate() || $card->dueDate()): ?>
                     <p class="date-range">
                         <?php if ($card->startDate()): ?><span class="due"><?= $this->te('Starts') ?> <?= $this->e($card->startDate()) ?></span><?php endif; ?>
                         <?php if ($card->dueDate()): ?><span class="due"><?= $this->icon('calendar') ?><?= $this->e($card->dueDate()) ?></span><?php endif; ?>
                     </p>
                 <?php endif; ?>
+                <?php if ($card->description): ?>
+                    <div class="prose" dir="auto"><?= $this->markdown($card->description) ?></div>
+                <?php elseif (!$canEdit): ?>
+                    <p class="muted"><?= $this->te('No description.') ?></p>
+                <?php endif; ?>
+            <?php endif; ?>
+
+            <?php if ($canEdit): ?>
+                <details class="edit-card" <?= $editErrors || !$card->description ? 'open' : '' ?>>
+                    <summary class="btn btn-ghost"><?= $this->icon('edit') ?><?= $this->te('Edit card') ?></summary>
+                    <form action="<?= $this->url($cardPath) ?>" method="post" class="stack" novalidate>
+                        <?= $this->csrfField() ?>
+                        <label><span><?= $this->te('Title') ?></span>
+                            <input name="title" required maxlength="200" dir="auto" value="<?= $this->e($form->old('title', $card->title)) ?>"
+                                   aria-invalid="<?= $form->error('title') ? 'true' : 'false' ?>">
+                            <?= $this->partial('partials/field-error', ['field' => 'title']) ?></label>
+                        <label><span><?= $this->te('Description') ?></span>
+                            <textarea name="description" rows="7" maxlength="10000" dir="auto" class="js-description"><?= $this->e($form->old('description', (string) $card->description)) ?></textarea>
+                            <small class="muted"><?= $this->te('Markdown works: **bold**, *italic*, - lists, [links](https://…), `code`.') ?></small>
+                            <?= $this->partial('partials/field-error', ['field' => 'description']) ?></label>
+                        <div class="field-row">
+                            <label><span><?= $this->te('Start date') ?></span>
+                                <input type="date" name="start_date" value="<?= $this->e($form->old('start_date', (string) $card->startDate())) ?>"
+                                       aria-invalid="<?= $form->error('start_date') ? 'true' : 'false' ?>">
+                                <?= $this->partial('partials/field-error', ['field' => 'start_date']) ?></label>
+                            <label><span><?= $this->te('Due date') ?></span>
+                                <input type="date" name="due_date" value="<?= $this->e($form->old('due_date', (string) $card->dueDate())) ?>">
+                                <?= $this->partial('partials/field-error', ['field' => 'due_date']) ?></label>
+                        </div>
+                        <div><button class="btn btn-primary" type="submit"><?= $this->te('Save') ?></button></div>
+                    </form>
+                </details>
             <?php endif; ?>
 
             <?php if ($activity): ?>
