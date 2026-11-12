@@ -15,7 +15,7 @@ use App\Auth\UserRepository;
 use App\Core\Config;
 use App\Core\Container;
 use App\Database\ConnectionFactory;
-use App\Database\Migrator;
+use App\Database\Migrations\MigrationRunner;
 use App\Http\Kernel;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\VerifyCsrfToken;
@@ -35,7 +35,11 @@ use App\View\View;
 
 require_once __DIR__ . '/autoload.php';
 
-return static function (Config $config, Session $session, string $basePath = ''): Container {
+/*
+ | $autoMigrate: apply pending migrations on the first database use.
+ | Handy for local SQLite; turn it off and run database/migrate.php in production.
+ */
+return static function (Config $config, Session $session, string $basePath = '', ?bool $autoMigrate = null): Container {
     $root = dirname(__DIR__);
     $container = new Container();
 
@@ -45,9 +49,16 @@ return static function (Config $config, Session $session, string $basePath = '')
     $container->instance(Session::class, $session);
     $container->singleton(Clock::class, fn () => new SystemClock());
 
-    $container->singleton(PDO::class, function () use ($config, $root): PDO {
+    $autoMigrate ??= (bool) $config->get('auto_migrate', true);
+    $migrationDirs = [$root . '/database/migrations'];
+
+    $container->singleton(MigrationRunner::class, fn (Container $c) => new MigrationRunner($c->get(PDO::class), $migrationDirs));
+    $container->singleton(PDO::class, function (Container $c) use ($config, $autoMigrate, $migrationDirs): PDO {
         $pdo = ConnectionFactory::make((array) $config->get('db'));
-        (new Migrator($pdo, $root . '/database'))->migrate();
+
+        if ($autoMigrate) {
+            (new MigrationRunner($pdo, $migrationDirs))->migrate();
+        }
 
         return $pdo;
     });

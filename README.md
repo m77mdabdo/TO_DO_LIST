@@ -121,8 +121,8 @@ php database/seed.php
    'pass'   => '',
    ```
 4. Make sure `mod_rewrite` is on (it is by default in XAMPP), then visit <http://localhost/TO_DO_LIST>.
-   Tables are created on the first request
-   (or import `database/schema.mysql.sql` yourself).
+   Tables are created on the first request, or run `php database/migrate.php`
+   (set `APP_AUTO_MIGRATE=false` on a real server and migrate on deploy).
 
 You can also use environment variables instead of `config.local.php`:
 `DB_DRIVER`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`, `APP_NAME`, `APP_TIMEZONE`.
@@ -151,12 +151,12 @@ TO_DO_LIST/
 │   ├── Session/            # Session interface, NativeSession, ArraySession (tests)
 │   ├── Security/Csrf.php
 │   ├── View/               # View renderer, FormState (errors + old input), Icons
-│   ├── Database/           # ConnectionFactory, Migrator
+│   ├── Database/           # ConnectionFactory, Migrations/ (versioned runner)
 │   └── Support/            # Clock, TimeAgo, Greeting, Logger
 │
 ├── views/                  # plain PHP templates: layout, board, tasks/edit, auth/*, partials/*
 ├── assets/                 # style.css (~20 KB, light + dark), app.js, theme.js, favicon
-├── database/               # schema.sqlite.sql, schema.mysql.sql, seed.php
+├── database/               # migrations/, migrate.php, seed.php
 ├── storage/logs/           # error logs
 └── tests/                  # Unit, Integration and Feature tests + a tiny runner
 ```
