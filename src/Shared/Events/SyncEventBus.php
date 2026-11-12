@@ -17,7 +17,7 @@ namespace App\Shared\Events;
  */
 final class SyncEventBus implements EventBus
 {
-    /** @var array<string, list<callable(DomainEvent): void>> */
+    /** @var array<string, list<callable>> each listener takes the event published under its key */
     private array $listeners = [];
 
     /** @var list<DomainEvent> */
