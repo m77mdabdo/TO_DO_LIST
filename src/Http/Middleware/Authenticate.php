@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
-use App\Auth\AuthService;
+use App\Modules\Identity\Contract\Authenticator;
 use App\Http\Middleware;
 use App\Http\Request;
 use App\Http\Response;
@@ -15,7 +15,7 @@ use App\Http\Url;
  */
 final class Authenticate implements Middleware
 {
-    public function __construct(private AuthService $auth, private Url $url)
+    public function __construct(private Authenticator $auth, private Url $url)
     {
     }
 

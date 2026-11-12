@@ -2,12 +2,13 @@
 
 declare(strict_types=1);
 
-namespace App\Controllers;
+namespace App\Modules\Identity\Http;
 
-use App\Auth\AuthService;
+use App\Controllers\Controller;
 use App\Http\Request;
 use App\Http\Response;
 use App\Http\Url;
+use App\Modules\Identity\Application\AuthService;
 use App\Session\Session;
 use App\Validation\ValidationException;
 use App\View\View;

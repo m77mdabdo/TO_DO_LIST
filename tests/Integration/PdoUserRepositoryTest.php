@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Integration;
 
-use App\Auth\PdoUserRepository;
+use App\Modules\Identity\Infrastructure\PdoUserRepository;
 use App\Support\FrozenClock;
 use Tests\Support\Database;
 use Tests\TestCase;
@@ -23,6 +23,21 @@ final class PdoUserRepositoryTest extends TestCase
         $this->assertNull($users->credentials('nobody@example.com'));
         $this->assertSame('Omar', $user->firstName());
         $this->assertSame('O', $user->initial());
+    }
+
+    public function testFindsManyUsersInOneGoKeyedById(): void
+    {
+        $users = new PdoUserRepository(Database::fresh(), new FrozenClock());
+        $a = $users->create('Omar', 'omar@example.com', 'hash');
+        $b = $users->create('Mona', 'mona@example.com', 'hash');
+
+        $found = $users->findMany([$b->id, $a->id, $a->id, 999]);
+
+        $ids = array_keys($found);
+        sort($ids);
+        $this->assertSame([$a->id, $b->id], $ids);
+        $this->assertSame('Mona', $found[$b->id]->name);
+        $this->assertSame([], $users->findMany([]));
     }
 
     public function testUpdatesThePasswordHash(): void
