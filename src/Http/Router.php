@@ -4,10 +4,20 @@ declare(strict_types=1);
 
 namespace App\Http;
 
+/**
+ * Finds the route for a request without scanning every route:
+ *
+ *  - static paths ("/boards") sit in a hash map keyed by path: O(1);
+ *  - dynamic paths ("/boards/{board:ulid}") are bucketed by their first
+ *    literal segment, so only the few routes under "/boards" are tried.
+ */
 final class Router
 {
-    /** @var list<Route> */
-    private array $routes = [];
+    /** @var array<string, array<string, Route>> path => method => route */
+    private array $static = [];
+
+    /** @var array<string, list<Route>> first segment => routes */
+    private array $dynamic = [];
 
     /** @var list<class-string<Middleware>> */
     private array $groupMiddleware = [];
@@ -38,15 +48,26 @@ final class Router
     }
 
     /**
-     * @return array{0: Route, 1: array<string, int>}
+     * @return array{0: Route, 1: array<string, int|string>}
      * @throws HttpException 404 when nothing matches, 405 for the wrong method
      */
     public function match(Request $request): array
     {
-        $allowed = [];
+        $path = Route::normalize($request->path);
+        $allowed = false;
 
-        foreach ($this->routes as $route) {
-            $params = $route->match($request->path);
+        if (isset($this->static[$path])) {
+            if (isset($this->static[$path][$request->method])) {
+                return [$this->static[$path][$request->method], []];
+            }
+
+            $allowed = true;
+        }
+
+        $segment = explode('/', ltrim($path, '/'), 2)[0];
+
+        foreach ([...($this->dynamic[$segment] ?? []), ...($this->dynamic[''] ?? [])] as $route) {
+            $params = $route->match($path);
 
             if ($params === null) {
                 continue;
@@ -56,7 +77,7 @@ final class Router
                 return [$route, $params];
             }
 
-            $allowed[] = $route->method;
+            $allowed = true;
         }
 
         if ($allowed) {
@@ -69,6 +90,14 @@ final class Router
     /** @param array{0: class-string, 1: string} $action */
     private function add(string $method, string $pattern, array $action): Route
     {
-        return $this->routes[] = new Route($method, $pattern, $action, $this->groupMiddleware);
+        $route = new Route($method, $pattern, $action, $this->groupMiddleware);
+
+        if ($route->isStatic()) {
+            $this->static[Route::normalize($pattern)][$method] = $route;
+        } else {
+            $this->dynamic[$route->firstSegment()][] = $route;
+        }
+
+        return $route;
     }
 }
