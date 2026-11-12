@@ -113,6 +113,27 @@ final class BoardPagesTest extends TestCase
         $this->assertTrue(str_contains($this->f->app->page('/boards/' . $this->f->board->publicId), '1/2'));
     }
 
+    public function testCommentsAndVotesShowOnTheCardAndTheBoard(): void
+    {
+        $this->f->app->post('/boards/' . $this->f->board->publicId . '/cards', ['list_id' => (string) $this->f->todo->id, 'title' => 'Draft']);
+        $card = $this->openCards()[$this->f->todo->id][0];
+        $mona = $this->f->colleague('mona@example.com');
+        $this->f->app->container->get(\App\Modules\Access\Contract\BoardMembers::class)->add($this->f->board->id, $mona, \App\Modules\Access\Contract\BoardRole::Member);
+        $this->f->app->loginAs('sara@example.com');
+
+        $this->f->app->post('/cards/' . $card->publicId . '/comments', ['body' => 'Ready for @Mona? <img src=x onerror=alert(1)>']);
+        $this->f->app->post('/cards/' . $card->publicId . '/vote');
+
+        $html = $this->f->app->page('/cards/' . $card->publicId);
+        $this->assertTrue(str_contains($html, '<span class="mention">@Mona</span>'));
+        $this->assertFalse(str_contains($html, '<img src=x'));
+        $this->assertTrue(str_contains($html, 'Remove my vote'));
+
+        $board = $this->f->app->page('/boards/' . $this->f->board->publicId);
+        $this->assertTrue(str_contains($board, 'title="Comments"'));
+        $this->assertTrue(str_contains($board, 'title="Votes"'));
+    }
+
     public function testOtherCompaniesGetNotFoundForBoardsAndCards(): void
     {
         $this->f->app->post('/boards/' . $this->f->board->publicId . '/cards', ['list_id' => (string) $this->f->todo->id, 'title' => 'Secret']);

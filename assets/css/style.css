@@ -599,3 +599,21 @@ button.label { cursor: pointer; }
 .add-checklist > summary { list-style: none; width: fit-content; cursor: pointer; }
 .add-checklist > summary::-webkit-details-marker { display: none; }
 .add-checklist[open] > summary { margin-bottom: .6rem; }
+
+/* ---------- comments and votes ---------- */
+
+.link-btn { background: none; border: 0; padding: 0; font: inherit; font-size: .82rem; font-weight: 700; color: var(--muted); cursor: pointer; }
+.link-btn:hover { color: var(--violet); text-decoration: underline; }
+details > summary.link-btn { list-style: none; display: inline; }
+details > summary.link-btn::-webkit-details-marker { display: none; }
+.comment-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 1rem; }
+.comment { display: flex; gap: .65rem; align-items: flex-start; }
+.comment-body { flex: 1; min-width: 0; display: grid; gap: .3rem; }
+.comment-meta { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem; }
+.comment .prose { background: var(--surface-2); border: 1px solid var(--border); padding: .6rem .8rem; border-radius: var(--radius-sm); }
+.comment-actions { display: flex; gap: .9rem; align-items: flex-start; }
+.comment-actions form { margin: 0; }
+.comment-edit[open] { flex: 1; }
+.comment-edit[open] > form { margin-top: .5rem; }
+.mention { color: var(--violet); font-weight: 700; background: color-mix(in srgb, var(--violet) 12%, transparent); border-radius: 4px; padding: 0 .15em; }
+.votes .count { margin-inline-start: auto; }

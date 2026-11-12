@@ -54,6 +54,21 @@ $form = $this->form;
                                     <option value="private" <?= $board->visibility->value === 'private' ? 'selected' : '' ?>><?= $this->te('Private: only board members') ?></option>
                                     <option value="workspace" <?= $board->visibility->value === 'workspace' ? 'selected' : '' ?>><?= $this->te('Workspace: every member can view') ?></option>
                                 </select></label>
+                            <?php $choices = ['off' => 'Nobody', 'members' => 'Board members (not viewers)', 'everyone' => 'Everyone who can see the board']; ?>
+                            <div class="field-row">
+                                <label><span><?= $this->te('Who can comment') ?></span>
+                                    <select name="commenting">
+                                        <?php foreach ($choices as $value => $text): ?>
+                                            <option value="<?= $value ?>" <?= $board->commenting->value === $value ? 'selected' : '' ?>><?= $this->te($text) ?></option>
+                                        <?php endforeach; ?>
+                                    </select></label>
+                                <label><span><?= $this->te('Who can vote') ?></span>
+                                    <select name="voting">
+                                        <?php foreach ($choices as $value => $text): ?>
+                                            <option value="<?= $value ?>" <?= $board->voting->value === $value ? 'selected' : '' ?>><?= $this->te($text) ?></option>
+                                        <?php endforeach; ?>
+                                    </select></label>
+                            </div>
                             <fieldset class="swatches">
                                 <legend><?= $this->te('Color') ?></legend>
                                 <?php foreach (BoardSummary::COLORS as $color): ?>

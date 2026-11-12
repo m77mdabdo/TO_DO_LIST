@@ -119,7 +119,7 @@ final class BoardController extends Controller
         $board = $this->boards->boardFor($user->id, $params['board'], Permission::ManageSettings);
 
         try {
-            $this->boards->updateBoard($user->id, $board, $request->only(['name', 'description', 'color', 'visibility']));
+            $this->boards->updateBoard($user->id, $board, $request->only(['name', 'description', 'color', 'visibility', 'commenting', 'voting']));
         } catch (ValidationException $e) {
             return $this->backWithErrors($e, $request, '/boards/' . $board->publicId);
         }

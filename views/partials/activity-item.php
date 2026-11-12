@@ -12,6 +12,7 @@ $templates = [
     'board.created'     => ':actor created this board',
     'board.renamed'     => ':actor renamed the board to :subject',
     'board.visibility'  => ':actor changed who can see the board',
+    'board.participation' => ':actor changed who can comment and vote',
     'board.recolored'   => ':actor changed the board color',
     'board.described'   => ':actor updated the board description',
     'board.archived'    => ':actor archived the board',
@@ -39,6 +40,8 @@ $templates = [
     'checklist.removed' => ':actor removed the checklist :subject from :card',
     'checklist.item_completed' => ':actor completed :subject on :card',
     'checklist.item_reopened'  => ':actor reopened :subject on :card',
+    'comment.posted'    => ':actor commented on :subject',
+    'vote.added'        => ':actor voted for :subject',
     'label.attached'    => ':actor added the label :subject',
     'label.detached'    => ':actor removed the label :subject',
 ];

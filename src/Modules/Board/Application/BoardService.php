@@ -120,6 +120,8 @@ final class BoardService implements BoardCatalog
             'description' => ['Description', 'max:2000'],
             'color'       => ['Color', 'required|in:' . implode(',', BoardSummary::COLORS)],
             'visibility'  => ['Visibility', 'required|in:private,workspace'],
+            'commenting'  => ['Commenting', 'in:off,members,everyone'],
+            'voting'      => ['Voting', 'in:off,members,everyone'],
         ]);
 
         $fields = [
@@ -127,6 +129,8 @@ final class BoardService implements BoardCatalog
             'description' => trim((string) ($input['description'] ?? '')) ?: null,
             'color'       => (string) $input['color'],
             'visibility'  => (string) $input['visibility'],
+            'commenting'  => (string) ($input['commenting'] ?? '') ?: $board->commenting->value,
+            'voting'      => (string) ($input['voting'] ?? '') ?: $board->voting->value,
         ];
 
         $this->transactions->run(function () use ($actorId, $board, $fields): void {
@@ -137,6 +141,8 @@ final class BoardService implements BoardCatalog
                 'visibility' => $fields['visibility'] !== $board->visibility->value ? ['to' => $fields['visibility']] : null,
                 'recolored'  => $fields['color'] !== $board->color ? ['to' => $fields['color']] : null,
                 'described'  => $fields['description'] !== $board->description ? [] : null,
+                'participation' => $fields['commenting'] !== $board->commenting->value || $fields['voting'] !== $board->voting->value
+                    ? ['commenting' => $fields['commenting'], 'voting' => $fields['voting']] : null,
             ];
 
             foreach (array_filter($changes, static fn ($c) => $c !== null) as $change => $details) {

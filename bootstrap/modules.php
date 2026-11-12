@@ -16,6 +16,7 @@ return [
     App\Modules\Card\CardModule::class,
     App\Modules\Label\LabelModule::class,
     App\Modules\Checklist\ChecklistModule::class,
+    App\Modules\Discussion\DiscussionModule::class,
     App\Modules\Activity\ActivityModule::class,
     App\Modules\LegacyImport\LegacyImportModule::class,
 ];
