@@ -29,8 +29,6 @@ use App\Support\FileLogger;
 use App\Support\Logger;
 use App\Support\SystemClock;
 use App\Support\TimeAgo;
-use App\Task\PdoTaskRepository;
-use App\Task\TaskRepository;
 use App\View\FormState;
 use App\View\View;
 
@@ -67,7 +65,6 @@ return static function (Config $config, Session $session, string $basePath = '',
         return $pdo;
     });
 
-    $container->singleton(TaskRepository::class, fn (Container $c) => new PdoTaskRepository($c->get(PDO::class), $c->get(Clock::class)));
 
     $container->singleton(Translator::class, fn (Container $c) => new Translator(
         $root . '/lang',

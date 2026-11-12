@@ -132,12 +132,6 @@ final class View
         return is_string($value) ? $value : null;
     }
 
-    /** Stable color class for a list name, so "Work" always has the same color. */
-    public function categoryClass(?string $category): string
-    {
-        return 'cat-' . (crc32(mb_strtolower((string) $category)) % 8);
-    }
-
     /** @param array<string, mixed> $data */
     private function renderFile(string $template, array $data): string
     {

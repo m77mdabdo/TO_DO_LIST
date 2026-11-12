@@ -3,15 +3,28 @@
 declare(strict_types=1);
 
 /*
- | Fills the app with a demo account and some sample tasks.
+ | Fills a fresh database with a demo company to click around in.
  |
  |   php database/seed.php
  |
- | Login: demo@todo.test / demo1234
+ | Logins (password demo1234 for both):
+ |   demo@todo.test  owner of "Nile Studio", plus a few old-style tasks that
+ |                   are imported into "My Board" on the first login
+ |   mona@todo.test  a member of "Nile Studio" (views the team board)
+ |
+ | Everything goes through the same services the app uses, so the data
+ | passes the same validation and permission checks.
  */
 
-use App\Modules\Identity\Domain\PasswordHasher;
 use App\Core\Config;
+use App\Modules\Board\Application\BoardService;
+use App\Modules\Board\Contract\BoardVisibility;
+use App\Modules\Card\Application\CardService;
+use App\Modules\Identity\Application\AuthService;
+use App\Modules\Label\Application\LabelService;
+use App\Modules\Workspace\Application\WorkspaceService;
+use App\Modules\Workspace\Contract\WorkspaceRole;
+use App\Modules\Workspace\Domain\WorkspaceRepository;
 use App\Session\ArraySession;
 
 if (PHP_SAPI !== 'cli') {
@@ -22,42 +35,85 @@ if (PHP_SAPI !== 'cli') {
 require __DIR__ . '/../bootstrap/autoload.php';
 
 $app = (require __DIR__ . '/../bootstrap/app.php')(Config::load(dirname(__DIR__)), new ArraySession());
-$db  = $app->get(PDO::class);
+$db = $app->get(PDO::class);
 
-$email = 'demo@todo.test';
-
-$db->prepare('DELETE FROM users WHERE email = ?')->execute([$email]);
-$db->prepare('INSERT INTO users (name, email, password, created_at) VALUES (?, ?, ?, ?)')
-    ->execute(['Mohamed Abdo', $email, (new PasswordHasher())->hash('demo1234'), date('Y-m-d H:i:s')]);
-$userId = (int) $db->lastInsertId();
-
-$day = fn (int $offset) => date('Y-m-d', strtotime("$offset days"));
-$ago = fn (string $when) => date('Y-m-d H:i:s', strtotime($when));
-
-$samples = [
-    // title, notes, status, priority, category, due, created, completed
-    ['Prepare client proposal', 'Pricing table, timeline and a short case study at the end.', 'doing', 'high', 'Work', $day(0), '-2 days', null],
-    ['Fix login redirect bug', 'Happens only when the session expires on the edit page.', 'todo', 'high', 'Work', $day(-1), '-3 days', null],
-    ['Gym — leg day', null, 'todo', 'normal', 'Health', $day(0), '-5 hours', null],
-    ['Read 20 pages of Atomic Habits', null, 'todo', 'low', 'Personal', $day(2), '-1 day', null],
-    ['Plan weekend trip', "Check hotel prices\nBook the train tickets", 'todo', 'normal', 'Personal', $day(5), '-6 hours', null],
-    ['Write LinkedIn post about this project', 'Screenshots + 3 things I learned.', 'doing', 'normal', 'Content', $day(1), '-1 day', null],
-    ['تجهيز عرض السعر للعميل', 'إضافة تفاصيل الدفع والمدة', 'todo', 'normal', 'Work', $day(3), '-4 hours', null],
-    ['Pay internet bill', null, 'done', 'normal', 'Home', null, '-3 days', '-2 hours'],
-    ['Refactor validation classes', 'Rules with params like min:3 and max:150.', 'done', 'high', 'Work', null, '-4 days', '-1 day'],
-    ['Call mom', null, 'done', 'low', 'Personal', null, '-2 days', '-30 minutes'],
-];
-
-$stmt = $db->prepare(
-    'INSERT INTO tasks (user_id, title, notes, status, priority, category, due_date, created_at, updated_at, completed_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-);
-
-foreach ($samples as [$title, $notes, $status, $priority, $category, $due, $created, $completed]) {
-    $stmt->execute([
-        $userId, $title, $notes, $status, $priority, $category, $due,
-        $ago($created), $ago($created), $completed ? $ago($completed) : null,
-    ]);
+$exists = $db->prepare('SELECT 1 FROM users WHERE email = ?');
+$exists->execute(['demo@todo.test']);
+if ($exists->fetchColumn()) {
+    echo "Already seeded. Delete database/todo.sqlite (or empty the MySQL database) to start over.\n";
+    exit;
 }
 
-echo 'Seeded ' . count($samples) . " tasks. Log in with $email / demo1234\n";
+$auth = $app->get(AuthService::class);
+$register = static function (string $name, string $email) use ($auth): int {
+    $id = $auth->register(['name' => $name, 'email' => $email, 'password' => 'demo1234', 'password_confirmation' => 'demo1234'])->id;
+    $auth->logout();
+
+    return $id;
+};
+
+$demo = $register('Mohamed Abdo', 'demo@todo.test');
+$mona = $register('Mona Hassan', 'mona@todo.test');
+
+// A company workspace with a team board everyone in it can see.
+$workspace = $app->get(WorkspaceService::class)->create($demo, ['company_name' => 'Nile Studio']);
+$app->get(WorkspaceRepository::class)->addMember($workspace->id, $mona, WorkspaceRole::Member);
+
+$boards = $app->get(BoardService::class);
+$cards = $app->get(CardService::class);
+$labels = $app->get(LabelService::class);
+
+$board = $boards->createBoard($demo, $workspace->id, 'Website launch', BoardVisibility::Workspace, 'sky');
+$lists = [];
+foreach (['Backlog', 'In progress', 'Review', 'Done'] as $name) {
+    $lists[$name] = $boards->addList($demo, $board->id, $name)->id;
+}
+
+$label = static fn (string $name, string $color) => $labels->ensureLabel($demo, $board->id, $name, $color);
+$design = $label('Design', 'purple');
+$dev = $label('Development', 'blue');
+$urgent = $label('Urgent', 'red');
+$content = $label('Content', 'green');
+
+$day = static fn (int $offset) => date('Y-m-d', strtotime("$offset days"));
+
+$samples = [
+    // list, title, description, due, labels, done
+    ['Backlog', 'Write the About page', 'Team photos and a short story of the studio.', $day(6), [$content], false],
+    ['Backlog', 'Pick the analytics tool', null, null, [$dev], false],
+    ['Backlog', 'تجهيز محتوى الصفحة الرئيسية', 'نصوص قصيرة وواضحة باللغتين.', $day(4), [$content], false],
+    ['In progress', 'Design the pricing page', 'Three plans, yearly toggle, FAQ at the bottom.', $day(1), [$design, $urgent], false],
+    ['In progress', 'Build the contact form', 'Validation, spam protection and a thank-you page.', $day(2), [$dev], false],
+    ['Review', 'Home page hero', null, $day(-1), [$design], false],
+    ['Done', 'Set up the domain and HTTPS', null, null, [$dev], true],
+    ['Done', 'Moodboard', null, null, [$design], true],
+];
+
+foreach ($samples as [$list, $title, $description, $due, $cardLabels, $done]) {
+    $card = $cards->createCard($demo, $board->id, $lists[$list], $title, ['description' => $description, 'due_date' => $due]);
+    foreach ($cardLabels as $cardLabel) {
+        $labels->attach($demo, $card->id, $cardLabel->id);
+    }
+    if ($done) {
+        $cards->setComplete($demo, $card, true);
+    }
+}
+
+// A private board only the owner sees (Mona is not a member).
+$private = $boards->createBoard($demo, $workspace->id, 'Hiring', BoardVisibility::Private, 'coral');
+$boards->addList($demo, $private->id, 'Candidates');
+
+// Old-style tasks, as the app stored them before boards existed.
+// They move to "My Board" the first time demo@todo.test logs in.
+$ago = static fn (string $when) => date('Y-m-d H:i:s', strtotime($when));
+$old = $db->prepare('INSERT INTO tasks (user_id, title, notes, status, priority, category, due_date, created_at, updated_at, completed_at)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+foreach ([
+    ['Prepare client proposal', 'Pricing table, timeline and a short case study.', 'doing', 'high', 'Work', $day(0), '-2 days', null],
+    ['Read 20 pages', null, 'todo', 'low', 'Personal', $day(2), '-1 day', null],
+    ['Pay internet bill', null, 'done', 'normal', 'Home', null, '-3 days', '-2 hours'],
+] as [$title, $notes, $status, $priority, $category, $due, $created, $completed]) {
+    $old->execute([$demo, $title, $notes, $status, $priority, $category, $due, $ago($created), $ago($created), $completed ? $ago($completed) : null]);
+}
+
+echo "Seeded \"Nile Studio\" with 2 boards. Log in with demo@todo.test / demo1234 (or mona@todo.test).\n";

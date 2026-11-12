@@ -6,7 +6,6 @@ namespace App\Http;
 
 use App\Core\Container;
 use App\Support\Logger;
-use App\Task\TaskNotFound;
 use App\View\View;
 use Throwable;
 
@@ -84,7 +83,6 @@ final class Kernel
     {
         [$status, $message] = match (true) {
             $e instanceof HttpException => [$e->status, $e->getMessage()],
-            $e instanceof TaskNotFound  => [404, $e->getMessage()],
             default                     => [500, 'Something broke on our side. Please try again.'],
         };
 
