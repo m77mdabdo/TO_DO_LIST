@@ -1,0 +1,11 @@
+# Static analysis, run in CI:  phpstan analyse
+# PHPStan is installed by the CI job itself; the project stays Composer-free.
+parameters:
+    level: 5
+    paths:
+        - src
+        - bootstrap
+        - routes
+        - database
+    bootstrapFiles:
+        - bootstrap/autoload.php
