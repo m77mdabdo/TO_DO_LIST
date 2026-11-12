@@ -67,6 +67,11 @@ a:hover { text-decoration: underline; }
 
 h1, h2, h3 { margin: 0; line-height: 1.2; letter-spacing: -.01em; }
 
+/* User text gets dir="auto" so mixed Arabic / English reads right,
+   but it should still line up with the page, not with its own language. */
+:where([dir="rtl"] [dir="auto"]:not(input, textarea)) { text-align: right; }
+:where([dir="ltr"] [dir="auto"]:not(input, textarea)) { text-align: left; }
+
 .icon { width: 1.1em; height: 1.1em; flex: none; vertical-align: -.18em; }
 .muted { color: var(--muted); }
 .small { font-size: .85rem; }
@@ -514,6 +519,7 @@ button.label { cursor: pointer; }
 .activity-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .7rem; }
 .activity-item { display: flex; gap: .55rem; align-items: flex-start; font-size: .88rem; line-height: 1.4; }
 .activity-item small { display: block; }
+.activity-name { font-weight: 700; }
 
 /* card page */
 .card-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 1rem; align-items: start; }

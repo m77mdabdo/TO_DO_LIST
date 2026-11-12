@@ -41,7 +41,7 @@ final class BoardPagesTest extends TestCase
 
         $this->assertTrue(str_contains($html, 'Doing'));
         $this->assertTrue(str_contains($html, 'Write the brief'));
-        $this->assertTrue(str_contains($html, "added \u{2068}Write the brief"));
+        $this->assertTrue(str_contains($html, 'added <bdi class="activity-name">Write the brief</bdi>'));
     }
 
     public function testDragAndDropMoveOverJson(): void

@@ -24,7 +24,7 @@ final class TranslationsTest extends TestCase
             $code = (string) file_get_contents($file->getPathname());
             preg_match_all("/->te?\\(\\s*'((?:[^'\\\\]|\\\\.)*)'/", $code, $matches);
             // Activity sentences are kept in an array and translated through a variable.
-            preg_match_all("/'(:actor[^']*)'/", $code, $sentences);
+            preg_match_all("/'(:actor [^']*)'/", $code, $sentences);
 
             foreach ([...$matches[1], ...$sentences[1]] as $raw) {
                 $key = stripslashes($raw);
