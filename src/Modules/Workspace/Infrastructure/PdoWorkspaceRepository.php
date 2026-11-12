@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Workspace\Infrastructure;
 
+use App\Modules\Workspace\Contract\WorkspaceInfo;
 use App\Modules\Workspace\Contract\WorkspaceRole;
 use App\Modules\Workspace\Contract\WorkspaceSummary;
 use App\Modules\Workspace\Domain\WorkspaceRepository;
@@ -106,6 +107,34 @@ final class PdoWorkspaceRepository implements WorkspaceRepository
             static fn (array $row) => ['userId' => (int) $row['user_id'], 'role' => WorkspaceRole::from((string) $row['role'])],
             $stmt->fetchAll(),
         );
+    }
+
+    public function setRole(int $workspaceId, int $userId, WorkspaceRole $role): void
+    {
+        $this->db->prepare('UPDATE workspace_members SET role = ? WHERE workspace_id = ? AND user_id = ?')
+            ->execute([$role->value, $workspaceId, $userId]);
+    }
+
+    public function removeMember(int $workspaceId, int $userId): void
+    {
+        $this->db->prepare('DELETE FROM workspace_members WHERE workspace_id = ? AND user_id = ?')->execute([$workspaceId, $userId]);
+    }
+
+    public function ownerCount(int $workspaceId): int
+    {
+        $stmt = $this->db->prepare("SELECT COUNT(*) FROM workspace_members WHERE workspace_id = ? AND role = 'owner'");
+        $stmt->execute([$workspaceId]);
+
+        return (int) $stmt->fetchColumn();
+    }
+
+    public function info(int $workspaceId): ?WorkspaceInfo
+    {
+        $stmt = $this->db->prepare('SELECT w.id, w.public_id, c.name FROM workspaces w JOIN companies c ON c.id = w.company_id WHERE w.id = ?');
+        $stmt->execute([$workspaceId]);
+        $row = $stmt->fetch();
+
+        return $row ? new WorkspaceInfo((int) $row['id'], (string) $row['public_id'], (string) $row['name']) : null;
     }
 
     /** @param array<string, mixed> $row */

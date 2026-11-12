@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Workspace\Domain;
 
+use App\Modules\Workspace\Contract\WorkspaceInfo;
 use App\Modules\Workspace\Contract\WorkspaceRole;
 use App\Modules\Workspace\Contract\WorkspaceSummary;
 
@@ -31,4 +32,12 @@ interface WorkspaceRepository
 
     /** @return list<array{userId: int, role: WorkspaceRole}> */
     public function members(int $workspaceId): array;
+
+    public function setRole(int $workspaceId, int $userId, WorkspaceRole $role): void;
+
+    public function removeMember(int $workspaceId, int $userId): void;
+
+    public function ownerCount(int $workspaceId): int;
+
+    public function info(int $workspaceId): ?WorkspaceInfo;
 }
