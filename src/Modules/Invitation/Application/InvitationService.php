@@ -302,8 +302,10 @@ final class InvitationService
     {
         $ids = [];
         foreach (is_array($raw) ? $raw : [] as $value) {
-            if (is_string($value) && ctype_digit($value) && $value !== '0') {
-                $ids[(int) $value] = true;
+            if (is_int($value) || (is_string($value) && ctype_digit($value))) {
+                if ((int) $value > 0) {
+                    $ids[(int) $value] = true;
+                }
             }
         }
 
