@@ -421,4 +421,20 @@ return [
     ':actor accepted your invitation to :subject' => ':actor قبل دعوتك إلى :subject',
     ':actor made you :role in :subject' => ':actor جعلك :role في :subject',
     ':actor removed you from :subject' => ':actor أزالك من :subject',
+
+    // Audit
+    'Audit log' => 'سجل التدقيق',
+    'Invitations, role changes and removals in this workspace. Entries can not be edited or deleted.' => 'الدعوات وتغييرات الأدوار وعمليات الإزالة في مساحة العمل هذه. لا يمكن تعديل الإدخالات أو حذفها.',
+    'Nothing recorded yet.' => 'لم يُسجَّل شيء بعد.',
+    'Older entries' => 'إدخالات أقدم',
+    ':actor invited :target as :role' => ':actor دعا :target بدور :role',
+    ':actor sent the invitation to :target again' => ':actor أعاد إرسال الدعوة إلى :target',
+    ':actor cancelled the invitation to :target' => ':actor ألغى الدعوة إلى :target',
+    ':target accepted the invitation as :role' => ':target قبل الدعوة بدور :role',
+    ':target joined as :role' => ':target انضم بدور :role',
+    ':actor changed :target from :from to :to' => ':actor غيّر دور :target من :from إلى :to',
+    ':actor removed :target (:role)' => ':actor أزال :target (:role)',
+    ':target left the workspace' => ':target غادر مساحة العمل',
+    ':actor changed :target on the board :board from :from to :to' => ':actor غيّر دور :target في لوحة :board من :from إلى :to',
+    ':actor changed :target' => ':actor غيّر :target',
 ];
