@@ -269,4 +269,9 @@ return [
     'Everyone who can see the board' => 'كل من يرى اللوحة',
     'Commenting' => 'التعليق',
     'Voting' => 'التصويت',
+
+    // Activity pages
+    'Nothing has happened here yet.' => 'لم يحدث شيء هنا بعد.',
+    'Older activity' => 'نشاط أقدم',
+    'All activity' => 'كل النشاط',
 ];

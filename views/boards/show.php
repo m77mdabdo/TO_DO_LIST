@@ -196,6 +196,7 @@ $form = $this->form;
                     <?= $this->partial('partials/activity-item', ['entry' => $entry, 'people' => $people]) ?>
                 <?php endforeach; ?>
             </ul>
+            <a class="btn btn-ghost btn-block" href="<?= $this->url('/boards/' . $board->publicId . '/activity') ?>"><?= $this->te('All activity') ?></a>
         </aside>
     <?php endif; ?>
 </div>
