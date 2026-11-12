@@ -192,4 +192,11 @@ return [
     ':actor added the label :subject'           => 'أضاف :actor الوسم :subject',
     ':actor removed the label :subject'         => 'أزال :actor الوسم :subject',
     ':actor updated :subject'                   => 'حدّث :actor :subject',
+
+    // Legacy import
+    'My Board'                  => 'لوحتي',
+    'To do'                     => 'للتنفيذ',
+    'Doing'                     => 'قيد التنفيذ',
+    'High priority'             => 'أولوية عالية',
+    'Low priority'              => 'أولوية منخفضة',
 ];
