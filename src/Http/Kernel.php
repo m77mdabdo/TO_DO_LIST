@@ -72,7 +72,7 @@ final class Kernel
         };
     }
 
-    /** @param array<string, int> $params */
+    /** @param array<string, int|string> $params */
     private function callController(Route $route, Request $request, array $params): Response
     {
         [$class, $method] = $route->action;
