@@ -10,12 +10,14 @@
  * @var list<\App\Modules\Activity\Contract\ActivityEntry> $activity
  * @var array<int, \App\Modules\Identity\Contract\User> $people
  * @var array<int, list<int>> $cardMembers card id => assigned user ids
+ * @var array<int, list<array{icon: string, text: string, class: string, title: string}>> $cardBadges added by other modules
  * @var \DateTimeImmutable $today
  */
 use App\Modules\Access\Contract\Permission;
 use App\Modules\Board\Contract\BoardSummary;
 
 $open = !$board->archived;
+$cardBadges ??= [];
 $canEdit = $open && $role->allows(Permission::EditCards);
 $canMove = $open && $role->allows(Permission::MoveCards);
 $canArchive = $open && $role->allows(Permission::ArchiveItems);
@@ -139,6 +141,7 @@ $form = $this->form;
                     <?php foreach ($cards as $card): ?>
                         <?= $this->partial('partials/card-tile', [
                             'card' => $card, 'labels' => $cardLabels[$card->id] ?? [], 'canMove' => $canMove, 'canEdit' => $canEdit,
+                            'badges' => $cardBadges[$card->id] ?? [],
                             'members' => array_values(array_filter(array_map(static fn (int $id) => $people[$id] ?? null, $cardMembers[$card->id] ?? []))),
                         ]) ?>
                     <?php endforeach; ?>

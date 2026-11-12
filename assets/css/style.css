@@ -570,3 +570,32 @@ button.label { cursor: pointer; }
 .edit-card > summary { list-style: none; width: fit-content; cursor: pointer; }
 .edit-card > summary::-webkit-details-marker { display: none; }
 .edit-card[open] > summary { margin-bottom: 1rem; }
+
+/* ---------- checklists ---------- */
+
+.badge { display: inline-flex; align-items: center; gap: .25rem; font-size: .75rem; font-weight: 700; color: var(--muted); padding: .1rem .4rem; border-radius: 6px; }
+.badge .icon { width: .95em; height: .95em; }
+.badge-complete { background: var(--mint); color: #fff; }
+.checklist { display: grid; gap: .55rem; }
+.checklist-head { display: flex; align-items: center; gap: .6rem; }
+.checklist-head .section-title { margin: 0; flex: 1; min-width: 0; }
+.checklist-progress { width: 100%; height: 8px; appearance: none; border: 0; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.checklist-progress::-webkit-progress-bar { background: var(--surface-2); border-radius: 999px; }
+.checklist-progress::-webkit-progress-value { background: var(--violet); border-radius: 999px; transition: width .2s; }
+.checklist-progress::-moz-progress-bar { background: var(--violet); border-radius: 999px; }
+.checklist-progress.is-complete::-webkit-progress-value { background: var(--mint); }
+.checklist-progress.is-complete::-moz-progress-bar { background: var(--mint); }
+.checklist-items { list-style: none; margin: 0; padding: 0; display: grid; gap: .25rem; min-height: 8px; }
+.checklist-items.is-over { outline: 2px dashed var(--border); outline-offset: 2px; border-radius: var(--radius-sm); }
+.checklist-item { display: flex; align-items: center; gap: .55rem; padding: .35rem .45rem; border-radius: var(--radius-sm); }
+.checklist-item:hover { background: var(--surface-2); }
+.checklist-item[draggable="true"] { cursor: grab; }
+.checklist-item.is-dragging { opacity: .5; }
+.checklist-item form { margin: 0; }
+.checklist-item .item-text { flex: 1; min-width: 0; word-break: break-word; }
+.checklist-item.is-done .item-text { text-decoration: line-through; color: var(--muted); }
+.item-meta { display: inline-flex; align-items: center; gap: .35rem; }
+.item-menu .menu-panel { min-width: 260px; }
+.add-checklist > summary { list-style: none; width: fit-content; cursor: pointer; }
+.add-checklist > summary::-webkit-details-marker { display: none; }
+.add-checklist[open] > summary { margin-bottom: .6rem; }

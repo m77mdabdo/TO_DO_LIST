@@ -94,6 +94,25 @@ final class BoardPagesTest extends TestCase
         $this->assertFalse(str_contains($html, '<script>alert'));
     }
 
+    public function testChecklistShowsOnTheCardAndItsProgressOnTheBoard(): void
+    {
+        $this->f->app->post('/boards/' . $this->f->board->publicId . '/cards', ['list_id' => (string) $this->f->todo->id, 'title' => 'Draft']);
+        $card = $this->openCards()[$this->f->todo->id][0];
+
+        $this->f->app->post('/cards/' . $card->publicId . '/checklists', ['title' => 'Steps']);
+        $html = $this->f->app->page('/cards/' . $card->publicId);
+        $this->assertTrue(str_contains($html, 'Steps'));
+        preg_match('#/checklists/(\d+)/items#', $html, $m);
+
+        $this->f->app->post('/checklists/' . $m[1] . '/items', ['text' => 'Write intro']);
+        $this->f->app->post('/checklists/' . $m[1] . '/items', ['text' => 'Proofread']);
+        preg_match('#/checklist-items/(\d+)/toggle#', $this->f->app->page('/cards/' . $card->publicId), $item);
+        $toggle = $this->f->app->post('/checklist-items/' . $item[1] . '/toggle', [], json: true);
+
+        $this->assertSame(200, $toggle->status);
+        $this->assertTrue(str_contains($this->f->app->page('/boards/' . $this->f->board->publicId), '1/2'));
+    }
+
     public function testOtherCompaniesGetNotFoundForBoardsAndCards(): void
     {
         $this->f->app->post('/boards/' . $this->f->board->publicId . '/cards', ['list_id' => (string) $this->f->todo->id, 'title' => 'Secret']);

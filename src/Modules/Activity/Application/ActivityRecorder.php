@@ -16,6 +16,7 @@ use App\Modules\Card\Contract\Events\CardDeleted;
 use App\Modules\Card\Contract\Events\CardMemberChanged;
 use App\Modules\Identity\Contract\UserDirectory;
 use App\Modules\Card\Contract\Events\CardMoved;
+use App\Modules\Checklist\Contract\Events\ChecklistChanged;
 use App\Modules\Label\Contract\Events\LabelAttached;
 use App\Modules\Label\Contract\Events\LabelDetached;
 use App\Shared\Events\DomainEvent;
@@ -37,7 +38,7 @@ final class ActivityRecorder
         return [
             BoardCreated::name(), BoardChanged::name(), ListCreated::name(), ListChanged::name(),
             CardCreated::name(), CardChanged::name(), CardMoved::name(), CardMemberChanged::name(), CardDeleted::name(),
-            LabelAttached::name(), LabelDetached::name(),
+            LabelAttached::name(), LabelDetached::name(), ChecklistChanged::name(),
         ];
     }
 
@@ -60,6 +61,7 @@ final class ActivityRecorder
             $event instanceof CardDeleted   => $this->log->record($event->boardId, null, $event->actorId, 'card.deleted', $event->title),
             $event instanceof LabelAttached => $this->log->record($event->boardId, $event->cardId, $event->actorId, 'label.attached', $event->labelName),
             $event instanceof LabelDetached => $this->log->record($event->boardId, $event->cardId, $event->actorId, 'label.detached', $event->labelName),
+            $event instanceof ChecklistChanged => $this->log->record($event->boardId, $event->cardId, $event->actorId, 'checklist.' . $event->change, $event->subject, ['card' => $event->cardTitle]),
             default => null,
         };
     }
