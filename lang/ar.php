@@ -57,4 +57,22 @@ return [
     ':label may not be longer than :param characters.' => 'حقل :label يجب ألا يزيد عن :param حرفًا.',
     ':label must be at least :param characters.'  => 'حقل :label يجب ألا يقل عن :param أحرف.',
     ':label must be text, not just a number.'     => 'حقل :label يجب أن يكون نصًا وليس رقمًا فقط.',
+
+    // Workspaces
+    'Your workspaces'           => 'مساحات العمل',
+    'Members'                   => 'الأعضاء',
+    'New company'               => 'شركة جديدة',
+    'Toggle dark mode'          => 'تبديل الوضع الداكن',
+    'Log out'                   => 'تسجيل الخروج',
+    'Owner'                     => 'مالك',
+    'Admin'                     => 'مسؤول',
+    'Member'                    => 'عضو',
+    'Guest'                     => 'ضيف',
+    'Create a company workspace' => 'إنشاء مساحة عمل لشركة',
+    'Each company gets its own workspace. Its boards and members stay separate from your other workspaces.' => 'كل شركة لها مساحة عمل خاصة، ولوحاتها وأعضاؤها منفصلون تمامًا عن مساحاتك الأخرى.',
+    'Company name'              => 'اسم الشركة',
+    'Cancel'                    => 'إلغاء',
+    'Create workspace'          => 'إنشاء المساحة',
+    'Your company workspace is ready.' => 'مساحة عمل شركتك جاهزة.',
+    'Inviting people by email comes in the team phase.' => 'دعوة الأعضاء بالبريد تأتي في مرحلة الفريق.',
 ];
