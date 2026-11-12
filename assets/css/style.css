@@ -530,7 +530,7 @@ button.label { cursor: pointer; }
 .btn-block { justify-content: center; }
 
 @media (max-width: 980px) {
-    .board-layout { flex-direction: column; }
+    .board-layout { flex-direction: column; align-items: stretch; }
     .activity { position: static; width: 100%; max-height: none; flex-basis: auto; }
     .card-layout { grid-template-columns: 1fr; }
 }
@@ -563,6 +563,8 @@ button.label { cursor: pointer; }
 .prose > :last-child { margin-bottom: 0; }
 .prose h3, .prose h4, .prose h5 { margin-top: 1em; }
 .prose ul, .prose ol { padding-inline-start: 1.4em; }
+/* Inside markers stay beside their text when a list in another script is aligned to the page. */
+:where([dir="rtl"] .prose[dir="auto"], [dir="ltr"] .prose[dir="auto"]) :is(ul, ol) { list-style-position: inside; padding-inline-start: 0; }
 .prose blockquote { margin-inline: 0; padding-inline-start: .9em; border-inline-start: 3px solid var(--border); color: var(--muted); }
 .prose code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .88em; background: var(--surface-2); padding: .1em .35em; border-radius: 6px; }
 .prose pre { overflow-x: auto; background: var(--surface-2); padding: .8rem 1rem; border-radius: var(--radius-sm); direction: ltr; text-align: left; }
@@ -640,7 +642,8 @@ kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fon
 .search-results li.is-done a { text-decoration: line-through; color: var(--muted); }
 
 @media (max-width: 640px) {
-    .topbar-search { max-width: none; }
+    .topbar { flex-wrap: wrap; row-gap: .6rem; }
+    .topbar-search { order: 3; flex-basis: 100%; max-width: none; }
     .topbar-search kbd { display: none; }
 }
 
