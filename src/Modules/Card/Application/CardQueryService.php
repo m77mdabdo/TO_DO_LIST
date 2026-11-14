@@ -60,4 +60,19 @@ final class CardQueryService implements CardQueries
     {
         return $this->cards->archivedCards($boardId);
     }
+
+    public function openCardsAssignedTo(int $userId, int $limit = 300): array
+    {
+        return $this->cards->openCardsAssignedTo($userId, $limit);
+    }
+
+    public function openCardsOnBoards(array $boardIds, int $limit = 1000): array
+    {
+        return $boardIds === [] ? [] : $this->cards->openCardsOnBoards(array_values($boardIds), $limit);
+    }
+
+    public function cardsBetween(array $boardIds, string $column, string $from, string $to): array
+    {
+        return $boardIds === [] ? [] : $this->cards->cardsBetween(array_values($boardIds), $column, $from, $to);
+    }
 }

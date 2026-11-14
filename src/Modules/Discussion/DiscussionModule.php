@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Discussion;
 
+use App\Shared\Automation\ActionContext;
+use App\Shared\Automation\ActionType;
+use App\Shared\Automation\AutomationActions;
+use App\Modules\Card\Contract\CardQueries;
 use App\Shared\Export\ExportParts;
 use App\Modules\Discussion\Infrastructure\PdoCommentSearch;
 use App\Shared\Search\SearchSources;
@@ -38,6 +42,13 @@ final class DiscussionModule implements ModuleProvider
 
     public function register(Container $container): void
     {
+        $container->extend(AutomationActions::class, function (object $actions, Container $c): void {
+            /** @var AutomationActions $actions */
+            $actions->add(new ActionType('comment.post', 'Post a comment', 'text', static function (ActionContext $ctx, string $text) use ($c): void {
+                $card = $c->get(CardQueries::class)->find((int) $ctx->cardId) ?? throw new \RuntimeException('The card is gone.');
+                $c->get(DiscussionService::class)->post($ctx->actorId, $card, $text);
+            }));
+        });
         $container->extend(ExportParts::class, function (object $parts, Container $c): void {
             /** @var ExportParts $parts */
             $parts->add('comments', function (array $cardIds) use ($c): array {

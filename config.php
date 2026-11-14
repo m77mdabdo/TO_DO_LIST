@@ -27,6 +27,12 @@ return [
         'path' => getenv('ATTACHMENTS_PATH') ?: __DIR__ . '/storage/attachments',
     ],
 
+    // Outgoing webhooks (sent by bin/webhooks.php). Addresses inside private
+    // networks are refused unless this is on (only for local testing).
+    'webhooks' => [
+        'allow_private_networks' => filter_var(getenv('WEBHOOKS_ALLOW_PRIVATE') ?: 'false', FILTER_VALIDATE_BOOLEAN),
+    ],
+
     // Database backups made by bin/backup.php.
     'backups' => [
         'path' => getenv('BACKUPS_PATH') ?: __DIR__ . '/storage/backups',

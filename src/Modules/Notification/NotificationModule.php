@@ -4,6 +4,13 @@ declare(strict_types=1);
 
 namespace App\Modules\Notification;
 
+use App\Shared\Automation\ActionContext;
+use App\Shared\Automation\ActionType;
+use App\Shared\Automation\AutomationActions;
+use App\Modules\Access\Contract\AccessGate;
+use App\Modules\Access\Contract\BoardRole;
+use App\Modules\Card\Contract\CardQueries;
+use App\Modules\Notification\Application\Notifier;
 use App\Core\Container;
 use App\Http\Middleware\Authenticate;
 use App\Http\Router;
@@ -35,6 +42,27 @@ final class NotificationModule implements ModuleProvider
 
     public function register(Container $container): void
     {
+        $container->extend(AutomationActions::class, function (object $actions, Container $c): void {
+            /** @var AutomationActions $actions */
+            $notice = static function (string $who) use ($c): \Closure {
+                return static function (ActionContext $ctx, string $message) use ($c, $who): void {
+                    $card = $c->get(CardQueries::class)->find((int) $ctx->cardId) ?? throw new \RuntimeException('The card is gone.');
+                    $recipients = match ($who) {
+                        'managers' => array_keys(array_filter($c->get(AccessGate::class)->peopleOn($card->boardId), static fn (BoardRole $r) => $r === BoardRole::Manager)),
+                        'members'  => $c->get(CardQueries::class)->membersForCards([$card->id])[$card->id] ?? [],
+                        default    => $c->get(NotificationStore::class)->watchersOfCard($card->id, $card->boardId),
+                    };
+                    // The person who started it already knows, so they are left out.
+                    $c->get(Notifier::class)->notify($recipients, 'automation.notice', $ctx->triggeredBy, $card->boardId, $card->id, $card->title, [
+                        'rule'    => $ctx->automationName,
+                        'message' => mb_substr(trim($message), 0, 500),
+                    ], '/cards/' . $card->publicId, 'automation:' . $ctx->runKey . ':' . $who);
+                };
+            };
+            $actions->add(new ActionType('notify.managers', 'Notify the board managers', 'text', $notice('managers')));
+            $actions->add(new ActionType('notify.members', 'Notify the people on the card', 'text', $notice('members')));
+            $actions->add(new ActionType('notify.watchers', 'Notify the card\'s watchers', 'text', $notice('watchers')));
+        });
         $container->singleton(NotificationStore::class, fn (Container $c) => new PdoNotifications($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(NotificationCenter::class, fn (Container $c) => $c->build(NotificationCenter::class));
         $container->singleton(NotificationRules::class, fn (Container $c) => $c->build(NotificationRules::class));

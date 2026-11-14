@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Card;
 
 use App\Modules\Board\Contract\Events\BoardCopied;
+use App\Shared\Automation\ActionContext;
+use App\Shared\Automation\ActionType;
+use App\Shared\Automation\AutomationActions;
 use App\Modules\Card\Application\CardCopier;
 use App\Modules\Card\Infrastructure\PdoCardSearch;
 use App\Shared\Search\SearchSources;
@@ -40,6 +43,36 @@ final class CardModule implements ModuleProvider
         $container->extend(SearchSources::class, function (object $sources, Container $c): void {
             /** @var SearchSources $sources */
             $sources->add(new PdoCardSearch($c->get(PDO::class)));
+        });
+        $container->extend(AutomationActions::class, function (object $actions, Container $c): void {
+            /** @var AutomationActions $actions */
+            $service = static fn (): CardService => $c->get(CardService::class);
+            $card = static fn (ActionContext $ctx) => $c->get(CardQueries::class)->find((int) $ctx->cardId) ?? throw new \RuntimeException('The card is gone.');
+
+            $actions->add(new ActionType('card.move', 'Move the card to list :value', 'list', static fn (ActionContext $ctx, string $v) => $service()->moveToEnd($ctx->actorId, $card($ctx), (int) $v)));
+            $actions->add(new ActionType('card.complete', 'Mark the card complete', 'none', static fn (ActionContext $ctx) => $service()->setComplete($ctx->actorId, $card($ctx), true)));
+            $actions->add(new ActionType('card.reopen', 'Mark the card not complete', 'none', static fn (ActionContext $ctx) => $service()->setComplete($ctx->actorId, $card($ctx), false)));
+            $actions->add(new ActionType('card.assign', 'Add :value to the card', 'person', static function (ActionContext $ctx, string $v) use ($service, $card): void {
+                $target = $card($ctx);
+                if (!in_array($ctx->person($v), $service()->membersOf($target), true)) {
+                    $service()->toggleMember($ctx->actorId, $target, $ctx->person($v));
+                }
+            }));
+            $actions->add(new ActionType('card.unassign', 'Remove :value from the card', 'person', static function (ActionContext $ctx, string $v) use ($service, $card): void {
+                $target = $card($ctx);
+                if (in_array($ctx->person($v), $service()->membersOf($target), true)) {
+                    $service()->toggleMember($ctx->actorId, $target, $ctx->person($v));
+                }
+            }));
+            $actions->add(new ActionType('card.due_in', 'Set the due date :value days from now', 'days', static fn (ActionContext $ctx, string $v) => $service()->setDueDate(
+                $ctx->actorId,
+                $card($ctx),
+                $c->get(Clock::class)->now()->modify('+' . max(0, (int) $v) . ' days')->format('Y-m-d'),
+            )));
+            $actions->add(new ActionType('card.clear_due', 'Remove the due date', 'none', static fn (ActionContext $ctx) => $service()->setDueDate($ctx->actorId, $card($ctx), null)));
+            $actions->add(new ActionType('card.archive', 'Archive the card', 'none', static fn (ActionContext $ctx) => $service()->archive($ctx->actorId, $card($ctx))));
+            $actions->add(new ActionType('list.sort_due', 'Sort the list by due date', 'none', static fn (ActionContext $ctx) => $service()->sortList($ctx->actorId, $ctx->boardId, (int) $ctx->listId, 'due'), 'list'));
+            $actions->add(new ActionType('list.sort_title', 'Sort the list by title', 'none', static fn (ActionContext $ctx) => $service()->sortList($ctx->actorId, $ctx->boardId, (int) $ctx->listId, 'title'), 'list'));
         });
         $container->singleton(CardRepository::class, fn (Container $c) => new PdoCardRepository($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(CardQueries::class, fn (Container $c) => $c->build(CardQueryService::class));

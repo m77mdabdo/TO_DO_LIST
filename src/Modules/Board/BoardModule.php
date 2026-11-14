@@ -14,6 +14,7 @@ use App\Modules\Board\Contract\BoardDirectory;
 use App\Modules\Board\Domain\BoardRepository;
 use App\Modules\Board\Http\BoardController;
 use App\Modules\Board\Http\BoardViewsController;
+use App\Modules\Board\Http\WorkspaceViewsController;
 use App\Modules\Board\Http\ListController;
 use App\Modules\Board\Http\SearchController;
 use App\Modules\Board\Infrastructure\PdoBoardRepository;
@@ -61,6 +62,11 @@ final class BoardModule implements ModuleProvider
             $router->post('/boards/{board:ulid}/template', [BoardController::class, 'template']);
             $router->get('/boards/{board:ulid}/table', [BoardViewsController::class, 'table']);
             $router->get('/boards/{board:ulid}/calendar', [BoardViewsController::class, 'calendar']);
+            $router->get('/boards/{board:ulid}/timeline', [BoardViewsController::class, 'timeline']);
+            $router->get('/my-tasks', [WorkspaceViewsController::class, 'myTasks']);
+            $router->get('/workspaces/{workspace:ulid}/cards', [WorkspaceViewsController::class, 'cards']);
+            $router->get('/workspaces/{workspace:ulid}/report', [WorkspaceViewsController::class, 'report']);
+            $router->get('/workspaces/{workspace:ulid}/report.csv', [WorkspaceViewsController::class, 'reportCsv']);
             $router->get('/boards/{board:ulid}/dashboard', [BoardViewsController::class, 'dashboard']);
 
             $router->post('/boards/{board:ulid}/lists', [ListController::class, 'store']);

@@ -61,4 +61,29 @@ interface CardQueries
 
     /** @return list<CardSummary> */
     public function archivedCards(int $boardId): array;
+
+    /**
+     * Open, unfinished cards the person is assigned to, on any board, soonest
+     * due first. The caller drops boards the person can no longer see.
+     *
+     * @return list<CardSummary>
+     */
+    public function openCardsAssignedTo(int $userId, int $limit = 300): array;
+
+    /**
+     * Open (not archived) cards of many boards in one query, soonest due first.
+     *
+     * @param list<int> $boardIds
+     * @return list<CardSummary>
+     */
+    public function openCardsOnBoards(array $boardIds, int $limit = 1000): array;
+
+    /**
+     * Cards created (or completed) between two dates, Y-m-d inclusive, archived ones included: for reports.
+     *
+     * @param list<int> $boardIds
+     * @param 'created_at'|'completed_at' $column
+     * @return list<CardSummary>
+     */
+    public function cardsBetween(array $boardIds, string $column, string $from, string $to): array;
 }

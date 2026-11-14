@@ -19,6 +19,7 @@ use App\Modules\Card\Contract\Events\CardMemberChanged;
 use App\Modules\Card\Contract\Events\CardMoved;
 use App\Modules\Card\Domain\CardRepository;
 use App\Shared\Events\EventBus;
+use App\Shared\Ordering\FractionalIndex;
 use App\Support\Clock;
 use App\Validation\ValidationException;
 use App\Validation\ValidationResult;
@@ -191,6 +192,52 @@ final class CardService implements CardWriter
             $this->events->publish(new CardMoved($card->id, $card->boardId, $actorId, $card->title, $card->listId, $toListId, $this->clock->now()));
 
             return $this->cards->find($card->id);
+        });
+    }
+
+    /** Moves the card to the bottom of a list (what automations do: "move it to Done"). */
+    public function moveToEnd(int $actorId, CardSummary $card, int $toListId): CardSummary
+    {
+        if ($card->listId === $toListId) {
+            return $card;
+        }
+
+        $cards = $this->cards->openCardsByList($card->boardId)[$toListId] ?? [];
+        $last = $cards !== [] ? end($cards)->id : null;
+
+        return $this->move($actorId, $card, $toListId, $last);
+    }
+
+    /** Sets or clears only the due date (Y-m-d or null), keeping everything else. */
+    public function setDueDate(int $actorId, CardSummary $card, ?string $date): void
+    {
+        $this->update($actorId, $card, [
+            'title'       => $card->title,
+            'description' => (string) $card->description,
+            'due_date'    => (string) $date,
+        ] + ($date !== null && $card->startDate() !== null && $card->startDate() > $date ? ['start_date' => $date] : []));
+    }
+
+    /**
+     * Reorders a list's open cards by due date (undated last) or by title,
+     * writing fresh, evenly spread positions in one pass.
+     */
+    public function sortList(int $actorId, int $boardId, int $listId, string $by = 'due'): void
+    {
+        $this->gate->authorize($actorId, $boardId, Permission::MoveCards);
+        $this->assertOpenList($boardId, $listId);
+        $cards = $this->cards->openCardsByList($boardId)[$listId] ?? [];
+
+        usort($cards, static fn (CardSummary $a, CardSummary $b): int => $by === 'title'
+            ? strcmp(mb_strtolower($a->title), mb_strtolower($b->title))
+            : (([$a->dueAt === null, (string) $a->dueAt] <=> [$b->dueAt === null, (string) $b->dueAt]) ?: strcmp($a->position, $b->position)));
+
+        $this->transactions->run(function () use ($cards): void {
+            foreach (array_map(null, $cards, FractionalIndex::spread(count($cards))) as [$card, $position]) {
+                if ($card->position !== $position) {
+                    $this->cards->update($card->id, ['position' => $position]);
+                }
+            }
         });
     }
 

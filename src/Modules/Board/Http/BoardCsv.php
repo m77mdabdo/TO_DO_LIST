@@ -49,7 +49,7 @@ final class BoardCsv
     }
 
     /** Stops spreadsheet apps from running text that starts like a formula. */
-    private static function safe(?string $value): string
+    public static function safe(?string $value): string
     {
         $value ??= '';
 
