@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Label;
 
+use App\Shared\Export\ExportParts;
 use App\Modules\Board\Contract\Events\BoardCopied;
 use App\Modules\Board\Contract\Events\BoardSeeded;
 use App\Modules\Card\Contract\Events\CardCopied;
@@ -35,6 +36,13 @@ final class LabelModule implements ModuleProvider
 
     public function register(Container $container): void
     {
+        $container->extend(ExportParts::class, function (object $parts, Container $c): void {
+            /** @var ExportParts $parts */
+            $parts->add('labels', fn (array $cardIds): array => array_map(
+                static fn (array $labels) => array_map(static fn ($l) => ['name' => $l->name, 'color' => $l->color], $labels),
+                $c->get(LabelCatalog::class)->forCards($cardIds),
+            ));
+        });
         $container->singleton(LabelRepository::class, fn (Container $c) => new PdoLabels($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(LabelService::class, fn (Container $c) => $c->build(LabelService::class));
         $container->singleton(LabelCatalog::class, fn (Container $c) => $c->get(LabelService::class));

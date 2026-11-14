@@ -36,7 +36,7 @@ final class Route
             $this->types[$m[1]] = $type;
 
             return '(?P<' . $m[1] . '>' . (self::TYPES[$type] ?? throw new \InvalidArgumentException("Unknown route parameter type [$type].")) . ')';
-        }, self::normalize($pattern));
+        }, str_replace('.', '\\.', self::normalize($pattern)));
 
         $this->regex = '#^' . $regex . '$#';
     }

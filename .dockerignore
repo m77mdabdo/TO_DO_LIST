@@ -1,0 +1,12 @@
+.git
+.github
+.env
+config.local.php
+database/*.sqlite
+database/*.sqlite-*
+storage/logs/*
+storage/mail/*
+storage/attachments/*
+storage/backups/*
+docs
+tests

@@ -38,7 +38,13 @@ $form = $this->form;
         <?= $this->slot('board.actions', ['board' => $board, 'role' => $role]) ?>
         <a class="btn btn-ghost" href="<?= $this->url($base . '/archived') ?>"><?= $this->icon('archive') ?><span class="hide-sm"><?= $this->te('Archived items') ?></span></a>
         <?php if ($role->allows(Permission::Export)): ?>
-            <a class="btn btn-ghost" href="<?= $this->url($base . '/export') ?>" title="<?= $this->te('Download as CSV') ?>"><?= $this->icon('download') ?></a>
+            <details class="menu menu-end">
+                <summary class="btn btn-ghost" title="<?= $this->te('Export') ?>"><?= $this->icon('download') ?><span class="visually-hidden"><?= $this->te('Export') ?></span></summary>
+                <div class="menu-panel">
+                    <a class="menu-item" href="<?= $this->url($base . '/export') ?>"><?= $this->icon('table') ?><?= $this->te('Spreadsheet (CSV)') ?></a>
+                    <a class="menu-item" href="<?= $this->url($base . '/export.json') ?>"><?= $this->icon('download') ?><?= $this->te('Everything (JSON)') ?></a>
+                </div>
+            </details>
         <?php endif; ?>
         <?php if ($canManage): ?>
             <details class="menu menu-end">
