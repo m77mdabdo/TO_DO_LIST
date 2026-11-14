@@ -11,8 +11,9 @@
  * @var array<int, \App\Modules\Identity\Contract\User> $people
  * @var int $totalCards
  * @var int $shownCards
+ * @var string|null $viewPath "/table" or "/calendar" to keep filtering inside that view
  */
-$base = '/boards/' . $board->publicId;
+$base = '/boards/' . $board->publicId . ($viewPath ?? '');
 $dueChoices = ['' => 'Any due date', 'overdue' => 'Overdue', 'today' => 'Due today', 'week' => 'Due in the next 7 days', 'none' => 'No due date'];
 $statusChoices = ['' => 'Open and done', 'open' => 'Open', 'done' => 'Done'];
 ?>

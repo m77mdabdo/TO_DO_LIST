@@ -43,4 +43,12 @@ interface ChecklistRepository
      * @return array<int, array{done: int, total: int}>
      */
     public function progressForCards(array $cardIds): array;
+
+    /**
+     * Items on these cards that are due between two dates (Y-m-d, inclusive).
+     *
+     * @param list<int> $cardIds
+     * @return list<ChecklistItem>
+     */
+    public function itemsDueBetween(array $cardIds, string $from, string $to): array;
 }

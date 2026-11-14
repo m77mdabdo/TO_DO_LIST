@@ -80,6 +80,22 @@ final class ChecklistModule implements ModuleProvider
 
                 return ['cardBadges' => $badges];
             });
+
+            // Progress per row of the table view.
+            $view->composer('boards/table', fn (array $data): array => [
+                'progress' => $c->get(ChecklistService::class)->progressForCards(array_map(static fn ($card) => $card->id, $data['rows'] ?? [])),
+            ]);
+
+            // Dated checklist items in the calendar, on the cards shown there.
+            $view->composer('boards/calendar', function (array $data) use ($c): array {
+                $items = [];
+                $grid = $data['grid'];
+                foreach ($c->get(ChecklistService::class)->itemsDueBetween(array_keys($data['cardById'] ?? []), $grid->first(), $grid->last()) as $item) {
+                    $items[(string) $item->dueDate()][] = $item;
+                }
+
+                return ['checklistItems' => $items];
+            });
         });
     }
 

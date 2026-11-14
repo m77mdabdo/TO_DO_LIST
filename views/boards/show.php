@@ -33,6 +33,7 @@ $form = $this->form;
         <span class="pill"><?= $this->icon($board->visibility->value === 'private' ? 'lock' : 'users') ?><?= $this->te($board->visibility->value === 'private' ? 'Private' : 'Workspace') ?></span>
         <span class="pill pill-role"><?= $this->te($role->label()) ?></span>
     </div>
+    <?= $this->partial('boards/view-tabs', ['board' => $board, 'current' => '', 'query' => $query ?? []]) ?>
     <div class="board-bar-actions">
         <?= $this->slot('board.actions', ['board' => $board, 'role' => $role]) ?>
         <a class="btn btn-ghost" href="<?= $this->url($base . '/archived') ?>"><?= $this->icon('archive') ?><span class="hide-sm"><?= $this->te('Archived items') ?></span></a>
