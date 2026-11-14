@@ -18,7 +18,8 @@ final class VerifyCsrfToken implements Middleware
 
     public function handle(Request $request, callable $next): Response
     {
-        if ($request->isPost()) {
+        // The API is called with a bearer token, never with the session cookie, so there is nothing to forge.
+        if ($request->isPost() && !str_starts_with($request->path, '/api/')) {
             $token = $request->body()['_token'] ?? $request->header('x-csrf-token');
 
             if (!$this->csrf->isValid($token)) {

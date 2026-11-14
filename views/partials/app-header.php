@@ -43,6 +43,7 @@ $currentWorkspace ??= null;
                     <a class="menu-item" href="<?= $this->url('/workspaces/' . $currentWorkspace->publicId . '/members') ?>"><?= $this->icon('users') ?><?= $this->te('Members') ?></a>
                     <a class="menu-item" href="<?= $this->url('/workspaces/' . $currentWorkspace->publicId . '/cards') ?>"><?= $this->icon('table') ?><?= $this->te('All cards') ?></a>
                     <a class="menu-item" href="<?= $this->url('/workspaces/' . $currentWorkspace->publicId . '/report') ?>"><?= $this->icon('chart') ?><?= $this->te('Team report') ?></a>
+                    <a class="menu-item" href="<?= $this->url('/integrations') ?>"><?= $this->icon('key') ?><?= $this->te('API tokens') ?></a>
                     <a class="menu-item" href="<?= $this->url('/workspaces/new') ?>"><?= $this->icon('plus') ?><?= $this->te('New company') ?></a>
                 </div>
             </details>

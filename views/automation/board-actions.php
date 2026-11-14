@@ -26,6 +26,7 @@ if (!$canManage && $buttons === []) {
         <?php endif; ?>
         <?php if ($canManage): ?>
             <a class="menu-item" href="<?= $this->url('/boards/' . $board->publicId . '/automation') ?>"><?= $this->icon('bolt') ?><?= $this->te('Rules, buttons and schedules') ?></a>
+            <?= $this->slot('board.automation-menu', ['board' => $board]) ?>
         <?php endif; ?>
     </div>
 </details>
