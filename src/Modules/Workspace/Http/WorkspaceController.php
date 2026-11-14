@@ -11,6 +11,7 @@ use App\Http\Response;
 use App\Http\Url;
 use App\Modules\Identity\Contract\UserDirectory;
 use App\Modules\Workspace\Application\WorkspaceService;
+use App\Modules\Workspace\Contract\WorkspaceSummary;
 use App\Session\Session;
 use App\Validation\ValidationException;
 use App\View\View;
@@ -56,7 +57,8 @@ final class WorkspaceController extends Controller
     /** @param array{workspace: string} $params */
     public function members(Request $request, array $params): Response
     {
-        $workspace = $this->workspaces->findForUser($params['workspace'], $this->user($request)->id)
+        $viewer = $this->user($request);
+        $workspace = $this->workspaces->findForUser($params['workspace'], $viewer->id)
             ?? throw HttpException::notFound();
 
         $members = $this->workspaces->members($workspace->id);
@@ -68,6 +70,61 @@ final class WorkspaceController extends Controller
             'workspace' => $workspace,
             'members'   => $members,
             'people'    => $people,
+            'viewerId'  => $viewer->id,
+            'grantable' => $workspace->role->grantable(),
         ]);
+    }
+
+    /** @param array{workspace: string, id: string} $params */
+    public function changeRole(Request $request, array $params): Response
+    {
+        $workspace = $this->workspaceOf($request, $params);
+
+        try {
+            $this->workspaces->changeRole($this->user($request)->id, $workspace->id, (int) $params['id'], $request->input('role'));
+        } catch (ValidationException $e) {
+            return $this->backWithErrors($e, $request, $this->membersPath($workspace->publicId));
+        }
+
+        return $this->redirect($this->membersPath($workspace->publicId), 'Role updated.');
+    }
+
+    /** @param array{workspace: string, id: string} $params */
+    public function removeMember(Request $request, array $params): Response
+    {
+        $workspace = $this->workspaceOf($request, $params);
+
+        try {
+            $this->workspaces->removeMember($this->user($request)->id, $workspace->id, (int) $params['id']);
+        } catch (ValidationException $e) {
+            return $this->backWithErrors($e, $request, $this->membersPath($workspace->publicId));
+        }
+
+        return $this->redirect($this->membersPath($workspace->publicId), 'Member removed.');
+    }
+
+    /** @param array{workspace: string} $params */
+    public function leave(Request $request, array $params): Response
+    {
+        $workspace = $this->workspaceOf($request, $params);
+
+        try {
+            $this->workspaces->leave($this->user($request)->id, $workspace->id);
+        } catch (ValidationException $e) {
+            return $this->backWithErrors($e, $request, $this->membersPath($workspace->publicId));
+        }
+
+        return $this->redirect('/', 'You left the workspace.');
+    }
+
+    /** @param array{workspace: string} $params */
+    private function workspaceOf(Request $request, array $params): WorkspaceSummary
+    {
+        return $this->workspaces->findForUser($params['workspace'], $this->user($request)->id) ?? throw HttpException::notFound();
+    }
+
+    private function membersPath(string $publicId): string
+    {
+        return '/workspaces/' . $publicId . '/members';
     }
 }

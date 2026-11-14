@@ -16,4 +16,7 @@ interface BoardDirectory
 
     /** @return list<ListSummary> open lists in board order */
     public function openLists(int $boardId): array;
+
+    /** @return list<BoardSummary> every board of the workspace, archived ones included */
+    public function allInWorkspace(int $workspaceId): array;
 }

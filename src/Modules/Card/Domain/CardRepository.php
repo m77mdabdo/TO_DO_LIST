@@ -32,6 +32,9 @@ interface CardRepository
     public function search(array $boardIds, string $text, int $limit): array;
 
     /** @return list<CardSummary> */
+    public function dueBetween(string $from, string $to): array;
+
+    /** @return list<CardSummary> */
     public function archivedCards(int $boardId): array;
 
     /** @return list<int> user ids assigned to the card */

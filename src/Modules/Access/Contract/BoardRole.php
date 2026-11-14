@@ -32,6 +32,16 @@ enum BoardRole: string
         return ($this->permissions() & $permission->value) !== 0;
     }
 
+    /** Higher means more rights: viewer < member < manager. */
+    public function rank(): int
+    {
+        return match ($this) {
+            self::Viewer  => 0,
+            self::Member  => 1,
+            self::Manager => 2,
+        };
+    }
+
     public function label(): string
     {
         return ucfirst($this->value);

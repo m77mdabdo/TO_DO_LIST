@@ -34,6 +34,11 @@ final class CardQueryService implements CardQueries
         return $this->cards->membersForCards($cardIds);
     }
 
+    public function dueBetween(string $from, string $to): array
+    {
+        return $this->cards->dueBetween($from, $to);
+    }
+
     public function search(array $boardIds, string $text, int $limit = 50): array
     {
         $text = trim($text);

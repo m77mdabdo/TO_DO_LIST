@@ -34,4 +34,12 @@ final class BoardQueries implements BoardDirectory
     {
         return $this->boards->lists($boardId);
     }
+
+    public function allInWorkspace(int $workspaceId): array
+    {
+        return [
+            ...$this->boards->visibleInWorkspace($workspaceId, true, true, [], false),
+            ...$this->boards->visibleInWorkspace($workspaceId, true, true, [], true),
+        ];
+    }
 }

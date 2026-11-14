@@ -5,9 +5,15 @@ Options -Indexes
     Require all denied
 </FilesMatch>
 
+# Dot files (.env with the mail password, .git, .htaccess) are never served
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
 # Pretty URLs: send everything that isn't a real file to index.php
 <IfModule mod_rewrite.c>
     RewriteEngine On
+    RewriteRule (^|/)\. - [F,L]
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [QSA,L]
 </IfModule>

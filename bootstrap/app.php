@@ -19,6 +19,12 @@ use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\VerifyCsrfToken;
 use App\Http\Router;
 use App\Http\Url;
+use App\Mail\LogMailer;
+use App\Mail\Mailer;
+use App\Mail\MemoryMailer;
+use App\Mail\MimeFormat;
+use App\Mail\NativeMailer;
+use App\Mail\SmtpMailer;
 use App\Security\Csrf;
 use App\Session\Session;
 use App\Shared\Events\EventBus;
@@ -101,6 +107,26 @@ return static function (Config $config, Session $session, string $basePath = '',
     });
 
     $container->singleton(Logger::class, fn (Container $c) => new FileLogger($root . '/storage/logs', $c->get(Clock::class)));
+
+    $container->singleton(MimeFormat::class, fn () => new MimeFormat(
+        (string) $config->get('mail.from_address', 'no-reply@localhost'),
+        (string) $config->get('mail.from_name', 'To Do List'),
+    ));
+    $container->singleton(Mailer::class, fn (Container $c): Mailer => match ((string) $config->get('mail.driver', 'log')) {
+        'smtp' => new SmtpMailer(
+            (string) $config->get('mail.host'),
+            (int) $config->get('mail.port', 587),
+            (string) $config->get('mail.encryption', 'tls'),
+            (string) $config->get('mail.username', ''),
+            (string) $config->get('mail.password', ''),
+            (string) $config->get('mail.from_address', 'no-reply@localhost'),
+            $c->get(MimeFormat::class),
+            $c->get(Logger::class),
+        ),
+        'mail'   => new NativeMailer($c->get(MimeFormat::class), $c->get(Logger::class)),
+        'memory' => new MemoryMailer(),
+        default  => new LogMailer($root . '/storage/mail', $c->get(MimeFormat::class), $c->get(Clock::class)),
+    });
 
     $container->singleton(Kernel::class, fn (Container $c) => new Kernel(
         $c,

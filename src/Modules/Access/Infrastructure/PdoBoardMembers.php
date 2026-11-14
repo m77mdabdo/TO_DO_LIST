@@ -23,6 +23,11 @@ final class PdoBoardMembers implements BoardMembers
             ->execute([$boardId, $userId, $role->value, $this->clock->now()->format('Y-m-d H:i:s')]);
     }
 
+    public function remove(int $boardId, int $userId): void
+    {
+        $this->db->prepare('DELETE FROM board_members WHERE board_id = ? AND user_id = ?')->execute([$boardId, $userId]);
+    }
+
     public function role(int $boardId, int $userId): ?BoardRole
     {
         $stmt = $this->db->prepare('SELECT role FROM board_members WHERE board_id = ? AND user_id = ?');
