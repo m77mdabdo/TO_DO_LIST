@@ -42,7 +42,7 @@ $link = fn (string $from): string => $this->url($base . '?' . http_build_query($
                 <div class="timeline-grid">
                     <?php foreach ($days as $i => $day): ?>
                         <span class="tl-day tl-c<?= $i + 1 ?> <?= $todayCol === $i + 1 ? 'is-today' : '' ?> <?= in_array((int) $day->format('w'), $this->locale() === 'ar' ? [5, 6] : [0, 6], true) ? 'is-weekend' : '' ?>" role="columnheader">
-                            <small><?= $this->te($weekdays[(int) $day->format('w')]) ?></small><?= (int) $day->format('j') ?>
+                            <?php if ($i % 7 === 0 || $todayCol === $i + 1): ?><small><?= $this->te($weekdays[(int) $day->format('w')]) ?></small><?php else: ?><small aria-hidden="true">&nbsp;</small><?php endif; ?><?= (int) $day->format('j') ?>
                         </span>
                     <?php endforeach; ?>
                 </div>
