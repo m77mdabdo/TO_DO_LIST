@@ -16,6 +16,7 @@ use App\Database\Migrations\MigrationRunner;
 use App\Http\Kernel;
 use App\I18n\Translator;
 use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\ThrottleRequests;
 use App\Http\Middleware\VerifyCsrfToken;
 use App\Http\Router;
 use App\Http\Url;
@@ -26,6 +27,8 @@ use App\Mail\MimeFormat;
 use App\Mail\NativeMailer;
 use App\Mail\SmtpMailer;
 use App\Security\Csrf;
+use App\Security\RateLimiter;
+use App\Security\RateLimits;
 use App\Session\Session;
 use App\Shared\Events\EventBus;
 use App\Shared\Automation\AutomationActions;
@@ -99,6 +102,9 @@ return static function (Config $config, Session $session, string $basePath = '',
     $container->singleton(ExportParts::class, fn () => new ExportParts());
     // ...and what automations can do with their things (see App\Shared\Automation).
     $container->singleton(AutomationActions::class, fn () => new AutomationActions());
+    // ...and the request limits of their routes (see App\Security\RateLimits).
+    $container->singleton(RateLimits::class, fn () => new RateLimits((array) $config->get('rate_limits', [])));
+    $container->singleton(RateLimiter::class, fn (Container $c) => new RateLimiter($c->get(PDO::class), $c->get(Clock::class)));
 
     $container->singleton(EventBus::class, function (Container $c) use ($modules): EventBus {
         $events = new SyncEventBus();
@@ -140,7 +146,7 @@ return static function (Config $config, Session $session, string $basePath = '',
     $container->singleton(Kernel::class, fn (Container $c) => new Kernel(
         $c,
         $c->get(Router::class),
-        [SecurityHeaders::class, VerifyCsrfToken::class],
+        [SecurityHeaders::class, ThrottleRequests::class, VerifyCsrfToken::class],
         $c->get(Logger::class),
         (bool) $config->get('debug', false),
     ));

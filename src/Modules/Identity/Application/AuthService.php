@@ -21,6 +21,8 @@ use App\Validation\Validator;
 final class AuthService implements Authenticator
 {
     private const SESSION_KEY = 'user_id';
+    // Sessions from before auth versions existed hold none: they count as version 1.
+    private const VERSION_KEY = 'auth_version';
 
     private ?User $user = null;
 
@@ -43,7 +45,27 @@ final class AuthService implements Authenticator
             return null;
         }
 
-        return $this->user ??= $this->users->find($id);
+        $version = $this->session->get(self::VERSION_KEY);
+        $this->user ??= $this->users->findForSession($id, is_int($version) ? $version : 1);
+
+        // The password changed since this session started (here or on another device).
+        if ($this->user === null) {
+            $this->session->forget(self::SESSION_KEY);
+        }
+
+        return $this->user;
+    }
+
+    /** Forget the cached user, e.g. after the email was confirmed during this request. */
+    public function refresh(): void
+    {
+        $this->user = null;
+    }
+
+    /** Signs $userId in on this device (used after a password reset). */
+    public function signIn(int $userId): User
+    {
+        return $this->startSession($userId);
     }
 
     public function check(): bool
@@ -135,6 +157,7 @@ final class AuthService implements Authenticator
     {
         $this->session->regenerate();
         $this->session->put(self::SESSION_KEY, $userId);
+        $this->session->put(self::VERSION_KEY, $this->users->authVersion($userId));
         $this->user = null;
 
         return $this->user();

@@ -27,6 +27,8 @@ use App\Modules\Integration\Infrastructure\PdoTokens;
 use App\Modules\Integration\Infrastructure\PdoWebhooks;
 use App\Modules\Label\Contract\Events\LabelAttached;
 use App\Shared\Events\DomainEvent;
+use App\Security\RateLimitRule;
+use App\Security\RateLimits;
 use App\Shared\Events\EventBus;
 use App\Shared\Module\ModuleProvider;
 use App\Support\Clock;
@@ -54,6 +56,13 @@ final class IntegrationModule implements ModuleProvider
         $container->singleton(WebhookTransport::class, fn () => new CurlTransport());
         $container->singleton(UrlGuard::class, fn (Container $c) => UrlGuard::system((bool) $c->get(Config::class)->get('webhooks.allow_private_networks', false)));
         $container->singleton(Webhooks::class, fn (Container $c) => $c->build(Webhooks::class));
+
+        // Per token, and per IP so that made-up tokens can't get around it.
+        $container->extend(RateLimits::class, function (object $limits): void {
+            /** @var RateLimits $limits */
+            $limits->add(new RateLimitRule('api-token', '*', '/api/**', 120, 60, 'token'));
+            $limits->add(new RateLimitRule('api-ip', '*', '/api/**', 300, 60));
+        });
 
         $container->extend(View::class, function (object $view, Container $c): void {
             /** @var View $view */

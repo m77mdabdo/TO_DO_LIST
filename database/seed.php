@@ -31,6 +31,7 @@ use App\Modules\Card\Application\CardService;
 use App\Modules\Checklist\Application\ChecklistService;
 use App\Modules\Discussion\Application\DiscussionService;
 use App\Modules\Identity\Application\AuthService;
+use App\Modules\Identity\Domain\UserRepository;
 use App\Modules\Identity\Contract\UserDirectory;
 use App\Modules\Invitation\Application\InvitationService;
 use App\Modules\Label\Application\LabelService;
@@ -62,9 +63,11 @@ if ($exists->fetchColumn()) {
 }
 
 $auth = $app->get(AuthService::class);
-$register = static function (string $name, string $email) use ($auth): int {
+$register = static function (string $name, string $email) use ($auth, $app): int {
     $id = $auth->register(['name' => $name, 'email' => $email, 'password' => 'demo1234', 'password_confirmation' => 'demo1234'])->id;
     $auth->logout();
+    // Demo accounts come confirmed, so they can invite people right away.
+    $app->get(UserRepository::class)->markEmailVerified($id);
 
     return $id;
 };

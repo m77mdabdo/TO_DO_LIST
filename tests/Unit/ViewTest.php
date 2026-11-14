@@ -55,6 +55,6 @@ final class ViewTest extends TestCase
 
         $html = $this->view->partial('partials/field-error', ['field' => 'title']);
 
-        $this->assertTrue(str_contains($html, '<small class="field-error">Title is required.</small>'));
+        $this->assertTrue(str_contains($html, '<small class="field-error" id="title-error">Title is required.</small>'));
     }
 }
