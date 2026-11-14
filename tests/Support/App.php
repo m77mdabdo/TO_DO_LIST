@@ -35,8 +35,33 @@ final class App
             'url'      => 'https://todo.test',
             'mail'     => ['driver' => 'memory', 'from_address' => 'team@todo.test', 'from_name' => 'To Do List'],
             'db'       => ['driver' => 'sqlite', 'sqlite_path' => ':memory:'],
+            'attachments' => ['path' => self::scratch('attachments')],
+            'backups'     => ['path' => self::scratch('backups')],
         ]), $this->session);
         $this->container->singleton(Clock::class, fn () => new FrozenClock($now));
+    }
+
+    /** A fresh folder under the system temp dir, removed when the test run ends. */
+    public static function scratch(string $what): string
+    {
+        $dir = sys_get_temp_dir() . '/todo-tests-' . getmypid() . '/' . $what . '-' . bin2hex(random_bytes(4));
+        static $registered = false;
+        if (!$registered) {
+            $registered = true;
+            $root = sys_get_temp_dir() . '/todo-tests-' . getmypid();
+            register_shutdown_function(static function () use ($root): void {
+                if (!is_dir($root)) {
+                    return;
+                }
+                $items = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST);
+                foreach ($items as $item) {
+                    $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
+                }
+                rmdir($root);
+            });
+        }
+
+        return $dir;
     }
 
     /** @param array<string, string> $body */
@@ -45,6 +70,19 @@ final class App
         $body['_token'] ??= $this->container->get(Csrf::class)->token();
 
         return $this->send(new Request('POST', $path, [], $body, $json ? ['accept' => 'application/json'] : [], '10.0.0.1'));
+    }
+
+    /**
+     * A multipart POST with files, as a browser sends a file input.
+     *
+     * @param array<string, string> $body
+     * @param array<string, \App\Http\UploadedFile> $files
+     */
+    public function upload(string $path, array $files, array $body = []): Response
+    {
+        $body['_token'] ??= $this->container->get(Csrf::class)->token();
+
+        return $this->send(new Request('POST', $path, [], $body, [], '10.0.0.1', [], $files));
     }
 
     public function get(string $path): Response
