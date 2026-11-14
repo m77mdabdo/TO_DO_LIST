@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Checklist;
 
+use App\Shared\Export\ExportParts;
 use App\Modules\Card\Contract\Events\CardCopied;
 use App\Modules\Checklist\Application\ChecklistCopier;
 use App\Modules\Checklist\Infrastructure\PdoChecklistSearch;
@@ -39,6 +40,21 @@ final class ChecklistModule implements ModuleProvider
 
     public function register(Container $container): void
     {
+        $container->extend(ExportParts::class, function (object $parts, Container $c): void {
+            /** @var ExportParts $parts */
+            $parts->add('checklists', function (array $cardIds) use ($c): array {
+                $out = [];
+                foreach ($cardIds as $cardId) {
+                    foreach ($c->get(ChecklistService::class)->forCard($cardId) as $checklist) {
+                        $out[$cardId][] = ['title' => $checklist->title, 'items' => array_map(static fn ($i) => [
+                            'text' => $i->text, 'done' => $i->isDone(), 'due' => $i->dueDate(),
+                        ], $checklist->items)];
+                    }
+                }
+
+                return $out;
+            });
+        });
         $container->extend(SearchSources::class, function (object $sources, Container $c): void {
             /** @var SearchSources $sources */
             $sources->add(new PdoChecklistSearch($c->get(PDO::class)));

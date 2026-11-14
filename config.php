@@ -49,7 +49,7 @@ return [
     'db' => [
         // "sqlite" works out of the box, "mysql" for XAMPP / shared hosting
         'driver'      => getenv('DB_DRIVER') ?: 'sqlite',
-        'sqlite_path' => __DIR__ . '/database/todo.sqlite',
+        'sqlite_path' => getenv('DB_SQLITE_PATH') ?: __DIR__ . '/database/todo.sqlite',
 
         'host' => getenv('DB_HOST') ?: '127.0.0.1',
         'port' => getenv('DB_PORT') ?: '3306',

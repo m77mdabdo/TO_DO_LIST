@@ -581,4 +581,10 @@ return [
     'Referral' => 'ترشيح',
     'Personal' => 'شخصي',
     'Work' => 'عمل',
+
+    // Export
+    'Export' => 'تصدير',
+    'Spreadsheet (CSV)' => 'جدول بيانات (CSV)',
+    'Everything (JSON)' => 'كل البيانات (JSON)',
+    'Export all boards (JSON)' => 'تصدير كل اللوحات (JSON)',
 ];

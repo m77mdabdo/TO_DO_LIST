@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Attachment;
 
+use App\Shared\Export\ExportParts;
 use App\Modules\Attachment\Infrastructure\PdoAttachmentSearch;
 use App\Shared\Search\SearchSources;
 use App\Core\Config;
@@ -41,6 +42,19 @@ final class AttachmentModule implements ModuleProvider
 
     public function register(Container $container): void
     {
+        $container->extend(ExportParts::class, function (object $parts, Container $c): void {
+            /** @var ExportParts $parts */
+            $parts->add('attachments', function (array $cardIds) use ($c): array {
+                $out = [];
+                foreach ($cardIds as $cardId) {
+                    foreach ($c->get(AttachmentService::class)->forCard($cardId) as $a) {
+                        $out[$cardId][] = ['name' => $a->name, 'kind' => $a->kind, 'url' => $a->url, 'type' => $a->mime, 'size' => $a->size, 'created_at' => $a->createdAt];
+                    }
+                }
+
+                return $out;
+            });
+        });
         $container->extend(SearchSources::class, function (object $sources, Container $c): void {
             /** @var SearchSources $sources */
             $sources->add(new PdoAttachmentSearch($c->get(PDO::class)));
