@@ -50,4 +50,21 @@ final class PdoActivityLog implements ActivityLog
 
         return array_map([ActivityEntry::class, 'fromRow'], $stmt->fetchAll());
     }
+
+    public function countsByActor(array $boardIds, string $from, string $to): array
+    {
+        if ($boardIds === []) {
+            return [];
+        }
+        $marks = implode(',', array_fill(0, count($boardIds), '?'));
+        $stmt = $this->db->prepare("SELECT actor_id, COUNT(*) AS n FROM activities WHERE board_id IN ($marks) AND created_at >= ? AND created_at <= ?
+            GROUP BY actor_id ORDER BY n DESC");
+        $stmt->execute([...array_values($boardIds), $from . ' 00:00:00', $to . ' 23:59:59']);
+        $counts = [];
+        foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+            $counts[(int) $row['actor_id']] = (int) $row['n'];
+        }
+
+        return $counts;
+    }
 }
