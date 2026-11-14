@@ -838,3 +838,5 @@ fieldset.stack-sm legend { padding: 0 .3rem; font-weight: 600; }
 .copy-board > summary { list-style: none; cursor: pointer; }
 .copy-board > summary::-webkit-details-marker { display: none; }
 .copy-board[open] > form { padding: .6rem 0; }
+.view-page .card:not(.table-wrap) { padding: 1.2rem 1.3rem; }
+.view-page .checklist-progress { height: 12px; }

@@ -587,4 +587,7 @@ return [
     'Spreadsheet (CSV)' => 'جدول بيانات (CSV)',
     'Everything (JSON)' => 'كل البيانات (JSON)',
     'Export all boards (JSON)' => 'تصدير كل اللوحات (JSON)',
+
+    // Views
+    'Still open' => 'مفتوحة',
 ];

@@ -59,7 +59,7 @@ $link = function (string $column) use ($base, $query, $sort, $desc): string {
                             <td dir="auto"><?= $this->e($listName[$card->listId] ?? '') ?></td>
                             <td class="nowrap"><?= $this->e((string) $card->startDate()) ?></td>
                             <td class="nowrap <?= $late ? 'danger' : '' ?>"><?= $this->e((string) $card->dueDate()) ?></td>
-                            <td><span class="status status-<?= $card->isComplete() ? 'done' : ($late ? 'late' : 'open') ?>"><?= $this->te($card->isComplete() ? 'Done' : ($late ? 'Overdue' : 'Open')) ?></span></td>
+                            <td><span class="status status-<?= $card->isComplete() ? 'done' : ($late ? 'late' : 'open') ?>"><?= $this->te($card->isComplete() ? 'Done' : ($late ? 'Overdue' : 'Still open')) ?></span></td>
                             <td>
                                 <?php foreach ($cardLabels[$card->id] ?? [] as $label): ?>
                                     <span class="label label-<?= $this->e($label->color) ?>" dir="auto"><?= $this->e($label->name) ?></span>
