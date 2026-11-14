@@ -25,6 +25,8 @@ final class SyncEventBus implements EventBus
 
     private bool $dispatching = false;
 
+    private int $round = 0;
+
     public function listen(string $eventName, callable $listener): void
     {
         $this->listeners[$eventName][] = $listener;
@@ -39,6 +41,7 @@ final class SyncEventBus implements EventBus
         }
 
         $this->dispatching = true;
+        $this->round++;
 
         try {
             // Index walk instead of array_shift(): shifting re-indexes the array, O(n) each time.
@@ -53,6 +56,11 @@ final class SyncEventBus implements EventBus
             $this->queue = [];
             $this->dispatching = false;
         }
+    }
+
+    public function round(): int
+    {
+        return $this->round;
     }
 
     public function hasListeners(string $eventName): bool

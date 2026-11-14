@@ -81,7 +81,7 @@ final class LabelService implements LabelCatalog
         $this->transactions->run(function () use ($actorId, $card, $label, $attach): void {
             if ($attach) {
                 $this->labels->attach($card->id, $label->id);
-                $this->events->publish(new LabelAttached($card->id, $card->boardId, $actorId, $label->name, $this->clock->now()));
+                $this->events->publish(new LabelAttached($card->id, $card->boardId, $actorId, $label->name, $this->clock->now(), $label->id));
             } else {
                 $this->labels->detach($card->id, $label->id);
                 $this->events->publish(new LabelDetached($card->id, $card->boardId, $actorId, $label->name, $this->clock->now()));

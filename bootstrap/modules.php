@@ -23,4 +23,6 @@ return [
     App\Modules\Audit\AuditModule::class,
     App\Modules\Activity\ActivityModule::class,
     App\Modules\LegacyImport\LegacyImportModule::class,
+    // Last, so a rule's effects are recorded after the change that set it off.
+    App\Modules\Automation\AutomationModule::class,
 ];

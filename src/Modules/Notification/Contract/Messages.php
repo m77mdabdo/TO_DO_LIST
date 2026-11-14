@@ -25,12 +25,13 @@ final class Messages
         'invitation.accepted'    => ':actor accepted your invitation to :subject',
         'workspace.role_changed' => ':actor made you :role in :subject',
         'workspace.removed'      => ':actor removed you from :subject',
+        'automation.notice'      => ':rule on :subject: :message',
     ];
 
     /** Kinds important enough to email (when the person has email on). */
     public const EMAILED = [
         'card.assigned', 'checklist.assigned', 'comment.mentioned', 'card.due_soon', 'card.overdue',
-        'board.added', 'workspace.role_changed', 'workspace.removed',
+        'board.added', 'workspace.role_changed', 'workspace.removed', 'automation.notice',
     ];
 
     public static function sentence(string $type): string
