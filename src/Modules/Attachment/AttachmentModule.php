@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Attachment;
 
+use App\Modules\Attachment\Infrastructure\PdoAttachmentSearch;
+use App\Shared\Search\SearchSources;
 use App\Core\Config;
 use App\Core\Container;
 use App\Http\Middleware\Authenticate;
@@ -39,6 +41,10 @@ final class AttachmentModule implements ModuleProvider
 
     public function register(Container $container): void
     {
+        $container->extend(SearchSources::class, function (object $sources, Container $c): void {
+            /** @var SearchSources $sources */
+            $sources->add(new PdoAttachmentSearch($c->get(PDO::class)));
+        });
         $container->singleton(AttachmentRepository::class, fn (Container $c) => new PdoAttachments($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(FileStore::class, fn (Container $c) => new LocalFileStore(
             (string) $c->get(Config::class)->get('attachments.path', dirname(__DIR__, 3) . '/storage/attachments'),

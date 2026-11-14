@@ -28,6 +28,7 @@ use App\Mail\SmtpMailer;
 use App\Security\Csrf;
 use App\Session\Session;
 use App\Shared\Events\EventBus;
+use App\Shared\Search\SearchSources;
 use App\Shared\Events\SyncEventBus;
 use App\Shared\Module\ModuleRegistry;
 use App\Support\Clock;
@@ -90,6 +91,9 @@ return static function (Config $config, Session $session, string $basePath = '',
 
         return $view;
     });
+
+    // Modules add what they can be searched for (see App\Shared\Search).
+    $container->singleton(SearchSources::class, fn () => new SearchSources());
 
     $container->singleton(EventBus::class, function (Container $c) use ($modules): EventBus {
         $events = new SyncEventBus();

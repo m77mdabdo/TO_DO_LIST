@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Checklist;
 
+use App\Modules\Checklist\Infrastructure\PdoChecklistSearch;
+use App\Shared\Search\SearchSources;
 use App\Core\Container;
 use App\Http\Middleware\Authenticate;
 use App\Http\Router;
@@ -35,6 +37,10 @@ final class ChecklistModule implements ModuleProvider
 
     public function register(Container $container): void
     {
+        $container->extend(SearchSources::class, function (object $sources, Container $c): void {
+            /** @var SearchSources $sources */
+            $sources->add(new PdoChecklistSearch($c->get(PDO::class)));
+        });
         $container->singleton(ChecklistRepository::class, fn (Container $c) => new PdoChecklists($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(ChecklistService::class, fn (Container $c) => $c->build(ChecklistService::class));
 

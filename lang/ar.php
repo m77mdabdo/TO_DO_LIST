@@ -461,4 +461,15 @@ return [
     'The title may not be longer than 150 characters.' => 'لا يمكن أن يزيد العنوان عن 150 حرفًا.',
     'A card can have up to 50 attachments.' => 'يمكن أن تحتوي البطاقة على 50 مرفقًا كحد أقصى.',
     'This board has used all of its 500 MB for files.' => 'استهلكت هذه اللوحة كامل مساحتها للملفات (500 ميجابايت).',
+
+    // Search
+    'In the description' => 'في الوصف',
+    'In a comment' => 'في تعليق',
+    'In a checklist' => 'في قائمة تحقق',
+    'In an attachment' => 'في مرفق',
+    'All boards' => 'كل اللوحات',
+    'Include the archive' => 'يشمل الأرشيف',
+    'Searches card titles, descriptions, comments, checklists and attachments on the boards you can see.' => 'يبحث في عناوين البطاقات وأوصافها والتعليقات وقوائم التحقق والمرفقات في اللوحات التي يمكنك رؤيتها.',
+    'archived' => 'مؤرشفة',
+    'Board' => 'اللوحة',
 ];
