@@ -26,7 +26,7 @@ final class Conditions
     ];
 
     /**
-     * @param list<array{type: string, value: string}> $conditions
+     * @param list<array<string, string>> $conditions
      * @param array{list: int, labels: list<int>, members: list<int>, due: ?string, complete: bool, today: string} $card
      */
     public static function hold(array $conditions, array $card): bool

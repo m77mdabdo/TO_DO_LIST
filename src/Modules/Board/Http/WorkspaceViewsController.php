@@ -59,9 +59,12 @@ final class WorkspaceViewsController extends Controller
     public function myTasks(Request $request): Response
     {
         $user = $this->user($request);
-        $visible = fn (int $boardId): bool => ($boards[$boardId] ??= $this->directory->find($boardId)) !== null
-            && !$boards[$boardId]->archived && $this->gate->can($user->id, $boardId, Permission::ViewBoard);
         $boards = [];
+        $visible = function (int $boardId) use (&$boards, $user): bool {
+            $boards[$boardId] ??= $this->directory->find($boardId);
+
+            return $boards[$boardId] !== null && !$boards[$boardId]->archived && $this->gate->can($user->id, $boardId, Permission::ViewBoard);
+        };
 
         $cards = array_values(array_filter($this->cards->openCardsAssignedTo($user->id), fn (CardSummary $c) => $visible($c->boardId)));
         $items = $this->checklists->openItemsAssignedTo($user->id);
