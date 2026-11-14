@@ -1,7 +1,7 @@
 Options -Indexes
 
 # Config files are only meant to be included
-<FilesMatch "^(config(\.local)?\.php|.*\.sql|.*\.sqlite.*)$">
+<FilesMatch "^(config(\.local)?\.php|.*\.sql|.*\.sqlite.*|Dockerfile|docker-compose\.yml|.*\.md|LICENSE)$">
     Require all denied
 </FilesMatch>
 

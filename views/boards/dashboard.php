@@ -36,7 +36,7 @@ $tiles = [
             <h2 class="section-title"><?= $this->icon('chart') ?> <?= $this->te('Progress') ?></h2>
             <strong class="big-number"><?= $stats->percentDone() ?>%</strong>
         </div>
-        <progress max="100" value="<?= $stats->percentDone() ?>" aria-label="<?= $this->te('Cards done') ?>"></progress>
+        <progress class="checklist-progress" max="100" value="<?= $stats->percentDone() ?>" aria-label="<?= $this->te('Cards done') ?>"></progress>
         <p class="muted small"><?= $this->te(':done of :total cards are done.', ['done' => (string) $stats->done, 'total' => (string) $stats->total]) ?></p>
     </section>
 
@@ -105,5 +105,5 @@ $tiles = [
             </div>
         </section>
     </div>
-    <p class="muted small"><span class="legend legend-open"></span> <?= $this->te('Open') ?> <span class="legend legend-done"></span> <?= $this->te('Done') ?></p>
+    <p class="muted small"><span class="legend legend-open"></span> <?= $this->te('Still open') ?> <span class="legend legend-done"></span> <?= $this->te('Done') ?></p>
 </main>

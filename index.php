@@ -26,7 +26,9 @@ if (PHP_SAPI === 'cli-server') {
 require __DIR__ . '/bootstrap/autoload.php';
 
 $config   = Config::load(__DIR__);
-$basePath = Url::detectBasePath();
+// PHP's built-in server serves from the root, and sets SCRIPT_NAME to the request path
+// for URLs with a dot (like /export.json), which would confuse the detection.
+$basePath = PHP_SAPI === 'cli-server' ? '' : Url::detectBasePath();
 $session  = new NativeSession('todo_session', !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
 $app      = (require __DIR__ . '/bootstrap/app.php')($config, $session, $basePath);
 
