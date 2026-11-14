@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Card;
 
+use App\Modules\Board\Contract\Events\BoardCopied;
+use App\Modules\Card\Application\CardCopier;
 use App\Modules\Card\Infrastructure\PdoCardSearch;
 use App\Shared\Search\SearchSources;
 use App\Core\Container;
@@ -62,6 +64,9 @@ final class CardModule implements ModuleProvider
 
     public function listeners(EventBus $events, Container $container): void
     {
+        $events->listen(BoardCopied::name(), static function (BoardCopied $event) use ($container): void {
+            $container->get(CardCopier::class)->onBoardCopied($event);
+        });
     }
 
     public function migrationsPath(): ?string

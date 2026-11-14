@@ -55,6 +55,8 @@ final class BoardModule implements ModuleProvider
             $router->post('/boards/{board:ulid}/restore', [BoardController::class, 'restore']);
             $router->get('/boards/{board:ulid}/archived', [BoardController::class, 'archived']);
             $router->get('/boards/{board:ulid}/export', [BoardController::class, 'export']);
+            $router->post('/boards/{board:ulid}/copy', [BoardController::class, 'copy']);
+            $router->post('/boards/{board:ulid}/template', [BoardController::class, 'template']);
             $router->get('/boards/{board:ulid}/table', [BoardViewsController::class, 'table']);
             $router->get('/boards/{board:ulid}/calendar', [BoardViewsController::class, 'calendar']);
             $router->get('/boards/{board:ulid}/dashboard', [BoardViewsController::class, 'dashboard']);

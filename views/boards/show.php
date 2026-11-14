@@ -83,6 +83,24 @@ $form = $this->form;
                             <button class="btn btn-primary" type="submit"><?= $this->te('Save') ?></button>
                         </form>
                         <hr>
+                        <form action="<?= $this->url($base . '/template') ?>" method="post">
+                            <?= $this->csrfField() ?>
+                            <input type="hidden" name="on" value="<?= $board->isTemplate ? '0' : '1' ?>">
+                            <button class="menu-item" type="submit"><?= $this->icon('copy') ?><?= $this->te($board->isTemplate ? 'Stop using as a template' : 'Make this board a template') ?></button>
+                        </form>
+                        <details class="copy-board">
+                            <summary class="menu-item"><?= $this->icon('copy') ?><?= $this->te('Copy board') ?></summary>
+                            <form action="<?= $this->url($base . '/copy') ?>" method="post" class="stack">
+                                <?= $this->csrfField() ?>
+                                <label><span><?= $this->te('Name of the copy') ?></span>
+                                    <input name="name" required maxlength="100" dir="auto" value="<?= $this->e($this->t(':name (copy)', ['name' => $board->name])) ?>"></label>
+                                <label class="check"><input type="checkbox" name="with_cards" value="1" checked> <?= $this->te('Copy the cards, with their labels and checklists') ?></label>
+                                <label class="check"><input type="checkbox" name="with_members" value="1"> <?= $this->te('Add the same members') ?></label>
+                                <p class="muted small"><?= $this->te('Comments, attachments and history are not copied.') ?></p>
+                                <button class="btn btn-primary" type="submit"><?= $this->te('Copy board') ?></button>
+                            </form>
+                        </details>
+                        <hr>
                         <form action="<?= $this->url($base . '/archive') ?>" method="post" data-confirm="<?= $this->te('Archive this board? Nobody can change it until it is restored.') ?>">
                             <?= $this->csrfField() ?>
                             <button class="menu-item danger" type="submit"><?= $this->icon('archive') ?><?= $this->te('Archive board') ?></button>
