@@ -8,6 +8,8 @@ interface BoardMembers
 {
     public function add(int $boardId, int $userId, BoardRole $role): void;
 
+    public function remove(int $boardId, int $userId): void;
+
     /** The role the user was explicitly given on the board, if any. */
     public function role(int $boardId, int $userId): ?BoardRole;
 

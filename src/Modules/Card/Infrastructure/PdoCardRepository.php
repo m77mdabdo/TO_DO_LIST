@@ -112,6 +112,15 @@ final class PdoCardRepository implements CardRepository
         return array_map([CardSummary::class, 'fromRow'], $stmt->fetchAll());
     }
 
+    public function dueBetween(string $from, string $to): array
+    {
+        $stmt = $this->db->prepare('SELECT ' . self::COLUMNS . ' FROM cards
+            WHERE due_at >= ? AND due_at <= ? AND completed_at IS NULL AND archived_at IS NULL ORDER BY due_at, id');
+        $stmt->execute([$from . ' 00:00:00', $to . ' 23:59:59']);
+
+        return array_map([CardSummary::class, 'fromRow'], $stmt->fetchAll());
+    }
+
     public function archivedCards(int $boardId): array
     {
         $stmt = $this->db->prepare('SELECT ' . self::COLUMNS . ' FROM cards WHERE board_id = ? AND archived_at IS NOT NULL ORDER BY archived_at DESC, id DESC');

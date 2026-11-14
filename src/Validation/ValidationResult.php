@@ -27,6 +27,11 @@ final class ValidationResult
         return $this->errors;
     }
 
+    public function has(string $field): bool
+    {
+        return isset($this->errors[$field]);
+    }
+
     public function with(string $field, string $message): self
     {
         return new self($this->errors + [$field => $message]);

@@ -34,6 +34,7 @@ $form = $this->form;
         <span class="pill pill-role"><?= $this->te($role->label()) ?></span>
     </div>
     <div class="board-bar-actions">
+        <?= $this->slot('board.actions', ['board' => $board, 'role' => $role]) ?>
         <a class="btn btn-ghost" href="<?= $this->url($base . '/archived') ?>"><?= $this->icon('archive') ?><span class="hide-sm"><?= $this->te('Archived items') ?></span></a>
         <?php if ($role->allows(Permission::Export)): ?>
             <a class="btn btn-ghost" href="<?= $this->url($base . '/export') ?>" title="<?= $this->te('Download as CSV') ?>"><?= $this->icon('download') ?></a>

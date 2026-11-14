@@ -13,4 +13,7 @@ interface BoardCatalog
     public function createBoard(int $actorId, int $workspaceId, string $name, BoardVisibility $visibility = BoardVisibility::Private): BoardSummary;
 
     public function addList(int $actorId, int $boardId, string $name): ListSummary;
+
+    /** @return list<BoardSummary> the boards of the workspace this user can see */
+    public function boardsInWorkspace(int $userId, int $workspaceId, bool $archived = false): array;
 }

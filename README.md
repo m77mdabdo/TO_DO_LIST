@@ -44,6 +44,9 @@ No framework, no Composer, no build step.
 - 🏢 **Companies with their own workspace.** Every account gets a personal workspace, and you can create as many companies as you need.
 - 🔀 **Workspace switcher** in the header. The next sign-in opens the workspace you were last in.
 - 👥 **Roles.** Workspace roles are owner, admin, member and guest. Board roles are manager, member and viewer.
+- ✉️ **Invitations by email or by link.** A link works once, for the invited address only, and expires after 7 days. Open invitations can be sent again or cancelled.
+- 🧑‍💼 **Member management.** Owners and admins change roles and remove people; anyone can leave. A workspace always keeps at least one owner.
+- 🧾 **Audit log** of invitations, role changes and removals, for owners and admins. Entries can't be edited.
 - 🔒 **Private or workspace boards.** A private board is visible only to its members. A workspace board can be seen by every full member of the workspace.
 
 **Boards**
@@ -57,6 +60,8 @@ No framework, no Composer, no build step.
 - 💬 **Comments with @mentions** and **votes**. Each board decides who may comment and vote: no one, members only, or everyone who can see it.
 - 🔎 **Filters and search.** Filter a board by text, label, person, due date or status, and search cards across every board you can see.
 - 🗄️ **Archive, then delete.** Archived lists, cards and boards can be restored. Deleting a card is only possible once it is archived.
+- 🧑‍🤝‍🧑 **Board members.** Managers choose who is on a board and with which role (manager, member, viewer). Guests only see the boards they were given.
+- 🔔 **Notifications.** A bell in the header for mentions, assignments, comments, moves and due dates, plus email for what matters (each person can turn email off). Watch a card or a whole board to follow it.
 - 📜 **Activity feed** for each board and each card, with a full page you can scroll back through.
 - ⬇️ **CSV export** of a board. It opens cleanly in Excel and is safe against formula injection.
 
@@ -112,6 +117,7 @@ php database/seed.php
 |---|---|---|
 | `demo@todo.test` | `demo1234` | Owner of "Nile Studio": a shared "Website launch" board and a private "Hiring" board. Some old-style tasks are also imported into "My Board" on the first sign-in. |
 | `mona@todo.test` | `demo1234` | A member of "Nile Studio". She sees the shared board but not the private one. |
+| `omar@todo.test` | `demo1234` | A guest who joined by invitation and can only view the shared board. |
 
 ### Option 2: XAMPP + MySQL
 
@@ -131,6 +137,33 @@ php database/seed.php
 You can also use environment variables instead of `config.local.php`:
 `DB_DRIVER`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`, `APP_NAME`, `APP_TIMEZONE`, `APP_LOCALE`.
 
+### Email and `.env`
+
+Settings can also come from a `.env` file in the project folder (it is ignored by git; server
+environment variables win over it). Copy `.env.example` to `.env` and fill it in:
+
+```ini
+APP_URL=http://localhost/TO_DO_LIST   # used in links inside emails
+MAIL_MAILER=smtp                       # log (default) | smtp | mail
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_ENCRYPTION=tls
+MAIL_USERNAME=you@gmail.com
+MAIL_PASSWORD=your-app-password        # for Gmail, an app password
+MAIL_FROM_ADDRESS=you@gmail.com
+MAIL_FROM_NAME="To Do List"
+```
+
+With the default `log` mailer nothing is sent: each email is written to `storage/mail/` as an
+`.eml` file you can open. Never commit `.env`.
+
+Due-date reminders ("due tomorrow", "overdue") are made by a small script. Run it from cron, for
+example every 15 minutes:
+
+```bash
+php bin/reminders.php
+```
+
 ### Command line
 
 ```bash
@@ -138,6 +171,7 @@ php database/migrate.php            # run pending migrations
 php database/migrate.php --pending  # list them without running
 php database/seed.php               # demo company (fresh database only)
 php database/import-legacy.php      # move every user's old tasks to boards now, instead of on sign-in
+php bin/reminders.php               # due-soon and overdue notifications (run it from cron)
 ```
 
 ## Project structure
@@ -195,6 +229,9 @@ The app is a modular monolith. Each feature lives in `src/Modules/<Name>/` with 
 | **Label** | board labels and which cards carry them |
 | **Checklist** | checklists and their items on a card, progress per card |
 | **Discussion** | comments, @mentions and votes on cards |
+| **Invitation** | invitations by email and link: one-time hashed tokens, expiry, resend, revoke, accept |
+| **Notification** | watchers, the notification bell, email for important events, due-date reminders |
+| **Audit** | an append-only log of invitations, role changes and removals per workspace |
 | **Activity** | the activity feed, built only from other modules' events |
 | **LegacyImport** | moves tasks from the single-board version into boards |
 
@@ -242,7 +279,18 @@ Archived boards are read-only.
 | POST | `/locale/{ar\|en}` | switch language |
 | GET / POST | `/workspaces/new`, `/workspaces` | create a company |
 | POST | `/workspaces/{id}/switch` | switch workspace |
-| GET | `/workspaces/{id}/members` | workspace members |
+| GET | `/workspaces/{id}/members` | workspace members and open invitations |
+| POST | `/workspaces/{id}/members/{user}`, `/remove` | change a member's role, remove them |
+| POST | `/workspaces/{id}/leave` | leave a workspace |
+| POST | `/workspaces/{id}/invitations` | invite someone by email (the link is also shown once) |
+| POST | `/invitations/{id}/resend`, `/revoke` | send an invitation again with a new link, cancel it |
+| GET / POST | `/invitations/{token}`, `/accept` | open and accept an invitation |
+| GET | `/workspaces/{id}/audit` | the audit log (owners and admins) |
+| GET / POST | `/boards/{id}/members` | who is on a board, add someone or change their role |
+| POST | `/boards/{id}/members/{user}/remove` | take someone off a board |
+| GET | `/notifications` | notifications, newest first |
+| POST | `/notifications/read-all`, `/settings`, `/{id}/open` | mark all read, email on or off, open one |
+| POST | `/cards/{id}/watch`, `/boards/{id}/watch` | watch or stop watching |
 | POST | `/boards` | create a board |
 | GET / POST | `/boards/{id}` | show / update a board |
 | POST | `/boards/{id}/archive`, `/restore` | archive or restore a board |
@@ -310,7 +358,10 @@ for PHP 8.1 and 8.3, together with PHPStan.
 | Session fixation / theft | ID regenerated on login, strict mode, `HttpOnly` + `SameSite=Lax` (+ `Secure` on HTTPS) |
 | Clickjacking & sniffing | `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy` |
 | CSV formula injection | Cells starting with `=`, `+`, `-`, `@` are neutralised in exports |
-| Open redirects | The language switch only returns to a path on this site |
+| Open redirects | The language switch and the after-login redirect only go to a path on this site |
+| Invitation links | 256-bit random tokens; only a SHA-256 hash is stored; single use, bound to the invited email, 7-day expiry, 30 invitations per hour per person |
+| Email header injection | Line breaks are stripped from addresses, names and subjects; SMTP verifies the server certificate |
+| Secrets | SMTP settings live in `.env`, which is git-ignored and blocked by `.htaccess` |
 | Direct file access | Everything goes through `index.php`; `.htaccess` blocks `src/`, `views/`, `database/`, `storage/`, `lang/`, `bootstrap/`, `routes/`, `tests/` and config files |
 
 ## Performance
@@ -330,11 +381,12 @@ for PHP 8.1 and 8.3, together with PHPStan.
 - [x] Boards, lists, cards, labels and activity
 - [x] Arabic interface (RTL) with English
 - [x] Export a board as CSV
-- [ ] Invitations by email and member management
+- [x] Invitations by email and member management
 - [x] Checklists, comments, mentions and votes on cards
 - [x] Search and filters
 - [ ] Attachments on cards
-- [ ] Notifications and due-date reminders
+- [x] Notifications, watchers and due-date reminders
+- [x] Audit log
 - [ ] Import from CSV
 
 Ideas and pull requests are welcome.

@@ -50,4 +50,13 @@ final class FormState
 
         return is_string($this->old[$field] ?? null) ? $this->old[$field] : $default;
     }
+
+    /** @return list<string> the strings sent for a multi-value field like boards[] */
+    public function oldArray(string $field): array
+    {
+        $this->old ??= (array) $this->session->pullFlash('old', []);
+        $values = $this->old[$field] ?? [];
+
+        return is_array($values) ? array_values(array_filter($values, 'is_string')) : [];
+    }
 }

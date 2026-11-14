@@ -11,6 +11,10 @@ declare(strict_types=1);
  |   demo@todo.test  owner of "Nile Studio", plus a few old-style tasks that
  |                   are imported into "My Board" on the first login
  |   mona@todo.test  a member of "Nile Studio" who works on the team board
+ |   omar@todo.test  a guest who can only view the team board, invited by link
+ |
+ | Invitation emails go to storage/mail even when .env sets up SMTP, so
+ | seeding never mails the made-up addresses.
  |
  | Everything goes through the same services the app uses, so the data
  | passes the same validation and permission checks.
@@ -25,11 +29,17 @@ use App\Modules\Card\Application\CardService;
 use App\Modules\Checklist\Application\ChecklistService;
 use App\Modules\Discussion\Application\DiscussionService;
 use App\Modules\Identity\Application\AuthService;
+use App\Modules\Identity\Contract\UserDirectory;
+use App\Modules\Invitation\Application\InvitationService;
 use App\Modules\Label\Application\LabelService;
 use App\Modules\Workspace\Application\WorkspaceService;
 use App\Modules\Workspace\Contract\WorkspaceRole;
 use App\Modules\Workspace\Domain\WorkspaceRepository;
+use App\Mail\LogMailer;
+use App\Mail\Mailer;
+use App\Mail\MimeFormat;
 use App\Session\ArraySession;
+use App\Support\Clock;
 
 if (PHP_SAPI !== 'cli') {
     http_response_code(404);
@@ -40,6 +50,7 @@ require __DIR__ . '/../bootstrap/autoload.php';
 
 $app = (require __DIR__ . '/../bootstrap/app.php')(Config::load(dirname(__DIR__)), new ArraySession());
 $db = $app->get(PDO::class);
+$app->instance(Mailer::class, new LogMailer(dirname(__DIR__) . '/storage/mail', $app->get(MimeFormat::class), $app->get(Clock::class)));
 
 $exists = $db->prepare('SELECT 1 FROM users WHERE email = ?');
 $exists->execute(['demo@todo.test']);
@@ -140,6 +151,14 @@ $discussion->toggleVote($mona, $created['Write the About page']);
 $private = $boards->createBoard($demo, $workspace->id, 'Hiring', BoardVisibility::Private, 'coral');
 $boards->addList($demo, $private->id, 'Candidates');
 
+// Omar joined through an invitation as a guest who views the team board; one
+// invitation is still waiting. Both show on the members page and audit log.
+$invitations = $app->get(InvitationService::class);
+[, $link] = $invitations->invite($demo, $workspace->id, ['email' => 'omar@todo.test', 'role' => 'guest', 'board_role' => 'viewer', 'boards' => [$board->id]]);
+$omar = $register('Omar Farouk', 'omar@todo.test');
+$invitations->accept($app->get(UserDirectory::class)->find($omar), basename($link));
+$invitations->invite($demo, $workspace->id, ['email' => 'sara@example.com', 'role' => 'member', 'board_role' => 'member', 'boards' => [$board->id]]);
+
 // Old-style tasks, as the app stored them before boards existed.
 // They move to "My Board" the first time demo@todo.test logs in.
 $ago = static fn (string $when) => date('Y-m-d H:i:s', strtotime($when));
@@ -153,4 +172,4 @@ foreach ([
     $old->execute([$demo, $title, $notes, $status, $priority, $category, $due, $ago($created), $ago($created), $completed ? $ago($completed) : null]);
 }
 
-echo "Seeded \"Nile Studio\" with 2 boards. Log in with demo@todo.test / demo1234 (or mona@todo.test).\n";
+echo "Seeded \"Nile Studio\" with 2 boards. Log in with demo@todo.test / demo1234 (or mona@todo.test, omar@todo.test).\n";

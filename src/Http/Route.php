@@ -6,11 +6,13 @@ namespace App\Http;
 
 final class Route
 {
-    /** Parameter types: {id} is a positive integer, {board:ulid} a 26-char public id. */
+    /** Parameter types: {id} is a positive integer, {board:ulid} a 26-char public id, {t:token} a 43-char secret. */
     private const TYPES = [
         'int'  => '[1-9]\d{0,17}',
         'ulid' => '[0-9A-HJKMNP-TV-Z]{26}',
         'slug' => '[a-z]{2,10}',
+        // 32 random bytes in URL-safe base64 (invitation links)
+        'token' => '[A-Za-z0-9_-]{43}',
     ];
 
     private string $regex;

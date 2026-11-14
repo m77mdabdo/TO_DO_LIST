@@ -36,6 +36,14 @@ interface CardQueries
      */
     public function search(array $boardIds, string $text, int $limit = 50): array;
 
+    /**
+     * Open, unfinished cards due between two dates (Y-m-d, both included),
+     * for due-date reminders. Uses the due_at index.
+     *
+     * @return list<CardSummary>
+     */
+    public function dueBetween(string $from, string $to): array;
+
     /** @return list<CardSummary> */
     public function archivedCards(int $boardId): array;
 }

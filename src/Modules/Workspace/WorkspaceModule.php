@@ -12,6 +12,7 @@ use App\Modules\Identity\Contract\Events\UserLoggedIn;
 use App\Modules\Identity\Contract\Events\UserRegistered;
 use App\Modules\Workspace\Application\WorkspaceService;
 use App\Modules\Workspace\Contract\WorkspaceDirectory;
+use App\Modules\Workspace\Contract\WorkspaceMembership;
 use App\Modules\Workspace\Contract\WorkspaceProvisioning;
 use App\Modules\Workspace\Domain\WorkspaceRepository;
 use App\Modules\Workspace\Http\WorkspaceController;
@@ -25,8 +26,8 @@ use PDO;
 /**
  * Companies, their workspaces and workspace membership.
  * Listens to: identity.user_registered, identity.user_logged_in (gives every user a workspace).
- * Publishes: workspace.created.
- * Offers: Contract\WorkspaceDirectory, Contract\WorkspaceProvisioning.
+ * Publishes: workspace.created, workspace.member_joined, workspace.member_role_changed, workspace.member_removed.
+ * Offers: Contract\WorkspaceDirectory, Contract\WorkspaceProvisioning, Contract\WorkspaceMembership.
  */
 final class WorkspaceModule implements ModuleProvider
 {
@@ -41,6 +42,7 @@ final class WorkspaceModule implements ModuleProvider
         $container->singleton(WorkspaceService::class, fn (Container $c) => $c->build(WorkspaceService::class));
         $container->singleton(WorkspaceDirectory::class, fn (Container $c) => $c->get(WorkspaceService::class));
         $container->singleton(WorkspaceProvisioning::class, fn (Container $c) => $c->get(WorkspaceService::class));
+        $container->singleton(WorkspaceMembership::class, fn (Container $c) => $c->get(WorkspaceService::class));
 
         // Every page with the app header gets the workspace switcher data.
         $container->extend(View::class, function (object $view, Container $c): void {
@@ -70,6 +72,9 @@ final class WorkspaceModule implements ModuleProvider
             $router->post('/workspaces', [WorkspaceController::class, 'store']);
             $router->post('/workspaces/{workspace:ulid}/switch', [WorkspaceController::class, 'switch']);
             $router->get('/workspaces/{workspace:ulid}/members', [WorkspaceController::class, 'members']);
+            $router->post('/workspaces/{workspace:ulid}/members/{id}', [WorkspaceController::class, 'changeRole']);
+            $router->post('/workspaces/{workspace:ulid}/members/{id}/remove', [WorkspaceController::class, 'removeMember']);
+            $router->post('/workspaces/{workspace:ulid}/leave', [WorkspaceController::class, 'leave']);
         });
     }
 

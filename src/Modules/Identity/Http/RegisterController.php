@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Identity\Http;
 
 use App\Controllers\Controller;
+use App\Http\Intended;
 use App\Http\Request;
 use App\Http\Response;
 use App\Http\Url;
@@ -38,6 +39,8 @@ final class RegisterController extends Controller
             return $this->backWithErrors($e, $request, '/register');
         }
 
-        return $this->redirect('/', 'Welcome aboard! Add your first task.');
+        $back = Intended::pull($this->session, '');
+
+        return $back !== '' ? $this->redirect($back) : $this->redirect('/', 'Welcome aboard! Add your first task.');
     }
 }
