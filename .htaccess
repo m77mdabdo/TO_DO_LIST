@@ -10,6 +10,9 @@ Options -Indexes
     Require all denied
 </FilesMatch>
 
+# Let PHP see "Authorization: Bearer ..." (the API)
+SetEnvIf Authorization "(.+)" HTTP_AUTHORIZATION=$1
+
 # Pretty URLs: send everything that isn't a real file to index.php
 <IfModule mod_rewrite.c>
     RewriteEngine On

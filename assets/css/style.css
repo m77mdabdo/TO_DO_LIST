@@ -955,3 +955,13 @@ fieldset.stack-sm legend { padding: 0 .3rem; font-weight: 600; }
 .tl-s33 { grid-column-end: span 33; }
 .tl-s34 { grid-column-end: span 34; }
 .tl-s35 { grid-column-end: span 35; }
+
+/* ---------- Integrations ---------- */
+label.check { display: flex; align-items: center; gap: .5rem; font-weight: 600; }
+label.check input { width: auto; }
+.token-secret { display: grid; gap: .4rem; padding: .8rem 1rem; border-radius: var(--radius-sm); border: 2px dashed var(--mint); background: color-mix(in srgb, var(--mint) 10%, transparent); }
+.token-value { display: block; padding: .45rem .6rem; border-radius: 8px; background: var(--surface-2); overflow-wrap: anywhere; user-select: all; font-size: .85rem; }
+.code-sample { margin: 0; padding: .8rem; border-radius: var(--radius-sm); background: var(--surface-2); overflow-x: auto; font-size: .8rem; white-space: pre; }
+.webhook-url { overflow-wrap: anywhere; }
+.delivery-list { list-style: none; padding: 0; margin: .4rem 0 0; display: grid; gap: .3rem; }
+.delivery-list li { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }

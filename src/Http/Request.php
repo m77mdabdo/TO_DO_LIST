@@ -41,11 +41,24 @@ final class Request
             }
         }
 
+        // Apache hides the Authorization header from PHP unless .htaccess passes it on.
+        $authorization = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null;
+        if (is_string($authorization)) {
+            $headers['authorization'] = $authorization;
+        }
+
+        // JSON bodies (the API), up to 1 MB.
+        $body = $_POST;
+        if (str_starts_with(strtolower((string) ($_SERVER['CONTENT_TYPE'] ?? '')), 'application/json')) {
+            $json = json_decode((string) file_get_contents('php://input', length: 1_048_576), true);
+            $body = is_array($json) ? $json : [];
+        }
+
         return new self(
             method: strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET'),
             path: $path,
             query: $_GET,
-            body: $_POST,
+            body: $body,
             headers: $headers,
             ip: $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0',
             files: UploadedFile::fromGlobals($_FILES),
@@ -101,7 +114,7 @@ final class Request
 
     public function wantsJson(): bool
     {
-        return str_contains($this->header('accept') ?? '', 'application/json');
+        return str_contains($this->header('accept') ?? '', 'application/json') || str_starts_with($this->path, '/api/');
     }
 
     public function attribute(string $key, mixed $default = null): mixed
