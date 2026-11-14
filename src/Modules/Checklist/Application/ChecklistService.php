@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Checklist\Application;
 
+use App\Modules\Checklist\Contract\ChecklistQueries;
 use App\Database\Transactions;
 use App\Modules\Access\Contract\AccessDenied;
 use App\Modules\Access\Contract\AccessGate;
@@ -27,7 +28,7 @@ use InvalidArgumentException;
  * card's board (EditCards), and refused on archived cards and boards.
  * Ids that don't exist and ids on boards the user can't see both give a 404.
  */
-final class ChecklistService
+final class ChecklistService implements ChecklistQueries
 {
     public const MAX_CHECKLISTS = 20;
     public const MAX_ITEMS = 200;
@@ -57,6 +58,11 @@ final class ChecklistService
     public function progressForCards(array $cardIds): array
     {
         return $this->checklists->progressForCards($cardIds);
+    }
+
+    public function openItemsAssignedTo(int $userId): array
+    {
+        return $this->checklists->openItemsAssignedTo($userId);
     }
 
     /**

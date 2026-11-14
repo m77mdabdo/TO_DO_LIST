@@ -51,4 +51,12 @@ interface ChecklistRepository
      * @return list<ChecklistItem>
      */
     public function itemsDueBetween(array $cardIds, string $from, string $to): array;
+
+    /**
+     * Unfinished items given to a person on open cards, soonest due first
+     * (uses the assignee index).
+     *
+     * @return list<ChecklistItem>
+     */
+    public function openItemsAssignedTo(int $userId, int $limit = 200): array;
 }
