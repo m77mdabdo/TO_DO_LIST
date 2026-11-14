@@ -121,6 +121,7 @@ final class BoardController extends Controller
             'cardMembers' => $cardMembers,
             'people'      => $this->users->findMany([...array_keys($audience), ...array_merge([], ...array_values($cardMembers)), ...array_map(static fn ($a) => $a->actorId, $activity)]),
             'audience'    => array_keys($audience),
+            'query'       => array_filter($request->only(['q', 'label', 'member', 'due', 'status']), static fn ($v) => $v !== ''),
         ]);
     }
 

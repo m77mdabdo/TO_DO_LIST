@@ -155,6 +155,18 @@ final class PdoChecklists implements ChecklistRepository
         return $progress;
     }
 
+    public function itemsDueBetween(array $cardIds, string $from, string $to): array
+    {
+        if ($cardIds === []) {
+            return [];
+        }
+        $marks = implode(', ', array_fill(0, count($cardIds), '?'));
+        $stmt = $this->db->prepare("SELECT * FROM checklist_items WHERE card_id IN ($marks) AND due_at >= ? AND due_at <= ? ORDER BY due_at, id");
+        $stmt->execute([...array_values($cardIds), $from . ' 00:00:00', $to . ' 23:59:59']);
+
+        return array_map([ChecklistItem::class, 'fromRow'], $stmt->fetchAll());
+    }
+
     private function now(): string
     {
         return $this->clock->now()->format('Y-m-d H:i:s');

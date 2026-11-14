@@ -59,6 +59,15 @@ final class ChecklistService
         return $this->checklists->progressForCards($cardIds);
     }
 
+    /**
+     * @param list<int> $cardIds
+     * @return list<ChecklistItem>
+     */
+    public function itemsDueBetween(array $cardIds, string $from, string $to): array
+    {
+        return $this->checklists->itemsDueBetween($cardIds, $from, $to);
+    }
+
     public function addChecklist(int $actorId, CardSummary $card, string $title): int
     {
         $this->authorize($actorId, $card);
