@@ -24,6 +24,7 @@ use App\Core\Config;
 use App\Modules\Access\Contract\BoardMembers;
 use App\Modules\Access\Contract\BoardRole;
 use App\Modules\Attachment\Application\AttachmentService;
+use App\Modules\Automation\Application\AutomationService;
 use App\Modules\Board\Application\BoardService;
 use App\Modules\Board\Contract\BoardVisibility;
 use App\Modules\Card\Application\CardService;
@@ -155,6 +156,15 @@ $discussion->post($mona, $pricing, 'Done. I think **Team** should be the highlig
 $discussion->toggleVote($demo, $pricing);
 $discussion->toggleVote($mona, $pricing);
 $discussion->toggleVote($mona, $created['Write the About page']);
+
+// Automations: a rule, a card button, a board button, a schedule and a due-date reminder.
+$automation = $app->get(AutomationService::class);
+$automation->create($demo, $board, ['kind' => 'rule', 'trigger' => 'card.moved:' . $lists['Done'], 'actions' => [['do' => 'card.complete'], ['do' => 'label.remove:' . $urgent->id]]]);
+$automation->create($demo, $board, ['kind' => 'rule', 'trigger' => 'card.created:' . $lists['Backlog'], 'conditions' => ['no_due'], 'actions' => [['do' => 'card.due_in:7']]]);
+$automation->create($demo, $board, ['kind' => 'card_button', 'name' => 'Send for review', 'actions' => [['do' => 'card.move:' . $lists['Review']], ['do' => 'notify.managers', 'text' => 'Ready for review, please take a look.']]]);
+$automation->create($demo, $board, ['kind' => 'board_button', 'name' => 'Archive finished cards', 'scope' => (string) $lists['Done'], 'conditions' => ['complete'], 'actions' => [['do' => 'card.archive']]]);
+$automation->create($demo, $board, ['kind' => 'schedule', 'every' => 'week', 'weekday' => '0', 'hour' => '9', 'scope' => (string) $lists['Backlog'], 'actions' => [['do' => 'list.sort_due']]]);
+$automation->create($demo, $board, ['kind' => 'due', 'when' => 'before', 'days' => '1', 'conditions' => ['not_complete'], 'actions' => [['do' => 'label.add:' . $urgent->id], ['do' => 'notify.members', 'text' => 'This is due tomorrow.']]]);
 
 // A private board only the owner sees (Mona is not a member), started from a ready-made template.
 $private = $boards->createFromTemplate($demo, $workspace->id, 'hiring', 'Hiring');

@@ -55,9 +55,10 @@ $base = '/boards/' . $board->publicId . '/automation';
                 <?php foreach ($byKind[$key] as $automation): ?>
                     <li class="automation-item <?= $automation->enabled ? '' : 'is-paused' ?>">
                         <div class="automation-text">
-                            <strong dir="auto"><?= $this->e($automation->name) ?></strong>
+                            <?php $sentence = $described[$automation->id] ?? ''; $own = !str_starts_with($sentence, $automation->name); ?>
+                            <strong dir="auto"><?= $this->e($own ? $automation->name : $sentence) ?></strong>
                             <?php if (!$automation->enabled): ?><span class="pill"><?= $this->icon('pause') ?><?= $this->te('Paused') ?></span><?php endif; ?>
-                            <p dir="auto"><?= $this->e($described[$automation->id] ?? '') ?></p>
+                            <?php if ($own): ?><p dir="auto"><?= $this->e($sentence) ?></p><?php endif; ?>
                             <p class="muted small">
                                 <?= $this->te('Set up by :name', ['name' => $people[$automation->createdBy]->name ?? $this->t('Someone')]) ?>
                                 <?php if ($automation->lastRunAt !== null): ?> · <?= $this->te('last ran :when', ['when' => $timeAgo->format(new DateTimeImmutable($automation->lastRunAt))]) ?><?php endif; ?>

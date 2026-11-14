@@ -60,7 +60,9 @@ No framework, no Composer, no build step.
 - 💬 **Comments with @mentions** and **votes**. Each board decides who may comment and vote: no one, members only, or everyone who can see it.
 - 🔎 **Filters and search.** Filter a board by text, label, person, due date or status. Search looks in card titles, descriptions, comments, checklists and attachments on every board you can see, with a board filter and an option to include the archive.
 - 📎 **Attachments and links.** Upload images, PDFs, Office files, text and zip files (up to 10 MB) or add web links. Images show a preview.
-- 🧮 **Table, calendar and dashboard views.** Sort a board's cards in a table, see due dates and dated checklist items on a month calendar, and read a board's progress, late work and workload per list, person and label.
+- 🧮 **Table, calendar, timeline and dashboard views.** Sort a board's cards in a table, see due dates and dated checklist items on a month calendar, see start-to-due bars over five weeks on the timeline, and read a board's progress, late work and workload per list, person and label.
+- 📥 **My tasks.** Every card and checklist item given to you, on every board you can see, grouped into overdue, today, this week and later.
+- 🗃️ **Workspace views and team report.** All open cards of a workspace in one filterable table, and a team report (open, overdue, due soon, created and completed in the last 7, 30 or 90 days, per person and per board) with a CSV download. Both only count boards the reader can see.
 - 🧩 **Templates.** Start a board from ready-made templates (Kanban, software sprint, marketing, hiring, weekly planner) or from your own boards saved as templates. Copy any board, with or without its cards and members.
 - 💾 **Export and backup.** Download a board or the whole workspace as JSON, and back up the database and uploaded files with one command.
 - 🗄️ **Archive, then delete.** Archived lists, cards and boards can be restored. Deleting a card is only possible once it is archived.
@@ -68,6 +70,11 @@ No framework, no Composer, no build step.
 - 🔔 **Notifications.** A bell in the header for mentions, assignments, comments, moves and due dates, plus email for what matters (each person can turn email off). Watch a card or a whole board to follow it.
 - 📜 **Activity feed** for each board and each card, with a full page you can scroll back through.
 - ⬇️ **CSV export** of a board. It opens cleanly in Excel and is safe against formula injection.
+
+**Automation and integrations**
+- ⚡ **Automation.** Rules (a trigger, optional conditions, then actions), buttons on every card, buttons on the board that work on many cards, schedules (every day, week or month at an hour) and due-date automations (before, on or after a card's due date). Actions move, complete, archive, assign, date, label, sort a list, add a checklist, comment and notify. A run log shows what ran and why something failed. Automations act with their author's permissions, a failing one undoes only its own changes, loops are stopped, and one that keeps failing is paused.
+- 🔑 **API tokens and a JSON API** (`/api/v1`). A token works only on the boards you pick, can be read-only, expires, can be revoked, and never does more than its owner may.
+- 🪝 **Webhooks.** Board managers send chosen events as signed JSON (HMAC-SHA256) to an https address, with retries. Addresses inside private networks are refused.
 
 **Everyday comfort**
 - 🌍 **Arabic by default (RTL), English ready.** Mixed Arabic and English text lines up correctly.
@@ -200,6 +207,17 @@ php database/seed.php               # demo company (fresh database only)
 php database/import-legacy.php      # move every user's old tasks to boards now, instead of on sign-in
 php bin/reminders.php               # due-soon and overdue notifications (run it from cron)
 php bin/backup.php --with-files     # back up the database and attachments
+php bin/automation.php              # scheduled and due-date automations (cron, every 15 minutes)
+php bin/webhooks.php                # send queued webhook messages (cron, every minute or two)
+```
+
+A crontab for everything:
+
+```
+*/15 * * * * php /path/to/todolist/bin/reminders.php
+*/15 * * * * php /path/to/todolist/bin/automation.php
+*/2  * * * * php /path/to/todolist/bin/webhooks.php
+0 3 * * *    php /path/to/todolist/bin/backup.php --with-files
 ```
 
 ## Project structure
@@ -219,7 +237,7 @@ TO_DO_LIST/
 │   ├── Core/               # Container (dependency injection) and Config
 │   ├── Http/               # Request, Response, Router, Kernel, Url, middleware
 │   ├── Modules/            # feature modules (see "Modules" below)
-│   ├── Shared/             # Events (EventBus), Module (ModuleProvider), Ids (ULID), Ordering (FractionalIndex)
+│   ├── Shared/             # Events (EventBus), Module (ModuleProvider), Ids (ULID), Ordering, and the Search, Export and Automation extension points
 │   ├── I18n/               # Translator
 │   ├── Validation/         # Validator, Rule interface and one class per rule
 │   ├── Session/            # Session interface, NativeSession, ArraySession (tests)
@@ -230,6 +248,7 @@ TO_DO_LIST/
 │
 ├── views/                  # plain PHP templates: layout, boards/*, cards/*, workspaces/*, auth/*, partials/*
 ├── assets/                 # style.css (light + dark, logical properties for RTL), app.js, theme.js
+├── bin/                    # cron jobs: reminders, automation, webhooks, backup
 ├── database/               # migrations/, migrate.php, seed.php, import-legacy.php
 ├── storage/logs/           # error logs
 └── tests/                  # Unit, Integration, Feature and Architecture tests + a tiny runner
@@ -258,11 +277,17 @@ The app is a modular monolith. Each feature lives in `src/Modules/<Name>/` with 
 | **Checklist** | checklists and their items on a card, progress per card |
 | **Discussion** | comments, @mentions and votes on cards |
 | **Attachment** | files and links on cards: real-type checks, storage outside the web root, downloads after a permission check |
+| **Automation** | rules, card and board buttons, schedules and due-date automations, the run log, loop protection |
+| **Integration** | API tokens and the JSON API, outgoing webhooks with signatures, retries and an SSRF guard |
 | **Invitation** | invitations by email and link: one-time hashed tokens, expiry, resend, revoke, accept |
 | **Notification** | watchers, the notification bell, email for important events, due-date reminders |
 | **Audit** | an append-only log of invitations, role changes and removals per workspace |
 | **Activity** | the activity feed, built only from other modules' events |
 | **LegacyImport** | moves tasks from the single-board version into boards |
+
+Shared extension points let modules add to features they don't own: `Shared\Search` (what search
+looks in), `Shared\Export` (what a JSON export contains) and `Shared\Automation` (what automations
+can do: each module registers its own actions, so the Automation module never touches cards directly).
 
 A module talks to another one in exactly two ways: by calling its `Contract\` interfaces, or by
 listening to the domain events it publishes on the `EventBus`. `tests/Architecture/ModuleBoundaryTest.php`
@@ -340,7 +365,18 @@ Archived boards are read-only.
 | POST | `/comments/{id}`, `/comments/{id}/delete` | edit or delete a comment |
 | GET | `/boards/{id}/activity` | the board's whole activity, page by page |
 | GET | `/search?q=&board=&archived=1` | search cards, comments, checklists and attachments in the current workspace |
-| GET | `/boards/{id}/table`, `/calendar?month=`, `/dashboard` | other views of a board (they take the same filters) |
+| GET | `/boards/{id}/table`, `/calendar?month=`, `/timeline?from=`, `/dashboard` | other views of a board (they take the same filters) |
+| GET | `/my-tasks` | cards and checklist items given to me |
+| GET | `/workspaces/{id}/cards`, `/report?days=`, `/report.csv` | every card of a workspace, the team report |
+| GET / POST | `/boards/{id}/automation` | a board's automations and run log, add one (managers) |
+| POST | `/automations/{id}/toggle`, `/delete`, `/run` | pause or turn on, delete, press a board button |
+| POST | `/cards/{id}/buttons/{automation}` | press a card button |
+| GET / POST | `/integrations`, `/integrations/tokens` | my API tokens, make one |
+| POST | `/integrations/tokens/{id}/revoke` | revoke a token |
+| GET / POST | `/boards/{id}/webhooks` | a board's webhooks and deliveries, add one (managers) |
+| POST | `/webhooks/{id}/toggle`, `/delete` | pause or delete a webhook |
+| GET | `/api/v1/me`, `/api/v1/boards`, `/api/v1/boards/{id}/cards` | the API (Bearer token) |
+| POST | `/api/v1/boards/{id}/cards` | add a card through the API (JSON body: list, title, description, due_date) |
 | GET | `/boards/{id}/export.json` | the whole board as JSON |
 | GET | `/workspaces/{id}/export.json` | every board of a workspace as JSON (owners and admins) |
 | POST | `/boards/{id}/copy`, `/template` | copy a board, mark it as a template |
@@ -348,7 +384,7 @@ Archived boards are read-only.
 | GET | `/attachments/{id}` (`?download=1`) | open or download an attachment |
 | POST | `/attachments/{id}/delete` | remove an attachment |
 
-Every state change is a POST route with a CSRF token. Other methods get 405.
+Every state change is a POST route with a CSRF token (the API uses its bearer token instead). Other methods get 405.
 
 ## Languages
 
@@ -398,6 +434,9 @@ for PHP 8.1 and 8.3, together with PHPStan.
 | Invitation links | 256-bit random tokens; only a SHA-256 hash is stored; single use, bound to the invited email, 7-day expiry, 30 invitations per hour per person |
 | Email header injection | Line breaks are stripped from addresses, names and subjects; SMTP verifies the server certificate |
 | Uploaded files | The type is read from the file's bytes (not its name), and it must match the extension; HTML, SVG and scripts are refused. Files get random names outside the web root and are only sent after a permission check, with `Content-Security-Policy: sandbox` and `nosniff`. Size limits per file (10 MB), card (50 files) and board (500 MB) |
+| API tokens | 160-bit random secrets shown once; only a SHA-256 hash is stored. Each token is limited to the boards chosen for it and to read or read-and-add, expires, can be revoked, and is checked against its owner's current access on every call. The API ignores the session cookie, so other sites can't use a signed-in browser |
+| Webhooks (SSRF) | Only `https://` without credentials; the host must resolve to a public address (private, loopback, link-local and shared ranges are refused), checked when added and again when sending, and the connection is pinned to the checked address; no redirects, short timeouts. Messages are signed with HMAC-SHA256 |
+| Automations | They act as their author (or whoever pressed the button) through the normal use cases, so they can never do more than that person. Each run gets a savepoint, loops are stopped, and errors never show database details |
 | Secrets | SMTP settings live in `.env`, which is git-ignored and blocked by `.htaccess` |
 | Direct file access | Everything goes through `index.php`; `.htaccess` blocks `src/`, `views/`, `database/`, `storage/`, `lang/`, `bootstrap/`, `routes/`, `tests/` and config files |
 
@@ -427,6 +466,9 @@ for PHP 8.1 and 8.3, together with PHPStan.
 - [x] JSON export and backups
 - [x] Notifications, watchers and due-date reminders
 - [x] Audit log
+- [x] Automation: rules, buttons, schedules and due-date automations
+- [x] Timeline, My tasks, workspace views and team report
+- [x] API tokens, JSON API and webhooks
 - [ ] Import from CSV
 
 Ideas and pull requests are welcome.
