@@ -15,6 +15,7 @@ final class LabelAttached implements DomainEvent
         public readonly int $actorId,
         public readonly string $labelName,
         private readonly DateTimeImmutable $at,
+        public readonly int $labelId = 0,
     ) {
     }
 

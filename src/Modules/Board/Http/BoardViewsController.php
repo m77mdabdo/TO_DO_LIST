@@ -109,6 +109,69 @@ final class BoardViewsController extends Controller
         ]);
     }
 
+    public const TIMELINE_DAYS = 35;
+
+    /**
+     * Cards as bars from their start to their due date, over five weeks.
+     * Query: from (Y-m-d, the first day shown) and the board filters.
+     *
+     * @param array{board: string} $params
+     */
+    public function timeline(Request $request, array $params): Response
+    {
+        $data = $this->load($request, $params['board']);
+        $today = $this->clock->now()->setTime(0, 0);
+        $firstWeekday = $this->view->locale() === 'ar' ? 6 : 1;
+        $from = \DateTimeImmutable::createFromFormat('!Y-m-d', $request->input('from')) ?: null;
+        if ($from === null || $from->format('Y-m-d') !== $request->input('from')) {
+            $from = $today->modify('-' . (((int) $today->format('w') - $firstWeekday + 7) % 7) . ' days');
+        }
+        $to = $from->modify('+' . (self::TIMELINE_DAYS - 1) . ' days');
+        $first = $from->format('Y-m-d');
+        $last = $to->format('Y-m-d');
+        $offset = static fn (string $day): int => (int) $from->diff(new \DateTimeImmutable($day))->format('%r%a');
+
+        $rows = [];
+        $undated = 0;
+        foreach ($data['lists'] as $list) {
+            foreach ($data['cardsByList'][$list->id] ?? [] as $card) {
+                $start = $card->startDate() ?? $card->dueDate();
+                $end = $card->dueDate() ?? $card->startDate();
+                if ($start === null || $end === null) {
+                    $undated++;
+                    continue;
+                }
+                if ($end < $first || $start > $last) {
+                    continue;
+                }
+                $column = $offset(max($start, $first)) + 1;
+                $rows[$list->id][] = [
+                    'card'   => $card,
+                    'column' => $column,
+                    'span'   => $offset(min($end, $last)) + 2 - $column,
+                    'before' => $start < $first,
+                    'after'  => $end > $last,
+                ];
+            }
+        }
+
+        $days = [];
+        for ($day = $from; $day <= $to; $day = $day->modify('+1 day')) {
+            $days[] = $day;
+        }
+
+        return $this->render('boards/timeline', $data + [
+            'title'    => $data['board']->name,
+            'days'     => $days,
+            'rows'     => $rows,
+            'undated'  => $undated,
+            'previous' => $from->modify('-28 days')->format('Y-m-d'),
+            'next'     => $from->modify('+28 days')->format('Y-m-d'),
+            'todayCol' => $today >= $from && $today <= $to ? $offset($today->format('Y-m-d')) + 1 : null,
+            'viewPath' => '/timeline',
+        ]);
+    }
+
     /** @param array{board: string} $params */
     public function dashboard(Request $request, array $params): Response
     {

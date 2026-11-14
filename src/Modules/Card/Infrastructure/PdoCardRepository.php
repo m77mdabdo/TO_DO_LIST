@@ -118,6 +118,42 @@ final class PdoCardRepository implements CardRepository
         return array_map([CardSummary::class, 'fromRow'], $stmt->fetchAll());
     }
 
+    public function openCardsAssignedTo(int $userId, int $limit): array
+    {
+        // idx_card_members_user finds the person's cards; then only open ones.
+        $stmt = $this->db->prepare('SELECT ' . self::prefixed('c') . ' FROM card_members m JOIN cards c ON c.id = m.card_id
+            WHERE m.user_id = ? AND c.archived_at IS NULL AND c.completed_at IS NULL
+            ORDER BY c.due_at IS NULL, c.due_at, c.id LIMIT ' . max(1, $limit));
+        $stmt->execute([$userId]);
+
+        return array_map([CardSummary::class, 'fromRow'], $stmt->fetchAll());
+    }
+
+    public function openCardsOnBoards(array $boardIds, int $limit): array
+    {
+        $marks = implode(',', array_fill(0, count($boardIds), '?'));
+        $stmt = $this->db->prepare('SELECT ' . self::COLUMNS . " FROM cards WHERE board_id IN ($marks) AND archived_at IS NULL
+            ORDER BY due_at IS NULL, due_at, id LIMIT " . max(1, $limit));
+        $stmt->execute($boardIds);
+
+        return array_map([CardSummary::class, 'fromRow'], $stmt->fetchAll());
+    }
+
+    public function cardsBetween(array $boardIds, string $column, string $from, string $to): array
+    {
+        $column = $column === 'completed_at' ? 'completed_at' : 'created_at';
+        $marks = implode(',', array_fill(0, count($boardIds), '?'));
+        $stmt = $this->db->prepare('SELECT ' . self::COLUMNS . " FROM cards WHERE board_id IN ($marks) AND $column >= ? AND $column <= ? ORDER BY $column, id");
+        $stmt->execute([...$boardIds, $from . ' 00:00:00', $to . ' 23:59:59']);
+
+        return array_map([CardSummary::class, 'fromRow'], $stmt->fetchAll());
+    }
+
+    private static function prefixed(string $alias): string
+    {
+        return implode(', ', array_map(static fn (string $c) => $alias . '.' . trim($c), explode(',', self::COLUMNS)));
+    }
+
     public function search(array $boardIds, string $text, int $limit): array
     {
         // LIKE wildcards in the user's text are escaped with "!" (portable across SQLite and MySQL).

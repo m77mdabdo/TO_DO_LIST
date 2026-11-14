@@ -28,6 +28,7 @@ use App\Mail\SmtpMailer;
 use App\Security\Csrf;
 use App\Session\Session;
 use App\Shared\Events\EventBus;
+use App\Shared\Automation\AutomationActions;
 use App\Shared\Export\ExportParts;
 use App\Shared\Search\SearchSources;
 use App\Shared\Events\SyncEventBus;
@@ -96,6 +97,8 @@ return static function (Config $config, Session $session, string $basePath = '',
     // Modules add what they can be searched for (see App\Shared\Search).
     $container->singleton(SearchSources::class, fn () => new SearchSources());
     $container->singleton(ExportParts::class, fn () => new ExportParts());
+    // ...and what automations can do with their things (see App\Shared\Automation).
+    $container->singleton(AutomationActions::class, fn () => new AutomationActions());
 
     $container->singleton(EventBus::class, function (Container $c) use ($modules): EventBus {
         $events = new SyncEventBus();

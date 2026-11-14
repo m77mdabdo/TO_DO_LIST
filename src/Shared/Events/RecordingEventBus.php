@@ -28,6 +28,11 @@ final class RecordingEventBus implements EventBus
         $this->inner->publish($event);
     }
 
+    public function round(): int
+    {
+        return $this->inner->round();
+    }
+
     /** @return list<DomainEvent> */
     public function published(?string $eventName = null): array
     {

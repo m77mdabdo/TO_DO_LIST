@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Label;
 
+use App\Shared\Automation\ActionContext;
+use App\Shared\Automation\ActionType;
+use App\Shared\Automation\AutomationActions;
 use App\Shared\Export\ExportParts;
 use App\Modules\Board\Contract\Events\BoardCopied;
 use App\Modules\Board\Contract\Events\BoardSeeded;
@@ -36,6 +39,11 @@ final class LabelModule implements ModuleProvider
 
     public function register(Container $container): void
     {
+        $container->extend(AutomationActions::class, function (object $actions, Container $c): void {
+            /** @var AutomationActions $actions */
+            $actions->add(new ActionType('label.add', 'Add the label :value', 'label', static fn (ActionContext $ctx, string $v) => $c->get(LabelService::class)->toggle($ctx->actorId, (int) $ctx->cardId, (int) $v, true)));
+            $actions->add(new ActionType('label.remove', 'Remove the label :value', 'label', static fn (ActionContext $ctx, string $v) => $c->get(LabelService::class)->toggle($ctx->actorId, (int) $ctx->cardId, (int) $v, false)));
+        });
         $container->extend(ExportParts::class, function (object $parts, Container $c): void {
             /** @var ExportParts $parts */
             $parts->add('labels', fn (array $cardIds): array => array_map(

@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Checklist;
 
+use App\Modules\Checklist\Contract\ChecklistQueries;
+use App\Shared\Automation\ActionContext;
+use App\Shared\Automation\ActionType;
+use App\Shared\Automation\AutomationActions;
+use App\Modules\Card\Contract\CardQueries;
 use App\Shared\Export\ExportParts;
 use App\Modules\Card\Contract\Events\CardCopied;
 use App\Modules\Checklist\Application\ChecklistCopier;
@@ -40,6 +45,19 @@ final class ChecklistModule implements ModuleProvider
 
     public function register(Container $container): void
     {
+        $container->extend(AutomationActions::class, function (object $actions, Container $c): void {
+            /** @var AutomationActions $actions */
+            // The first line is the checklist's name, each further line (or " | " part) an item.
+            $actions->add(new ActionType('checklist.add', 'Add a checklist', 'text', static function (ActionContext $ctx, string $text) use ($c): void {
+                $card = $c->get(CardQueries::class)->find((int) $ctx->cardId) ?? throw new \RuntimeException('The card is gone.');
+                $lines = array_values(array_filter(array_map('trim', preg_split('/\R|\s\|\s/', $text) ?: []), static fn (string $l) => $l !== ''));
+                $service = $c->get(ChecklistService::class);
+                $checklist = $service->addChecklist($ctx->actorId, $card, $lines[0] ?? 'Checklist');
+                foreach (array_slice($lines, 1, 50) as $item) {
+                    $service->addItem($ctx->actorId, $checklist, $item);
+                }
+            }));
+        });
         $container->extend(ExportParts::class, function (object $parts, Container $c): void {
             /** @var ExportParts $parts */
             $parts->add('checklists', function (array $cardIds) use ($c): array {
@@ -61,6 +79,7 @@ final class ChecklistModule implements ModuleProvider
         });
         $container->singleton(ChecklistRepository::class, fn (Container $c) => new PdoChecklists($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(ChecklistService::class, fn (Container $c) => $c->build(ChecklistService::class));
+        $container->singleton(ChecklistQueries::class, fn (Container $c) => $c->get(ChecklistService::class));
 
         $container->extend(View::class, function (object $view, Container $c): void {
             /** @var View $view */

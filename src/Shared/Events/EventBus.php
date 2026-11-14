@@ -20,4 +20,12 @@ interface EventBus
     public function listen(string $eventName, callable $listener): void;
 
     public function publish(DomainEvent $event): void;
+
+    /**
+     * Changes each time a fresh, outermost dispatch begins. Events published
+     * while listeners run are queued into the same round, so a listener can
+     * tell "caused by what I just did" from "a new action" (automations use
+     * it to stop loops).
+     */
+    public function round(): int;
 }

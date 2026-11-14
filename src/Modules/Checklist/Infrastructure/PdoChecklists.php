@@ -167,6 +167,16 @@ final class PdoChecklists implements ChecklistRepository
         return array_map([ChecklistItem::class, 'fromRow'], $stmt->fetchAll());
     }
 
+    public function openItemsAssignedTo(int $userId, int $limit = 200): array
+    {
+        $stmt = $this->db->prepare('SELECT i.* FROM checklist_items i JOIN cards c ON c.id = i.card_id
+            WHERE i.assignee_id = ? AND i.done_at IS NULL AND c.archived_at IS NULL
+            ORDER BY i.due_at IS NULL, i.due_at, i.id LIMIT ' . max(1, $limit));
+        $stmt->execute([$userId]);
+
+        return array_map([ChecklistItem::class, 'fromRow'], $stmt->fetchAll());
+    }
+
     private function now(): string
     {
         return $this->clock->now()->format('Y-m-d H:i:s');
