@@ -122,6 +122,7 @@ final class InvitationService
     public function resend(int $actorId, string $publicId): string
     {
         $invitation = $this->openInvitation($actorId, $publicId);
+        $this->assertConfirmed($actorId);
         $this->assertWithinLimit($actorId, new ValidationResult());
 
         $token = InvitationToken::generate();
@@ -266,6 +267,15 @@ final class InvitationService
     {
         if (!$this->workspaces->canManageMembers($actorId, $workspaceId)) {
             throw new HttpException(403, 'You do not have permission to do that.');
+        }
+        $this->assertConfirmed($actorId);
+    }
+
+    /** Invitations are emails to other people: only from accounts whose own email is confirmed. */
+    private function assertConfirmed(int $actorId): void
+    {
+        if ($this->users->find($actorId)?->emailVerified !== true) {
+            $this->fail('email', 'Confirm your own email address before inviting people.');
         }
     }
 

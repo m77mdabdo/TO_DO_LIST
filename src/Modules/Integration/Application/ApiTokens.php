@@ -10,6 +10,7 @@ use App\Modules\Access\Contract\Permission;
 use App\Modules\Board\Contract\BoardDirectory;
 use App\Modules\Integration\Contract\ApiToken;
 use App\Modules\Integration\Domain\TokenRepository;
+use App\Modules\Identity\Contract\UserDirectory;
 use App\Support\Clock;
 use App\Validation\ValidationException;
 use App\Validation\ValidationResult;
@@ -30,6 +31,7 @@ final class ApiTokens
         private AccessGate $gate,
         private BoardDirectory $boards,
         private Clock $clock,
+        private UserDirectory $users,
     ) {
     }
 
@@ -66,6 +68,9 @@ final class ApiTokens
         }
         if ($boardIds === [] && !isset($errors['boards'])) {
             $errors['boards'] = 'Choose at least one board. A token never gets every board automatically.';
+        }
+        if ($this->users->find($userId)?->emailVerified !== true) {
+            $errors['name'] = 'Confirm your email address before creating API tokens.';
         }
         if (count($this->tokens->forUser($userId)) >= self::MAX_PER_USER) {
             $errors['name'] = 'You can have at most 20 tokens. Revoke one first.';

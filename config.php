@@ -33,6 +33,15 @@ return [
         'allow_private_networks' => filter_var(getenv('WEBHOOKS_ALLOW_PRIVATE') ?: 'false', FILTER_VALIDATE_BOOLEAN),
     ],
 
+    // Account security. Security events older than this are deleted by bin/cleanup.php.
+    'security' => [
+        'log_days' => (int) (getenv('SECURITY_LOG_DAYS') ?: 180),
+    ],
+
+    // Request limits per rule name, e.g. ['login' => ['max' => 20, 'seconds' => 60]].
+    // The rules and their defaults are listed in docs/trello-parity-roadmap.md (batch 1).
+    'rate_limits' => [],
+
     // Database backups made by bin/backup.php.
     'backups' => [
         'path' => getenv('BACKUPS_PATH') ?: __DIR__ . '/storage/backups',

@@ -17,5 +17,18 @@ interface UserRepository
 
     public function create(string $name, string $email, string $passwordHash): User;
 
+    /** Same hash, new format (rehash on login): sessions stay signed in. */
     public function updatePassword(int $id, string $passwordHash): void;
+
+    /** A new password: bumps auth_version, which signs out every other session. */
+    public function changePassword(int $id, string $passwordHash): void;
+
+    /** The user, only while the session's auth version is still current. */
+    public function findForSession(int $id, int $authVersion): ?User;
+
+    public function authVersion(int $id): int;
+
+    public function findByEmail(string $email): ?User;
+
+    public function markEmailVerified(int $id): void;
 }

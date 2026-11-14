@@ -13,7 +13,7 @@ final class Database
     /** A fresh in-memory SQLite database with the app's schema. */
     public static function fresh(): PDO
     {
-        $pdo = ConnectionFactory::sqlite(':memory:');
+        $pdo = ConnectionFactory::make(TestDatabase::config());
         (new MigrationRunner($pdo, [BASE_PATH . '/database/migrations']))->migrate();
 
         return $pdo;

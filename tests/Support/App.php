@@ -24,7 +24,8 @@ final class App
     public readonly Container $container;
     public readonly ArraySession $session;
 
-    public function __construct(string $now = '2026-01-20 10:00:00', string $locale = 'en')
+    /** @param array<string, mixed> $config overrides, e.g. ['rate_limits' => ['login' => ['max' => 2]]] */
+    public function __construct(string $now = '2026-01-20 10:00:00', string $locale = 'en', array $config = [])
     {
         $boot = require BASE_PATH . '/bootstrap/app.php';
         $this->session = new ArraySession();
@@ -34,9 +35,10 @@ final class App
             'locale'   => $locale,
             'url'      => 'https://todo.test',
             'mail'     => ['driver' => 'memory', 'from_address' => 'team@todo.test', 'from_name' => 'To Do List'],
-            'db'       => ['driver' => 'sqlite', 'sqlite_path' => ':memory:'],
+            'db'       => TestDatabase::config(),
             'attachments' => ['path' => self::scratch('attachments')],
             'backups'     => ['path' => self::scratch('backups')],
+            ...$config,
         ]), $this->session);
         $this->container->singleton(Clock::class, fn () => new FrozenClock($now));
     }
@@ -97,8 +99,11 @@ final class App
         return $this->container->get(Kernel::class)->handle($request);
     }
 
-    /** Registers through the real form and returns the new user's id. */
-    public function signUp(string $name = 'Sara Ali', string $email = 'sara@example.com'): int
+    /**
+     * Registers through the real form and returns the new user's id. Unless
+     * $confirm is false, it also opens the confirmation link from the email.
+     */
+    public function signUp(string $name = 'Sara Ali', string $email = 'sara@example.com', bool $confirm = true): int
     {
         $this->post('/logout');
         $this->post('/register', [
@@ -108,7 +113,32 @@ final class App
             'password_confirmation' => 'secret123',
         ]);
 
+        if ($confirm && ($link = $this->linkFromLastEmail($email, '/verify-email/')) !== null) {
+            $this->get($link);
+            // The confirmation email is done with; tests about other emails start from an empty outbox.
+            $mailer = $this->container->get(\App\Mail\Mailer::class);
+            $mailer->sent = array_values(array_filter($mailer->sent, static fn ($m) => !str_contains($m->body, $link)));
+        }
+
         return (int) $this->session->get('user_id');
+    }
+
+    /** @return list<\App\Mail\Message> */
+    public function sentMail(): array
+    {
+        return $this->container->get(\App\Mail\Mailer::class)->sent;
+    }
+
+    /** The path of the last $prefix link emailed to $email (e.g. "/reset-password/"), or null. */
+    public function linkFromLastEmail(string $email, string $prefix): ?string
+    {
+        foreach (array_reverse($this->sentMail()) as $message) {
+            if ($message->to === mb_strtolower($email) && preg_match('#https://todo\.test(' . preg_quote($prefix, '#') . '[A-Za-z0-9_-]{43})#', $message->body, $m)) {
+                return $m[1];
+            }
+        }
+
+        return null;
     }
 
     /** Switches the session to another (already registered) user. */

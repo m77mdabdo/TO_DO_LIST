@@ -19,7 +19,7 @@ final class PdoUserRepository implements UserRepository, UserDirectory
 
     public function find(int $id): ?User
     {
-        $stmt = $this->db->prepare('SELECT id, name, email FROM users WHERE id = ?');
+        $stmt = $this->db->prepare('SELECT id, name, email, email_verified_at FROM users WHERE id = ?');
         $stmt->execute([$id]);
         $row = $stmt->fetch();
 
@@ -35,7 +35,7 @@ final class PdoUserRepository implements UserRepository, UserDirectory
         }
 
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $stmt = $this->db->prepare("SELECT id, name, email FROM users WHERE id IN ($placeholders)");
+        $stmt = $this->db->prepare("SELECT id, name, email, email_verified_at FROM users WHERE id IN ($placeholders)");
         $stmt->execute($ids);
 
         $users = [];
@@ -74,6 +74,43 @@ final class PdoUserRepository implements UserRepository, UserDirectory
     public function updatePassword(int $id, string $passwordHash): void
     {
         $this->db->prepare('UPDATE users SET password = ? WHERE id = ?')->execute([$passwordHash, $id]);
+    }
+
+    public function findForSession(int $id, int $authVersion): ?User
+    {
+        $stmt = $this->db->prepare('SELECT id, name, email, email_verified_at FROM users WHERE id = ? AND auth_version = ?');
+        $stmt->execute([$id, $authVersion]);
+        $row = $stmt->fetch();
+
+        return $row ? User::fromRow($row) : null;
+    }
+
+    public function authVersion(int $id): int
+    {
+        $stmt = $this->db->prepare('SELECT auth_version FROM users WHERE id = ?');
+        $stmt->execute([$id]);
+
+        return (int) $stmt->fetchColumn();
+    }
+
+    public function findByEmail(string $email): ?User
+    {
+        $stmt = $this->db->prepare('SELECT id, name, email, email_verified_at FROM users WHERE email = ?');
+        $stmt->execute([self::normalize($email)]);
+        $row = $stmt->fetch();
+
+        return $row ? User::fromRow($row) : null;
+    }
+
+    public function changePassword(int $id, string $passwordHash): void
+    {
+        $this->db->prepare('UPDATE users SET password = ?, auth_version = auth_version + 1 WHERE id = ?')->execute([$passwordHash, $id]);
+    }
+
+    public function markEmailVerified(int $id): void
+    {
+        $this->db->prepare('UPDATE users SET email_verified_at = ? WHERE id = ? AND email_verified_at IS NULL')
+            ->execute([$this->clock->now()->format('Y-m-d H:i:s'), $id]);
     }
 
     private static function normalize(string $email): string

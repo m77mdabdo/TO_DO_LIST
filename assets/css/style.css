@@ -965,3 +965,20 @@ label.check input { width: auto; }
 .webhook-url { overflow-wrap: anywhere; }
 .delivery-list { list-style: none; padding: 0; margin: .4rem 0 0; display: grid; gap: .3rem; }
 .delivery-list li { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+
+/* ---------- account security ---------- */
+
+.auth-single { grid-template-columns: minmax(0, 460px); justify-content: center; }
+a.avatar { text-decoration: none; color: inherit; }
+a.avatar:focus-visible { outline: 3px solid var(--violet); outline-offset: 2px; }
+.banner-verify span { flex: 1 1 18rem; font-weight: 600; }
+.account-facts { display: grid; grid-template-columns: max-content 1fr; gap: .6rem 1.2rem; margin: 0; }
+.account-facts dt { font-weight: 700; color: var(--muted); }
+.account-facts dd { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.pill-ok { color: var(--mint); }
+.pill-warn { color: var(--amber); }
+@media (max-width: 560px) {
+    .account-facts { grid-template-columns: 1fr; }
+}
+/* Section cards on the narrow settings-style pages had no inner padding. */
+main.wrap > section.card:not(.table-wrap) { padding: clamp(1rem, 3vw, 1.6rem); }

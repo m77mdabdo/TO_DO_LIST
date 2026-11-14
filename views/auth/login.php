@@ -36,6 +36,8 @@
             <button class="btn btn-primary btn-block" type="submit"><?= $this->te('Log in') ?></button>
         </form>
 
+        <p class="small center"><a href="<?= $this->url('/forgot-password') ?>"><?= $this->te('Forgot your password?') ?></a></p>
+
         <p class="muted small center"><?= $this->te('New here?') ?> <a href="<?= $this->url('/register') ?>"><?= $this->te('Create an account') ?></a></p>
     </section>
 </main>

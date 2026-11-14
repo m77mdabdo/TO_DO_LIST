@@ -70,7 +70,8 @@ $currentWorkspace ??= null;
             <span class="show-light"><?= $this->icon('moon') ?></span><span class="show-dark"><?= $this->icon('sun') ?></span>
         </button>
         <?php if (isset($user)): ?>
-            <span class="avatar" title="<?= $this->e($user->email) ?>"><?= $this->e($user->initial()) ?></span>
+            <a class="avatar" href="<?= $this->url('/account/security') ?>" title="<?= $this->e($user->email) ?>"
+               aria-label="<?= $this->te('Account security') ?>"><?= $this->e($user->initial()) ?></a>
             <form action="<?= $this->url('/logout') ?>" method="post">
                 <?= $this->csrfField() ?>
                 <button class="icon-btn" title="<?= $this->te('Log out') ?>"><?= $this->icon('logout') ?></button>
@@ -78,3 +79,4 @@ $currentWorkspace ??= null;
         <?php endif; ?>
     </div>
 </header>
+<?php if (isset($user)): ?><?= $this->slot('header.after', ['user' => $user]) ?><?php endif; ?>
