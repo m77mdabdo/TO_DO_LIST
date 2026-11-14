@@ -1,0 +1,37 @@
+# Optional. See the comment at the top of the Dockerfile.
+services:
+  app:
+    build: .
+    ports:
+      - "8080:80"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_URL: ${APP_URL:-http://localhost:8080}
+      DB_DRIVER: ${DB_DRIVER:-sqlite}
+      DB_SQLITE_PATH: /var/www/html/database/data/todo.sqlite
+      DB_HOST: ${DB_HOST:-mysql}
+      DB_NAME: ${DB_NAME:-to_do_list}
+      DB_USER: ${DB_USER:-todo}
+      DB_PASS: ${DB_PASS:-todo}
+    volumes:
+      # Data lives outside the image, so rebuilding never loses it.
+      - todo-database:/var/www/html/database/data
+      - todo-storage:/var/www/html/storage
+
+  mysql:
+    image: mysql:8.4
+    profiles: ["mysql"]
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-to_do_list}
+      MYSQL_USER: ${DB_USER:-todo}
+      MYSQL_PASSWORD: ${DB_PASS:-todo}
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+    volumes:
+      - todo-mysql:/var/lib/mysql
+
+volumes:
+  todo-database:
+  todo-storage:
+  todo-mysql:

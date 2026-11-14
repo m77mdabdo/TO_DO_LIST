@@ -16,6 +16,8 @@ use App\Modules\Board\Application\BoardService;
 use App\Modules\Board\Contract\BoardSummary;
 use App\Modules\Board\Contract\CardFilter;
 use App\Modules\Board\Contract\BoardVisibility;
+use App\Modules\Board\Domain\BuiltInTemplates;
+use App\Modules\Board\Application\BoardExport;
 use App\Modules\Card\Contract\CardQueries;
 use App\Modules\Identity\Contract\UserDirectory;
 use App\Modules\Label\Contract\LabelCatalog;
@@ -41,6 +43,7 @@ final class BoardController extends Controller
         private UserDirectory $users,
         private Greeting $greeting,
         private Clock $clock,
+        private BoardExport $exporter,
     ) {
         parent::__construct($view, $url, $session);
     }
@@ -57,6 +60,8 @@ final class BoardController extends Controller
             'boards'    => $this->boards->boardsInWorkspace($user->id, $workspace->id),
             'archived'  => $this->boards->boardsInWorkspace($user->id, $workspace->id, archived: true),
             'greeting'  => $this->greeting->forNow(),
+            'templates' => $this->boards->templatesIn($user->id, $workspace->id),
+            'builtIns'  => array_map(static fn (array $t) => ['name' => $t['name'], 'description' => $t['description'], 'lists' => $t['lists']], BuiltInTemplates::all()),
             'user'      => $user,
         ]);
     }
@@ -66,14 +71,22 @@ final class BoardController extends Controller
         $user = $this->user($request);
         $workspace = $this->workspaces->current($user->id) ?? throw HttpException::notFound();
 
+        $visibility = BoardVisibility::tryFrom($request->input('visibility')) ?? BoardVisibility::Private;
+        $template = $request->input('template');
+
         try {
-            $board = $this->boards->createBoard(
-                $user->id,
-                $workspace->id,
-                $request->input('name'),
-                BoardVisibility::tryFrom($request->input('visibility')) ?? BoardVisibility::Private,
-                $request->input('color', 'violet'),
-            );
+            if (str_starts_with($template, 'builtin:')) {
+                $board = $this->boards->createFromTemplate($user->id, $workspace->id, substr($template, 8), $request->input('name'), $visibility);
+            } elseif ($template !== '') {
+                // A saved template: a board in this workspace marked as one, that this person can see.
+                $source = $this->boards->boardFor($user->id, $template);
+                if (!$source->isTemplate || $source->workspaceId !== $workspace->id) {
+                    throw HttpException::notFound();
+                }
+                $board = $this->boards->copyBoard($user->id, $source, $request->input('name') ?: $source->name, $request->input('with_cards') === '1', false);
+            } else {
+                $board = $this->boards->createBoard($user->id, $workspace->id, $request->input('name'), $visibility, $request->input('color', 'violet'));
+            }
         } catch (ValidationException $e) {
             return $this->backWithErrors($e, $request, '/');
         }
@@ -121,7 +134,70 @@ final class BoardController extends Controller
             'cardMembers' => $cardMembers,
             'people'      => $this->users->findMany([...array_keys($audience), ...array_merge([], ...array_values($cardMembers)), ...array_map(static fn ($a) => $a->actorId, $activity)]),
             'audience'    => array_keys($audience),
+            'query'       => array_filter($request->only(['q', 'label', 'member', 'due', 'status']), static fn ($v) => $v !== ''),
         ]);
+    }
+
+    /** The whole board as JSON (lists, cards, labels, checklists, comments, attachment details). @param array{board: string} $params */
+    public function exportJson(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        $board = $this->boards->boardFor($user->id, $params['board'], Permission::Export);
+        $workspace = $this->workspaces->current($user->id);
+
+        return $this->jsonDownload($this->exporter->document([$board], $workspace->companyName ?? ''), 'board-' . $board->publicId . '.json');
+    }
+
+    /**
+     * Every board of a workspace, archived ones included, as one JSON file.
+     * Owners and admins only, since they can see every board.
+     *
+     * @param array{workspace: string} $params
+     */
+    public function exportWorkspace(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        $workspace = $this->workspaces->findForUser($params['workspace'], $user->id) ?? throw HttpException::notFound();
+        if (!$workspace->role->managesAllBoards()) {
+            throw new HttpException(403, 'You do not have permission to do that.');
+        }
+        $boards = [...$this->boards->boardsInWorkspace($user->id, $workspace->id), ...$this->boards->boardsInWorkspace($user->id, $workspace->id, archived: true)];
+
+        return $this->jsonDownload($this->exporter->document($boards, $workspace->companyName), 'workspace-' . $workspace->publicId . '-' . $this->clock->now()->format('Y-m-d') . '.json');
+    }
+
+    /** @param array<string, mixed> $data */
+    private function jsonDownload(array $data, string $filename): Response
+    {
+        return (new Response((string) json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)))
+            ->withHeader('Content-Type', 'application/json; charset=utf-8')
+            ->withHeader('Content-Disposition', 'attachment; filename="' . $filename . '"')
+            ->withHeader('Cache-Control', 'no-store');
+    }
+
+    /** Body: name, with_cards, with_members. @param array{board: string} $params */
+    public function copy(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        $source = $this->boards->boardFor($user->id, $params['board']);
+
+        try {
+            $board = $this->boards->copyBoard($user->id, $source, $request->input('name'), $request->input('with_cards') === '1', $request->input('with_members') === '1');
+        } catch (ValidationException $e) {
+            return $this->backWithErrors($e, $request, self::boardPath($source));
+        }
+
+        return $this->redirect(self::boardPath($board), 'Board copied.');
+    }
+
+    /** Body: on (1 or 0). @param array{board: string} $params */
+    public function template(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        $board = $this->boards->boardFor($user->id, $params['board']);
+        $this->boards->setTemplate($user->id, $board, $request->input('on') === '1');
+
+        return $this->redirect(self::boardPath($board), $request->input('on') === '1' ? 'This board is now a template.' : 'This board is no longer a template.');
     }
 
     /** @param array{board: string} $params */

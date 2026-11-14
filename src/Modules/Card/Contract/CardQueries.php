@@ -9,6 +9,21 @@ interface CardQueries
 {
     public function find(int $cardId): ?CardSummary;
 
+    /**
+     * @param list<int> $cardIds
+     * @return array<int, CardSummary> by id
+     */
+    public function findMany(array $cardIds): array;
+
+    /**
+     * Open (not archived) cards on these boards that start or are due between
+     * two dates (Y-m-d, inclusive), for calendars.
+     *
+     * @param list<int> $boardIds
+     * @return list<CardSummary>
+     */
+    public function scheduledBetween(array $boardIds, string $from, string $to): array;
+
     public function findByPublicId(string $publicId): ?CardSummary;
 
     /**

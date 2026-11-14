@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Discussion;
 
+use App\Shared\Export\ExportParts;
+use App\Modules\Discussion\Infrastructure\PdoCommentSearch;
+use App\Shared\Search\SearchSources;
 use App\Core\Container;
 use App\Http\Middleware\Authenticate;
 use App\Http\Router;
@@ -35,6 +38,25 @@ final class DiscussionModule implements ModuleProvider
 
     public function register(Container $container): void
     {
+        $container->extend(ExportParts::class, function (object $parts, Container $c): void {
+            /** @var ExportParts $parts */
+            $parts->add('comments', function (array $cardIds) use ($c): array {
+                $out = [];
+                $names = [];
+                foreach ($cardIds as $cardId) {
+                    foreach (array_reverse($c->get(DiscussionRepository::class)->commentsOn($cardId, null, 1000)) as $comment) {
+                        $names[$comment->authorId] ??= $c->get(UserDirectory::class)->find($comment->authorId)?->name ?? '';
+                        $out[$cardId][] = ['author' => $names[$comment->authorId], 'body' => $comment->body, 'created_at' => $comment->createdAt, 'edited_at' => $comment->editedAt];
+                    }
+                }
+
+                return $out;
+            });
+        });
+        $container->extend(SearchSources::class, function (object $sources, Container $c): void {
+            /** @var SearchSources $sources */
+            $sources->add(new PdoCommentSearch($c->get(PDO::class)));
+        });
         $container->singleton(DiscussionRepository::class, fn (Container $c) => new PdoDiscussion($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(DiscussionService::class, fn (Container $c) => $c->build(DiscussionService::class));
 

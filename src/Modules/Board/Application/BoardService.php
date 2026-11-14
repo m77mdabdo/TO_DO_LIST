@@ -13,11 +13,15 @@ use App\Modules\Board\Contract\BoardCatalog;
 use App\Modules\Board\Contract\BoardSummary;
 use App\Modules\Board\Contract\BoardVisibility;
 use App\Modules\Board\Contract\Events\BoardChanged;
+use App\Modules\Board\Contract\Events\BoardCopied;
+use App\Modules\Board\Contract\Events\BoardSeeded;
 use App\Modules\Board\Contract\Events\BoardCreated;
 use App\Modules\Board\Contract\Events\ListChanged;
 use App\Modules\Board\Contract\Events\ListCreated;
 use App\Modules\Board\Contract\ListSummary;
 use App\Modules\Board\Domain\BoardRepository;
+use App\Modules\Board\Domain\BuiltInTemplates;
+use App\I18n\Translator;
 use App\Modules\Workspace\Contract\WorkspaceDirectory;
 use App\Shared\Events\EventBus;
 use App\Support\Clock;
@@ -43,6 +47,7 @@ final class BoardService implements BoardCatalog
         private EventBus $events,
         private Clock $clock,
         private Validator $validator,
+        private ?Translator $translator = null,
     ) {
     }
 
@@ -158,6 +163,74 @@ final class BoardService implements BoardCatalog
         $this->transactions->run(function () use ($actorId, $board, $archive): void {
             $this->boards->setArchived($board->id, $archive);
             $this->events->publish(new BoardChanged($board->id, $actorId, $archive ? 'archived' : 'restored', [], $this->clock->now()));
+        });
+    }
+
+    /* ---------- templates and copies ---------- */
+
+    /** Marks a board as a template (or not). Templates show up when starting a new board. */
+    public function setTemplate(int $actorId, BoardSummary $board, bool $isTemplate): void
+    {
+        $this->gate->authorize($actorId, $board->id, Permission::ManageSettings);
+        $this->assertOpen($board);
+        $this->boards->update($board->id, ['is_template' => $isTemplate ? 1 : 0]);
+        $this->events->publish(new BoardChanged($board->id, $actorId, $isTemplate ? 'made_template' : 'unmade_template', [], $this->clock->now()));
+    }
+
+    /**
+     * Templates the user may start from in this workspace: boards marked as
+     * templates that they can see.
+     *
+     * @return list<BoardSummary>
+     */
+    public function templatesIn(int $userId, int $workspaceId): array
+    {
+        return array_values(array_filter($this->boardsInWorkspace($userId, $workspaceId), static fn (BoardSummary $b) => $b->isTemplate));
+    }
+
+    /**
+     * A new, independent board from another one: its settings and open lists,
+     * and (if asked) its open cards and its members. Nothing stays linked.
+     */
+    public function copyBoard(int $actorId, BoardSummary $source, string $name, bool $withCards, bool $withMembers): BoardSummary
+    {
+        $this->gate->authorize($actorId, $source->id, Permission::ViewBoard);
+        $lists = $this->boards->lists($source->id);
+
+        return $this->transactions->run(function () use ($actorId, $source, $name, $lists, $withCards, $withMembers): BoardSummary {
+            $board = $this->createBoard($actorId, $source->workspaceId, $name, $source->visibility, $source->color);
+            $this->boards->update($board->id, [
+                'description' => $source->description,
+                'commenting'  => $source->commenting->value,
+                'voting'      => $source->voting->value,
+            ]);
+
+            $listMap = [];
+            foreach ($lists as $list) {
+                $listMap[$list->id] = $this->boards->createList($board->id, $list->name, $this->boards->listPositionAtEnd($board->id))->id;
+            }
+            $this->events->publish(new BoardCopied($source->id, $board->id, $actorId, $listMap, $withCards, $withMembers, $this->clock->now()));
+
+            return $this->boards->find($board->id) ?? $board;
+        });
+    }
+
+    /** A new board from a built-in template (see BuiltInTemplates). */
+    public function createFromTemplate(int $actorId, int $workspaceId, string $key, string $name, BoardVisibility $visibility = BoardVisibility::Private): BoardSummary
+    {
+        $template = BuiltInTemplates::get($key) ?? throw new ValidationException(new ValidationResult(['template' => 'Choose a template.']));
+        $t = fn (string $text): string => $this->translator?->t($text) ?? $text;
+        $name = trim($name) !== '' ? $name : $t($template['name']);
+
+        return $this->transactions->run(function () use ($actorId, $workspaceId, $key, $template, $name, $visibility, $t): BoardSummary {
+            $board = $this->createBoard($actorId, $workspaceId, $name, $visibility, $template['color']);
+            foreach ($template['lists'] as $list) {
+                $this->boards->createList($board->id, $t($list), $this->boards->listPositionAtEnd($board->id));
+            }
+            $labels = array_map(static fn (array $label) => [$t($label[0]), $label[1]], $template['labels']);
+            $this->events->publish(new BoardSeeded($board->id, $actorId, $key, $labels, $this->clock->now()));
+
+            return $board;
         });
     }
 

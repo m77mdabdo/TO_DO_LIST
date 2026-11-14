@@ -13,6 +13,20 @@ interface CardRepository
 
     public function find(int $id): ?CardSummary;
 
+    /**
+     * @param list<int> $ids
+     * @return array<int, CardSummary> by id
+     */
+    public function findMany(array $ids): array;
+
+    /**
+     * Open cards on these boards whose start or due date falls in [from, to].
+     *
+     * @param list<int> $boardIds
+     * @return list<CardSummary>
+     */
+    public function scheduledBetween(array $boardIds, string $from, string $to): array;
+
     public function findByPublicId(string $publicId): ?CardSummary;
 
     /** @param array{title?: string, description?: ?string, start_at?: ?string, due_at?: ?string, completed_at?: ?string, list_id?: int, position?: string} $fields */

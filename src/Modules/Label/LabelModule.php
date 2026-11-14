@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Label;
 
+use App\Shared\Export\ExportParts;
+use App\Modules\Board\Contract\Events\BoardCopied;
+use App\Modules\Board\Contract\Events\BoardSeeded;
+use App\Modules\Card\Contract\Events\CardCopied;
+use App\Modules\Label\Application\LabelCopier;
 use App\Core\Container;
 use App\Http\Middleware\Authenticate;
 use App\Http\Router;
@@ -31,6 +36,13 @@ final class LabelModule implements ModuleProvider
 
     public function register(Container $container): void
     {
+        $container->extend(ExportParts::class, function (object $parts, Container $c): void {
+            /** @var ExportParts $parts */
+            $parts->add('labels', fn (array $cardIds): array => array_map(
+                static fn (array $labels) => array_map(static fn ($l) => ['name' => $l->name, 'color' => $l->color], $labels),
+                $c->get(LabelCatalog::class)->forCards($cardIds),
+            ));
+        });
         $container->singleton(LabelRepository::class, fn (Container $c) => new PdoLabels($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(LabelService::class, fn (Container $c) => $c->build(LabelService::class));
         $container->singleton(LabelCatalog::class, fn (Container $c) => $c->get(LabelService::class));
@@ -46,6 +58,9 @@ final class LabelModule implements ModuleProvider
 
     public function listeners(EventBus $events, Container $container): void
     {
+        $events->listen(BoardCopied::name(), static fn (BoardCopied $event) => $container->get(LabelCopier::class)->onBoardCopied($event));
+        $events->listen(BoardSeeded::name(), static fn (BoardSeeded $event) => $container->get(LabelCopier::class)->onBoardSeeded($event));
+        $events->listen(CardCopied::name(), static fn (CardCopied $event) => $container->get(LabelCopier::class)->onCardCopied($event));
     }
 
     public function migrationsPath(): ?string

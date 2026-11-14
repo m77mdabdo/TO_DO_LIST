@@ -33,11 +33,18 @@ $form = $this->form;
         <span class="pill"><?= $this->icon($board->visibility->value === 'private' ? 'lock' : 'users') ?><?= $this->te($board->visibility->value === 'private' ? 'Private' : 'Workspace') ?></span>
         <span class="pill pill-role"><?= $this->te($role->label()) ?></span>
     </div>
+    <?= $this->partial('boards/view-tabs', ['board' => $board, 'current' => '', 'query' => $query ?? []]) ?>
     <div class="board-bar-actions">
         <?= $this->slot('board.actions', ['board' => $board, 'role' => $role]) ?>
         <a class="btn btn-ghost" href="<?= $this->url($base . '/archived') ?>"><?= $this->icon('archive') ?><span class="hide-sm"><?= $this->te('Archived items') ?></span></a>
         <?php if ($role->allows(Permission::Export)): ?>
-            <a class="btn btn-ghost" href="<?= $this->url($base . '/export') ?>" title="<?= $this->te('Download as CSV') ?>"><?= $this->icon('download') ?></a>
+            <details class="menu menu-end">
+                <summary class="btn btn-ghost" title="<?= $this->te('Export') ?>"><?= $this->icon('download') ?><span class="visually-hidden"><?= $this->te('Export') ?></span></summary>
+                <div class="menu-panel">
+                    <a class="menu-item" href="<?= $this->url($base . '/export') ?>"><?= $this->icon('table') ?><?= $this->te('Spreadsheet (CSV)') ?></a>
+                    <a class="menu-item" href="<?= $this->url($base . '/export.json') ?>"><?= $this->icon('download') ?><?= $this->te('Everything (JSON)') ?></a>
+                </div>
+            </details>
         <?php endif; ?>
         <?php if ($canManage): ?>
             <details class="menu menu-end">
@@ -81,6 +88,24 @@ $form = $this->form;
                             </fieldset>
                             <button class="btn btn-primary" type="submit"><?= $this->te('Save') ?></button>
                         </form>
+                        <hr>
+                        <form action="<?= $this->url($base . '/template') ?>" method="post">
+                            <?= $this->csrfField() ?>
+                            <input type="hidden" name="on" value="<?= $board->isTemplate ? '0' : '1' ?>">
+                            <button class="menu-item" type="submit"><?= $this->icon('copy') ?><?= $this->te($board->isTemplate ? 'Stop using as a template' : 'Make this board a template') ?></button>
+                        </form>
+                        <details class="copy-board">
+                            <summary class="menu-item"><?= $this->icon('copy') ?><?= $this->te('Copy board') ?></summary>
+                            <form action="<?= $this->url($base . '/copy') ?>" method="post" class="stack">
+                                <?= $this->csrfField() ?>
+                                <label><span><?= $this->te('Name of the copy') ?></span>
+                                    <input name="name" required maxlength="100" dir="auto" value="<?= $this->e($this->t(':name (copy)', ['name' => $board->name])) ?>"></label>
+                                <label class="check"><input type="checkbox" name="with_cards" value="1" checked> <?= $this->te('Copy the cards, with their labels and checklists') ?></label>
+                                <label class="check"><input type="checkbox" name="with_members" value="1"> <?= $this->te('Add the same members') ?></label>
+                                <p class="muted small"><?= $this->te('Comments, attachments and history are not copied.') ?></p>
+                                <button class="btn btn-primary" type="submit"><?= $this->te('Copy board') ?></button>
+                            </form>
+                        </details>
                         <hr>
                         <form action="<?= $this->url($base . '/archive') ?>" method="post" data-confirm="<?= $this->te('Archive this board? Nobody can change it until it is restored.') ?>">
                             <?= $this->csrfField() ?>

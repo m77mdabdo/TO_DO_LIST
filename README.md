@@ -58,7 +58,11 @@ No framework, no Composer, no build step.
 - 📝 **Markdown descriptions**, rendered safely (no raw HTML, only http, https and mailto links).
 - ☑️ **Checklists** on a card, with progress on the board tile. Items can be dragged within and between checklists.
 - 💬 **Comments with @mentions** and **votes**. Each board decides who may comment and vote: no one, members only, or everyone who can see it.
-- 🔎 **Filters and search.** Filter a board by text, label, person, due date or status, and search cards across every board you can see.
+- 🔎 **Filters and search.** Filter a board by text, label, person, due date or status. Search looks in card titles, descriptions, comments, checklists and attachments on every board you can see, with a board filter and an option to include the archive.
+- 📎 **Attachments and links.** Upload images, PDFs, Office files, text and zip files (up to 10 MB) or add web links. Images show a preview.
+- 🧮 **Table, calendar and dashboard views.** Sort a board's cards in a table, see due dates and dated checklist items on a month calendar, and read a board's progress, late work and workload per list, person and label.
+- 🧩 **Templates.** Start a board from ready-made templates (Kanban, software sprint, marketing, hiring, weekly planner) or from your own boards saved as templates. Copy any board, with or without its cards and members.
+- 💾 **Export and backup.** Download a board or the whole workspace as JSON, and back up the database and uploaded files with one command.
 - 🗄️ **Archive, then delete.** Archived lists, cards and boards can be restored. Deleting a card is only possible once it is archived.
 - 🧑‍🤝‍🧑 **Board members.** Managers choose who is on a board and with which role (manager, member, viewer). Guests only see the boards they were given.
 - 🔔 **Notifications.** A bell in the header for mentions, assignments, comments, moves and due dates, plus email for what matters (each person can turn email off). Watch a card or a whole board to follow it.
@@ -115,7 +119,7 @@ php database/seed.php
 
 | Login | Password | What you see |
 |---|---|---|
-| `demo@todo.test` | `demo1234` | Owner of "Nile Studio": a shared "Website launch" board and a private "Hiring" board. Some old-style tasks are also imported into "My Board" on the first sign-in. |
+| `demo@todo.test` | `demo1234` | Owner of "Nile Studio": a shared "Website launch" board, a private "Hiring" board and a "Sprint template" saved as a template. Some old-style tasks are also imported into "My Board" on the first sign-in. |
 | `mona@todo.test` | `demo1234` | A member of "Nile Studio". She sees the shared board but not the private one. |
 | `omar@todo.test` | `demo1234` | A guest who joined by invitation and can only view the shared board. |
 
@@ -164,6 +168,29 @@ example every 15 minutes:
 php bin/reminders.php
 ```
 
+### Backups
+
+```bash
+php bin/backup.php                        # database only, keeps the newest 14
+php bin/backup.php --with-files --keep=30 # also zip the uploaded attachments
+```
+
+Backups go to `storage/backups/` (or `BACKUPS_PATH`). With SQLite you get a consistent copy of the
+database file; with MySQL a plain SQL dump (gzipped) that phpMyAdmin or `mysql < file` can import.
+Run it once a day from cron, for example `0 3 * * * php /path/to/todolist/bin/backup.php --with-files`.
+Uploaded files live in `storage/attachments/` (or `ATTACHMENTS_PATH`); keep that folder when you move the app.
+
+### Docker (optional)
+
+Nothing needs Docker, but a `Dockerfile` and `docker-compose.yml` are included:
+
+```bash
+docker compose up -d                    # http://localhost:8080 with SQLite
+docker compose --profile mysql up -d    # with a MySQL container (set DB_DRIVER=mysql in .env)
+```
+
+The database and `storage/` are kept in named volumes, so rebuilding the image never loses data.
+
 ### Command line
 
 ```bash
@@ -172,6 +199,7 @@ php database/migrate.php --pending  # list them without running
 php database/seed.php               # demo company (fresh database only)
 php database/import-legacy.php      # move every user's old tasks to boards now, instead of on sign-in
 php bin/reminders.php               # due-soon and overdue notifications (run it from cron)
+php bin/backup.php --with-files     # back up the database and attachments
 ```
 
 ## Project structure
@@ -229,6 +257,7 @@ The app is a modular monolith. Each feature lives in `src/Modules/<Name>/` with 
 | **Label** | board labels and which cards carry them |
 | **Checklist** | checklists and their items on a card, progress per card |
 | **Discussion** | comments, @mentions and votes on cards |
+| **Attachment** | files and links on cards: real-type checks, storage outside the web root, downloads after a permission check |
 | **Invitation** | invitations by email and link: one-time hashed tokens, expiry, resend, revoke, accept |
 | **Notification** | watchers, the notification bell, email for important events, due-date reminders |
 | **Audit** | an append-only log of invitations, role changes and removals per workspace |
@@ -310,7 +339,14 @@ Archived boards are read-only.
 | POST | `/cards/{id}/comments`, `/cards/{id}/vote` | comment on a card, vote for it |
 | POST | `/comments/{id}`, `/comments/{id}/delete` | edit or delete a comment |
 | GET | `/boards/{id}/activity` | the board's whole activity, page by page |
-| GET | `/search?q=` | search cards in the current workspace |
+| GET | `/search?q=&board=&archived=1` | search cards, comments, checklists and attachments in the current workspace |
+| GET | `/boards/{id}/table`, `/calendar?month=`, `/dashboard` | other views of a board (they take the same filters) |
+| GET | `/boards/{id}/export.json` | the whole board as JSON |
+| GET | `/workspaces/{id}/export.json` | every board of a workspace as JSON (owners and admins) |
+| POST | `/boards/{id}/copy`, `/template` | copy a board, mark it as a template |
+| POST | `/cards/{id}/attachments`, `/cards/{id}/links` | upload a file, add a link |
+| GET | `/attachments/{id}` (`?download=1`) | open or download an attachment |
+| POST | `/attachments/{id}/delete` | remove an attachment |
 
 Every state change is a POST route with a CSRF token. Other methods get 405.
 
@@ -361,6 +397,7 @@ for PHP 8.1 and 8.3, together with PHPStan.
 | Open redirects | The language switch and the after-login redirect only go to a path on this site |
 | Invitation links | 256-bit random tokens; only a SHA-256 hash is stored; single use, bound to the invited email, 7-day expiry, 30 invitations per hour per person |
 | Email header injection | Line breaks are stripped from addresses, names and subjects; SMTP verifies the server certificate |
+| Uploaded files | The type is read from the file's bytes (not its name), and it must match the extension; HTML, SVG and scripts are refused. Files get random names outside the web root and are only sent after a permission check, with `Content-Security-Policy: sandbox` and `nosniff`. Size limits per file (10 MB), card (50 files) and board (500 MB) |
 | Secrets | SMTP settings live in `.env`, which is git-ignored and blocked by `.htaccess` |
 | Direct file access | Everything goes through `index.php`; `.htaccess` blocks `src/`, `views/`, `database/`, `storage/`, `lang/`, `bootstrap/`, `routes/`, `tests/` and config files |
 
@@ -384,7 +421,10 @@ for PHP 8.1 and 8.3, together with PHPStan.
 - [x] Invitations by email and member management
 - [x] Checklists, comments, mentions and votes on cards
 - [x] Search and filters
-- [ ] Attachments on cards
+- [x] Attachments and links on cards
+- [x] Table, calendar and dashboard views
+- [x] Board templates and copies
+- [x] JSON export and backups
 - [x] Notifications, watchers and due-date reminders
 - [x] Audit log
 - [ ] Import from CSV

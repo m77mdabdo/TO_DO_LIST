@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Checklist;
 
+use App\Shared\Export\ExportParts;
+use App\Modules\Card\Contract\Events\CardCopied;
+use App\Modules\Checklist\Application\ChecklistCopier;
+use App\Modules\Checklist\Infrastructure\PdoChecklistSearch;
+use App\Shared\Search\SearchSources;
 use App\Core\Container;
 use App\Http\Middleware\Authenticate;
 use App\Http\Router;
@@ -35,6 +40,25 @@ final class ChecklistModule implements ModuleProvider
 
     public function register(Container $container): void
     {
+        $container->extend(ExportParts::class, function (object $parts, Container $c): void {
+            /** @var ExportParts $parts */
+            $parts->add('checklists', function (array $cardIds) use ($c): array {
+                $out = [];
+                foreach ($cardIds as $cardId) {
+                    foreach ($c->get(ChecklistService::class)->forCard($cardId) as $checklist) {
+                        $out[$cardId][] = ['title' => $checklist->title, 'items' => array_map(static fn ($i) => [
+                            'text' => $i->text, 'done' => $i->isDone(), 'due' => $i->dueDate(),
+                        ], $checklist->items)];
+                    }
+                }
+
+                return $out;
+            });
+        });
+        $container->extend(SearchSources::class, function (object $sources, Container $c): void {
+            /** @var SearchSources $sources */
+            $sources->add(new PdoChecklistSearch($c->get(PDO::class)));
+        });
         $container->singleton(ChecklistRepository::class, fn (Container $c) => new PdoChecklists($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(ChecklistService::class, fn (Container $c) => $c->build(ChecklistService::class));
 
@@ -74,6 +98,22 @@ final class ChecklistModule implements ModuleProvider
 
                 return ['cardBadges' => $badges];
             });
+
+            // Progress per row of the table view.
+            $view->composer('boards/table', fn (array $data): array => [
+                'progress' => $c->get(ChecklistService::class)->progressForCards(array_map(static fn ($card) => $card->id, $data['rows'] ?? [])),
+            ]);
+
+            // Dated checklist items in the calendar, on the cards shown there.
+            $view->composer('boards/calendar', function (array $data) use ($c): array {
+                $items = [];
+                $grid = $data['grid'];
+                foreach ($c->get(ChecklistService::class)->itemsDueBetween(array_keys($data['cardById'] ?? []), $grid->first(), $grid->last()) as $item) {
+                    $items[(string) $item->dueDate()][] = $item;
+                }
+
+                return ['checklistItems' => $items];
+            });
         });
     }
 
@@ -93,6 +133,7 @@ final class ChecklistModule implements ModuleProvider
 
     public function listeners(EventBus $events, Container $container): void
     {
+        $events->listen(CardCopied::name(), static fn (CardCopied $event) => $container->get(ChecklistCopier::class)->onCardCopied($event));
     }
 
     public function migrationsPath(): ?string

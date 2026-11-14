@@ -13,6 +13,8 @@ final class Request
      * @param array<string, mixed> $query
      * @param array<string, mixed> $body
      * @param array<string, string> $headers lower-cased names
+     * @param array<string, mixed> $attributes
+     * @param array<string, UploadedFile> $files
      */
     public function __construct(
         public readonly string $method,
@@ -22,6 +24,7 @@ final class Request
         private array $headers = [],
         public readonly string $ip = '0.0.0.0',
         private array $attributes = [],
+        private array $files = [],
     ) {
     }
 
@@ -45,6 +48,7 @@ final class Request
             body: $_POST,
             headers: $headers,
             ip: $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0',
+            files: UploadedFile::fromGlobals($_FILES),
         );
     }
 
@@ -77,6 +81,12 @@ final class Request
     public function body(): array
     {
         return $this->body;
+    }
+
+    /** The single file sent under $key, or null when none was sent. */
+    public function file(string $key): ?UploadedFile
+    {
+        return $this->files[$key] ?? null;
     }
 
     public function header(string $name): ?string
