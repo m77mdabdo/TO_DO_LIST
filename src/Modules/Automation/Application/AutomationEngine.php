@@ -262,7 +262,7 @@ final class AutomationEngine
         return ['ok' => $ok, 'failed' => $failed, 'error' => $error];
     }
 
-    /** @param list<array{type: string, value: string, text: string}> $actions */
+    /** @param list<array<string, string>> $actions */
     private function perform(array $actions, ActionContext $context): void
     {
         foreach ($actions as $action) {

@@ -27,7 +27,7 @@ final class ActionType
 {
     public const PARAMS = ['none', 'list', 'label', 'person', 'days', 'text'];
 
-    /** @param Closure(ActionContext, string): void $run */
+    /** @param Closure(ActionContext, string): mixed $run */
     public function __construct(
         public readonly string $key,
         public readonly string $label,
