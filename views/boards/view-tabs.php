@@ -4,7 +4,7 @@
  *
  * @var \App\View\View $this
  * @var \App\Modules\Board\Contract\BoardSummary $board
- * @var string $current "", "/table", "/calendar" or "/dashboard"
+ * @var string $current "", "/table", "/calendar", "/timeline" or "/dashboard"
  * @var array<string, string> $query the current query string
  */
 $base = '/boards/' . $board->publicId;
@@ -14,6 +14,7 @@ $tabs = [
     ''           => ['board', 'Board'],
     '/table'     => ['table', 'Table'],
     '/calendar'  => ['calendar', 'Calendar'],
+    '/timeline'  => ['timeline', 'Timeline'],
     '/dashboard' => ['chart', 'Dashboard'],
 ];
 ?>

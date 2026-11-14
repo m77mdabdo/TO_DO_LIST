@@ -41,6 +41,8 @@ $currentWorkspace ??= null;
                     <?php endforeach; ?>
                     <hr>
                     <a class="menu-item" href="<?= $this->url('/workspaces/' . $currentWorkspace->publicId . '/members') ?>"><?= $this->icon('users') ?><?= $this->te('Members') ?></a>
+                    <a class="menu-item" href="<?= $this->url('/workspaces/' . $currentWorkspace->publicId . '/cards') ?>"><?= $this->icon('table') ?><?= $this->te('All cards') ?></a>
+                    <a class="menu-item" href="<?= $this->url('/workspaces/' . $currentWorkspace->publicId . '/report') ?>"><?= $this->icon('chart') ?><?= $this->te('Team report') ?></a>
                     <a class="menu-item" href="<?= $this->url('/workspaces/new') ?>"><?= $this->icon('plus') ?><?= $this->te('New company') ?></a>
                 </div>
             </details>
@@ -60,6 +62,7 @@ $currentWorkspace ??= null;
     <div class="topbar-actions">
         <?php if (isset($user)): ?>
             <button class="icon-btn hide-sm js-shortcuts" type="button" title="<?= $this->te('Keyboard shortcuts') ?> (?)" aria-label="<?= $this->te('Keyboard shortcuts') ?>"><?= $this->icon('keyboard') ?></button>
+            <a class="icon-btn" href="<?= $this->url('/my-tasks') ?>" title="<?= $this->te('My tasks') ?>" aria-label="<?= $this->te('My tasks') ?>"><?= $this->icon('inbox') ?></a>
             <?= $this->slot('header.actions', ['user' => $user]) ?>
         <?php endif; ?>
         <button class="icon-btn js-theme" type="button" title="<?= $this->te('Toggle dark mode') ?>">

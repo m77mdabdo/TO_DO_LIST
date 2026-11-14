@@ -69,4 +69,22 @@ interface CardRepository
     public function positionAfter(int $listId, ?int $afterCardId, ?int $movingId = null): string;
 
     public function positionAtEnd(int $listId): string;
+
+    /** @return list<CardSummary> open, unfinished cards the person is on, soonest due first */
+    public function openCardsAssignedTo(int $userId, int $limit): array;
+
+    /**
+     * @param list<int> $boardIds
+     * @return list<CardSummary> open cards (done or not) of these boards, soonest due first
+     */
+    public function openCardsOnBoards(array $boardIds, int $limit): array;
+
+    /**
+     * Cards (archived ones too) created or completed between two dates.
+     *
+     * @param list<int> $boardIds
+     * @param 'created_at'|'completed_at' $column
+     * @return list<CardSummary>
+     */
+    public function cardsBetween(array $boardIds, string $column, string $from, string $to): array;
 }

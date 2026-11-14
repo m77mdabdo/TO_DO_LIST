@@ -15,4 +15,13 @@ interface ActivityFeed
 
     /** @return list<ActivityEntry> */
     public function forCard(int $cardId, ?int $beforeId = null, int $limit = 30): array;
+
+    /**
+     * How many things each person did on these boards between two dates
+     * (Y-m-d, inclusive), for team reports.
+     *
+     * @param list<int> $boardIds
+     * @return array<int, int> user id => count, busiest first
+     */
+    public function countsByActor(array $boardIds, string $from, string $to): array;
 }
