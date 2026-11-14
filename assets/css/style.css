@@ -703,3 +703,8 @@ fieldset.stack-sm legend { padding: 0 .3rem; font-weight: 600; }
 .attachment-list .row-actions form { margin: 0; }
 .attachment-forms { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 1rem; padding-top: .5rem; border-top: 1px solid var(--border); }
 .attachment-forms input[type=file] { max-width: 100%; }
+
+/* Search */
+.search-options { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; flex-basis: 100%; }
+.search-options select { width: auto; max-width: 100%; }
+.search-excerpt { flex-basis: 100%; overflow-wrap: anywhere; }

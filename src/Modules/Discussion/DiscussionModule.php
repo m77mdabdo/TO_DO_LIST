@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Discussion;
 
+use App\Modules\Discussion\Infrastructure\PdoCommentSearch;
+use App\Shared\Search\SearchSources;
 use App\Core\Container;
 use App\Http\Middleware\Authenticate;
 use App\Http\Router;
@@ -35,6 +37,10 @@ final class DiscussionModule implements ModuleProvider
 
     public function register(Container $container): void
     {
+        $container->extend(SearchSources::class, function (object $sources, Container $c): void {
+            /** @var SearchSources $sources */
+            $sources->add(new PdoCommentSearch($c->get(PDO::class)));
+        });
         $container->singleton(DiscussionRepository::class, fn (Container $c) => new PdoDiscussion($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(DiscussionService::class, fn (Container $c) => $c->build(DiscussionService::class));
 

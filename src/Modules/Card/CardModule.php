@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Card;
 
+use App\Modules\Card\Infrastructure\PdoCardSearch;
+use App\Shared\Search\SearchSources;
 use App\Core\Container;
 use App\Http\Middleware\Authenticate;
 use App\Http\Router;
@@ -33,6 +35,10 @@ final class CardModule implements ModuleProvider
 
     public function register(Container $container): void
     {
+        $container->extend(SearchSources::class, function (object $sources, Container $c): void {
+            /** @var SearchSources $sources */
+            $sources->add(new PdoCardSearch($c->get(PDO::class)));
+        });
         $container->singleton(CardRepository::class, fn (Container $c) => new PdoCardRepository($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(CardQueries::class, fn (Container $c) => $c->build(CardQueryService::class));
         $container->singleton(CardService::class, fn (Container $c) => $c->build(CardService::class));
