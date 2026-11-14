@@ -15,7 +15,9 @@ use App\Modules\Access\Contract\BoardMembers;
 use App\Modules\Access\Contract\BoardRole;
 use App\Modules\Access\Infrastructure\PdoBoardMembers;
 use App\Modules\Board\Contract\BoardDirectory;
+use App\Modules\Board\Contract\Events\BoardCopied;
 use App\Modules\Board\Contract\Events\BoardCreated;
+use App\Modules\Workspace\Contract\WorkspaceDirectory;
 use App\Modules\Workspace\Contract\Events\MemberRemoved;
 use App\Shared\Events\EventBus;
 use App\Shared\Module\ModuleProvider;
@@ -64,6 +66,23 @@ final class AccessModule implements ModuleProvider
         $events->listen(BoardCreated::name(), static function (BoardCreated $event) use ($container): void {
             $container->get(BoardMembers::class)->add($event->boardId, $event->actorId, BoardRole::Manager);
             $container->get(Gate::class)->forget($event->actorId, $event->boardId);
+        });
+
+        // A copied board can take the source's people along, with the same roles,
+        // as long as they still belong to the workspace.
+        $events->listen(BoardCopied::name(), static function (BoardCopied $event) use ($container): void {
+            if (!$event->withMembers) {
+                return;
+            }
+            $members = $container->get(BoardMembers::class);
+            $board = $container->get(BoardDirectory::class)->find($event->boardId);
+            foreach ($members->membersOf($event->sourceBoardId) as $userId => $role) {
+                if ($userId === $event->actorId || $board === null || $container->get(WorkspaceDirectory::class)->roleOf($userId, $board->workspaceId) === null) {
+                    continue;
+                }
+                $members->add($event->boardId, $userId, $role);
+                $container->get(Gate::class)->forget($userId, $event->boardId);
+            }
         });
 
         // Board roles must never outlive the workspace membership they came with.

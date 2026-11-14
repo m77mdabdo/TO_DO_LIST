@@ -19,6 +19,7 @@ final class BoardSummary
         public readonly bool $archived,
         public readonly Participation $commenting = Participation::Everyone,
         public readonly Participation $voting = Participation::Members,
+        public readonly bool $isTemplate = false,
     ) {
     }
 
@@ -36,6 +37,7 @@ final class BoardSummary
             $row['archived_at'] !== null,
             Participation::tryFrom((string) ($row['commenting'] ?? '')) ?? Participation::Everyone,
             Participation::tryFrom((string) ($row['voting'] ?? '')) ?? Participation::Members,
+            (bool) ($row['is_template'] ?? false),
         );
     }
 }

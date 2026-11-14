@@ -831,3 +831,10 @@ fieldset.stack-sm legend { padding: 0 .3rem; font-weight: 600; }
 .trend-bar[data-h="90"] { height: 90%; }
 .trend-bar[data-h="95"] { height: 95%; }
 .trend-bar[data-h="100"] { height: 100%; }
+
+/* Templates and copies */
+.tile-badge { display: inline-flex; align-items: center; gap: .3rem; align-self: flex-start; padding: .1rem .5rem; border-radius: 999px; font-size: .75rem; font-weight: 700; background: rgba(255, 255, 255, .25); }
+.tile-badge .icon { width: 14px; height: 14px; }
+.copy-board > summary { list-style: none; cursor: pointer; }
+.copy-board > summary::-webkit-details-marker { display: none; }
+.copy-board[open] > form { padding: .6rem 0; }

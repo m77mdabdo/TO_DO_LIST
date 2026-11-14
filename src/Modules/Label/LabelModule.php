@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Label;
 
+use App\Modules\Board\Contract\Events\BoardCopied;
+use App\Modules\Board\Contract\Events\BoardSeeded;
+use App\Modules\Card\Contract\Events\CardCopied;
+use App\Modules\Label\Application\LabelCopier;
 use App\Core\Container;
 use App\Http\Middleware\Authenticate;
 use App\Http\Router;
@@ -46,6 +50,9 @@ final class LabelModule implements ModuleProvider
 
     public function listeners(EventBus $events, Container $container): void
     {
+        $events->listen(BoardCopied::name(), static fn (BoardCopied $event) => $container->get(LabelCopier::class)->onBoardCopied($event));
+        $events->listen(BoardSeeded::name(), static fn (BoardSeeded $event) => $container->get(LabelCopier::class)->onBoardSeeded($event));
+        $events->listen(CardCopied::name(), static fn (CardCopied $event) => $container->get(LabelCopier::class)->onCardCopied($event));
     }
 
     public function migrationsPath(): ?string

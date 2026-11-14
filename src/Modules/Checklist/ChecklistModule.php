@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Checklist;
 
+use App\Modules\Card\Contract\Events\CardCopied;
+use App\Modules\Checklist\Application\ChecklistCopier;
 use App\Modules\Checklist\Infrastructure\PdoChecklistSearch;
 use App\Shared\Search\SearchSources;
 use App\Core\Container;
@@ -115,6 +117,7 @@ final class ChecklistModule implements ModuleProvider
 
     public function listeners(EventBus $events, Container $container): void
     {
+        $events->listen(CardCopied::name(), static fn (CardCopied $event) => $container->get(ChecklistCopier::class)->onCardCopied($event));
     }
 
     public function migrationsPath(): ?string
