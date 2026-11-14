@@ -22,6 +22,16 @@ return [
     'auto_migrate' => filter_var(getenv('APP_AUTO_MIGRATE') ?: true, FILTER_VALIDATE_BOOL),
 
     // Email for invitations and notifications.
+    // Uploaded files. Keep this folder outside the web root, or blocked like storage/ is.
+    'attachments' => [
+        'path' => getenv('ATTACHMENTS_PATH') ?: __DIR__ . '/storage/attachments',
+    ],
+
+    // Database backups made by bin/backup.php.
+    'backups' => [
+        'path' => getenv('BACKUPS_PATH') ?: __DIR__ . '/storage/backups',
+    ],
+
     // "log" writes each email to storage/mail (nothing is sent), "smtp" sends through
     // the server below, "mail" uses PHP's mail(). Put real credentials in .env, never here.
     'mail' => [
@@ -39,7 +49,7 @@ return [
     'db' => [
         // "sqlite" works out of the box, "mysql" for XAMPP / shared hosting
         'driver'      => getenv('DB_DRIVER') ?: 'sqlite',
-        'sqlite_path' => __DIR__ . '/database/todo.sqlite',
+        'sqlite_path' => getenv('DB_SQLITE_PATH') ?: __DIR__ . '/database/todo.sqlite',
 
         'host' => getenv('DB_HOST') ?: '127.0.0.1',
         'port' => getenv('DB_PORT') ?: '3306',

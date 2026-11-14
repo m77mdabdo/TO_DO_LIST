@@ -15,11 +15,11 @@ use PDO;
 
 final class PdoBoardRepository implements BoardRepository
 {
-    private const BOARD_COLUMNS = 'id, public_id, workspace_id, name, description, color, visibility, commenting, voting, archived_at';
+    private const BOARD_COLUMNS = 'id, public_id, workspace_id, name, description, color, visibility, commenting, voting, is_template, archived_at';
     private const LIST_COLUMNS = 'id, board_id, name, position, archived_at';
 
     /** Columns update() may touch: an allow-list, never names from the request. */
-    private const UPDATABLE = ['name', 'description', 'color', 'visibility', 'commenting', 'voting'];
+    private const UPDATABLE = ['name', 'description', 'color', 'visibility', 'commenting', 'voting', 'is_template'];
 
     private OrderedRows $listOrder;
 

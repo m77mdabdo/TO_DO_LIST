@@ -19,6 +19,16 @@ final class CardQueryService implements CardQueries
         return $this->cards->find($cardId);
     }
 
+    public function findMany(array $cardIds): array
+    {
+        return $cardIds === [] ? [] : $this->cards->findMany(array_values(array_unique($cardIds)));
+    }
+
+    public function scheduledBetween(array $boardIds, string $from, string $to): array
+    {
+        return $boardIds === [] ? [] : $this->cards->scheduledBetween($boardIds, $from, $to);
+    }
+
     public function findByPublicId(string $publicId): ?CardSummary
     {
         return $this->cards->findByPublicId($publicId);

@@ -13,6 +13,7 @@ use App\Modules\Board\Contract\BoardCatalog;
 use App\Modules\Board\Contract\BoardDirectory;
 use App\Modules\Board\Domain\BoardRepository;
 use App\Modules\Board\Http\BoardController;
+use App\Modules\Board\Http\BoardViewsController;
 use App\Modules\Board\Http\ListController;
 use App\Modules\Board\Http\SearchController;
 use App\Modules\Board\Infrastructure\PdoBoardRepository;
@@ -54,6 +55,13 @@ final class BoardModule implements ModuleProvider
             $router->post('/boards/{board:ulid}/restore', [BoardController::class, 'restore']);
             $router->get('/boards/{board:ulid}/archived', [BoardController::class, 'archived']);
             $router->get('/boards/{board:ulid}/export', [BoardController::class, 'export']);
+            $router->get('/boards/{board:ulid}/export.json', [BoardController::class, 'exportJson']);
+            $router->get('/workspaces/{workspace:ulid}/export.json', [BoardController::class, 'exportWorkspace']);
+            $router->post('/boards/{board:ulid}/copy', [BoardController::class, 'copy']);
+            $router->post('/boards/{board:ulid}/template', [BoardController::class, 'template']);
+            $router->get('/boards/{board:ulid}/table', [BoardViewsController::class, 'table']);
+            $router->get('/boards/{board:ulid}/calendar', [BoardViewsController::class, 'calendar']);
+            $router->get('/boards/{board:ulid}/dashboard', [BoardViewsController::class, 'dashboard']);
 
             $router->post('/boards/{board:ulid}/lists', [ListController::class, 'store']);
             $router->post('/boards/{board:ulid}/lists/{id}', [ListController::class, 'update']);

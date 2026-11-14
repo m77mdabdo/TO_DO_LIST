@@ -23,6 +23,7 @@ declare(strict_types=1);
 use App\Core\Config;
 use App\Modules\Access\Contract\BoardMembers;
 use App\Modules\Access\Contract\BoardRole;
+use App\Modules\Attachment\Application\AttachmentService;
 use App\Modules\Board\Application\BoardService;
 use App\Modules\Board\Contract\BoardVisibility;
 use App\Modules\Card\Application\CardService;
@@ -139,6 +140,14 @@ foreach (['Write plan names', 'Pick prices', 'Draft the FAQ', 'Mobile layout'] a
 foreach (array_slice($checklists->forCard($pricing->id)[0]->items, 0, 2) as $item) {
     $checklists->toggleItem($demo, $item->id);
 }
+// A dated item shows up in the calendar view.
+$mobile = $checklists->forCard($pricing->id)[0]->items[3];
+$checklists->updateItem($demo, $mobile->id, ['text' => $mobile->text, 'due_date' => $day(3)]);
+
+// Links on cards (files can be uploaded from the card page).
+$attachments = $app->get(AttachmentService::class);
+$attachments->addLink($demo, $pricing, 'https://example.com/pricing-ideas', 'Pricing ideas');
+$attachments->addLink($demo, $created['Build the contact form'], 'https://developer.mozilla.org/docs/Learn/Forms', 'MDN: web forms');
 
 $discussion = $app->get(DiscussionService::class);
 $discussion->post($demo, $pricing, '@Mona can you check the yearly prices before Thursday?');
@@ -147,9 +156,12 @@ $discussion->toggleVote($demo, $pricing);
 $discussion->toggleVote($mona, $pricing);
 $discussion->toggleVote($mona, $created['Write the About page']);
 
-// A private board only the owner sees (Mona is not a member).
-$private = $boards->createBoard($demo, $workspace->id, 'Hiring', BoardVisibility::Private, 'coral');
-$boards->addList($demo, $private->id, 'Candidates');
+// A private board only the owner sees (Mona is not a member), started from a ready-made template.
+$private = $boards->createFromTemplate($demo, $workspace->id, 'hiring', 'Hiring');
+
+// A saved template the team can start new boards from.
+$template = $boards->createFromTemplate($demo, $workspace->id, 'software', 'Sprint template', BoardVisibility::Workspace);
+$boards->setTemplate($demo, $template, true);
 
 // Omar joined through an invitation as a guest who views the team board; one
 // invitation is still waiting. Both show on the members page and audit log.
@@ -172,4 +184,4 @@ foreach ([
     $old->execute([$demo, $title, $notes, $status, $priority, $category, $due, $ago($created), $ago($created), $completed ? $ago($completed) : null]);
 }
 
-echo "Seeded \"Nile Studio\" with 2 boards. Log in with demo@todo.test / demo1234 (or mona@todo.test, omar@todo.test).\n";
+echo "Seeded \"Nile Studio\" with 3 boards. Log in with demo@todo.test / demo1234 (or mona@todo.test, omar@todo.test).\n";

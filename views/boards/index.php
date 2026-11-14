@@ -6,6 +6,8 @@
  * @var list<\App\Modules\Board\Contract\BoardSummary> $archived
  * @var \App\Modules\Identity\Contract\User $user
  * @var string $greeting
+ * @var list<\App\Modules\Board\Contract\BoardSummary> $templates boards saved as templates
+ * @var array<string, array{name: string, description: string, lists: list<string>}> $builtIns
  */
 use App\Modules\Board\Contract\BoardSummary;
 
@@ -25,6 +27,7 @@ $form = $this->form;
         <?php foreach ($boards as $board): ?>
             <a class="board-tile tile-<?= $this->e($board->color) ?>" href="<?= $this->url('/boards/' . $board->publicId) ?>">
                 <strong dir="auto"><?= $this->e($board->name) ?></strong>
+                <?php if ($board->isTemplate): ?><span class="tile-badge"><?= $this->icon('copy') ?><?= $this->te('Template') ?></span><?php endif; ?>
                 <span class="tile-meta">
                     <?= $this->icon($board->visibility->value === 'private' ? 'lock' : 'users') ?>
                     <?= $this->te($board->visibility->value === 'private' ? 'Private' : 'Workspace') ?>
@@ -38,8 +41,29 @@ $form = $this->form;
                 <form action="<?= $this->url('/boards') ?>" method="post" class="stack" novalidate>
                     <?= $this->csrfField() ?>
                     <label>
+                        <span><?= $this->te('Start from') ?></span>
+                        <select name="template">
+                            <option value=""><?= $this->te('A blank board') ?></option>
+                            <optgroup label="<?= $this->te('Ready-made templates') ?>">
+                                <?php foreach ($builtIns as $key => $template): ?>
+                                    <option value="builtin:<?= $this->e($key) ?>" <?= $form->old('template') === 'builtin:' . $key ? 'selected' : '' ?>><?= $this->te($template['name']) ?>: <?= $this->e(implode(' · ', array_map(fn ($l) => $this->t($l), $template['lists']))) ?></option>
+                                <?php endforeach; ?>
+                            </optgroup>
+                            <?php if ($templates): ?>
+                                <optgroup label="<?= $this->te('Your templates') ?>">
+                                    <?php foreach ($templates as $template): ?>
+                                        <option value="<?= $this->e($template->publicId) ?>" <?= $form->old('template') === $template->publicId ? 'selected' : '' ?>><?= $this->e($template->name) ?></option>
+                                    <?php endforeach; ?>
+                                </optgroup>
+                            <?php endif; ?>
+                        </select>
+                    </label>
+                    <?php if ($templates): ?>
+                        <label class="check"><input type="checkbox" name="with_cards" value="1"> <?= $this->te('Copy the cards of a saved template too') ?></label>
+                    <?php endif; ?>
+                    <label>
                         <span><?= $this->te('Board name') ?></span>
-                        <input name="name" required maxlength="100" dir="auto" value="<?= $this->e($form->old('name')) ?>"
+                        <input name="name" maxlength="100" dir="auto" placeholder="<?= $this->te('Leave empty to use the template name') ?>" value="<?= $this->e($form->old('name')) ?>"
                                aria-invalid="<?= $form->error('name') ? 'true' : 'false' ?>">
                         <?= $this->partial('partials/field-error', ['field' => 'name']) ?>
                     </label>

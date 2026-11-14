@@ -95,6 +95,29 @@ final class PdoCardRepository implements CardRepository
         return $byList;
     }
 
+    public function findMany(array $ids): array
+    {
+        $stmt = $this->db->prepare('SELECT ' . self::COLUMNS . ' FROM cards WHERE id IN (' . implode(',', array_fill(0, count($ids), '?')) . ')');
+        $stmt->execute($ids);
+        $cards = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $card = CardSummary::fromRow($row);
+            $cards[$card->id] = $card;
+        }
+
+        return $cards;
+    }
+
+    public function scheduledBetween(array $boardIds, string $from, string $to): array
+    {
+        $marks = implode(',', array_fill(0, count($boardIds), '?'));
+        $stmt = $this->db->prepare('SELECT ' . self::COLUMNS . " FROM cards WHERE board_id IN ($marks) AND archived_at IS NULL
+            AND ((due_at >= ? AND due_at <= ?) OR (start_at >= ? AND start_at <= ?)) ORDER BY COALESCE(due_at, start_at), id");
+        $stmt->execute([...$boardIds, $from . ' 00:00:00', $to . ' 23:59:59', $from . ' 00:00:00', $to . ' 23:59:59']);
+
+        return array_map([CardSummary::class, 'fromRow'], $stmt->fetchAll());
+    }
+
     public function search(array $boardIds, string $text, int $limit): array
     {
         // LIKE wildcards in the user's text are escaped with "!" (portable across SQLite and MySQL).

@@ -64,6 +64,39 @@ final class SearchAndFilterTest extends TestCase
         $this->assertFalse(str_contains($member, 'secret'));
     }
 
+    public function testSearchLooksInCommentsChecklistsAttachmentsAndOptionallyTheArchive(): void
+    {
+        $c = $this->f->app->container;
+        $cards = $c->get(CardService::class);
+        $talk = $cards->createCard($this->f->owner, $this->f->board->id, $this->f->todo->id, 'Kickoff');
+        $c->get(\App\Modules\Discussion\Application\DiscussionService::class)->post($this->f->owner, $talk, 'Remember the zebra stripes on the banner');
+        $steps = $cards->createCard($this->f->owner, $this->f->board->id, $this->f->todo->id, 'Launch steps');
+        $list = $c->get(\App\Modules\Checklist\Application\ChecklistService::class)->addChecklist($this->f->owner, $steps, 'Before launch');
+        $c->get(\App\Modules\Checklist\Application\ChecklistService::class)->addItem($this->f->owner, $list, 'Order flamingo stickers');
+        $files = $cards->createCard($this->f->owner, $this->f->board->id, $this->f->todo->id, 'Brand files');
+        $c->get(\App\Modules\Attachment\Application\AttachmentService::class)->addLink($this->f->owner, $files, 'https://example.com/walrus', 'Walrus moodboard');
+        $old = $cards->createCard($this->f->owner, $this->f->board->id, $this->f->todo->id, 'Old zebra poster');
+        $cards->archive($this->f->owner, $old);
+
+        $page = $this->f->app->page('/search?q=zebra');
+        $this->assertTrue(str_contains($page, 'Kickoff'));
+        $this->assertTrue(str_contains($page, 'In a comment'));
+        $this->assertFalse(str_contains($page, 'Old zebra poster'), 'Archived cards stay out unless asked for.');
+        $this->assertTrue(str_contains($this->f->app->page('/search?q=zebra&archived=1'), 'Old zebra poster'));
+
+        $this->assertTrue(str_contains($this->f->app->page('/search?q=flamingo'), 'Launch steps'));
+        $this->assertTrue(str_contains($this->f->app->page('/search?q=walrus'), 'Brand files'));
+
+        // A board the person can not see is never searched, even when named.
+        $secret = $c->get(BoardService::class)->createBoard($this->f->owner, $this->f->workspaceId, 'Private', BoardVisibility::Private);
+        $secretList = $c->get(BoardService::class)->addList($this->f->owner, $secret->id, 'Ideas');
+        $hidden = $cards->createCard($this->f->owner, $secret->id, $secretList->id, 'Hidden');
+        $c->get(\App\Modules\Discussion\Application\DiscussionService::class)->post($this->f->owner, $hidden, 'zebra secrets');
+        $this->f->colleague('mona@example.com', WorkspaceRole::Member);
+        $this->assertFalse(str_contains($this->f->app->page('/search?q=zebra&board=' . $secret->publicId), 'Hidden'));
+        $this->assertTrue(str_contains($this->f->app->page('/search?q=zebra'), 'Kickoff'));
+    }
+
     public function testLikeWildcardsAreMatchedLiterally(): void
     {
         $queries = $this->f->app->container->get(CardQueries::class);

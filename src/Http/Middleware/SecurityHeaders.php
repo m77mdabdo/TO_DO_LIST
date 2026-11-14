@@ -23,8 +23,11 @@ final class SecurityHeaders implements Middleware
     {
         $response = $next($request);
 
+        // A response may set a stricter policy of its own (e.g. a sandbox for downloads).
         foreach (self::HEADERS as $name => $value) {
-            $response = $response->withHeader($name, $value);
+            if ($response->header($name) === null) {
+                $response = $response->withHeader($name, $value);
+            }
         }
 
         return $response;
