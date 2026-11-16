@@ -8,6 +8,24 @@ use DateTimeImmutable;
 
 final class CardSummary
 {
+    public const COVER_COLORS = ['violet', 'sky', 'mint', 'amber', 'coral', 'slate'];
+    public const COVER_SIZES = ['top', 'full'];
+
+    /** key => [emoji, English name (the translation key)] */
+    public const STICKERS = [
+        'star'    => ['⭐', 'Star'],
+        'fire'    => ['🔥', 'Hot'],
+        'rocket'  => ['🚀', 'Launch'],
+        'idea'    => ['💡', 'Idea'],
+        'warning' => ['⚠️', 'Warning'],
+        'check'   => ['✅', 'Approved'],
+        'heart'   => ['❤️', 'Loved'],
+        'pin'     => ['📌', 'Pinned'],
+    ];
+
+    /** card: an ordinary card; separator: a heading between cards; board: a link to another board. */
+    public const KINDS = ['card', 'separator', 'board'];
+
     public function __construct(
         public readonly int $id,
         public readonly string $publicId,
@@ -23,6 +41,13 @@ final class CardSummary
         public readonly ?string $startAt = null,
         /** A template card: kept on the board to make new cards from. */
         public readonly bool $isTemplate = false,
+        public readonly ?string $coverColor = null,
+        /** One of the card's own images; cleared when that attachment is removed. */
+        public readonly ?int $coverAttachmentId = null,
+        public readonly string $coverSize = 'top',
+        public readonly ?string $sticker = null,
+        public readonly string $kind = 'card',
+        public readonly ?int $linkBoardId = null,
     ) {
     }
 
@@ -43,7 +68,23 @@ final class CardSummary
             (string) $row['created_at'],
             isset($row['start_at']) ? (string) $row['start_at'] : null,
             !empty($row['is_template']),
+            isset($row['cover_color']) ? (string) $row['cover_color'] : null,
+            isset($row['cover_attachment_id']) ? (int) $row['cover_attachment_id'] : null,
+            (string) ($row['cover_size'] ?? 'top'),
+            isset($row['sticker']) ? (string) $row['sticker'] : null,
+            (string) ($row['kind'] ?? 'card'),
+            isset($row['link_board_id']) ? (int) $row['link_board_id'] : null,
         );
+    }
+
+    public function hasCover(): bool
+    {
+        return $this->coverColor !== null || $this->coverAttachmentId !== null;
+    }
+
+    public function isSeparator(): bool
+    {
+        return $this->kind === 'separator';
     }
 
     public function isComplete(): bool

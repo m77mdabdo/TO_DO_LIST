@@ -531,3 +531,19 @@
         window.addEventListener('focus', () => checker.now());
     }
 })();
+
+/* ---------- batch 4: show only the inputs that apply ---------- */
+(() => {
+    'use strict';
+    const pairs = [['.js-field-type', '.js-field-options', (v) => v === 'select'], ['.js-card-kind', '.js-link-board', (v) => v === 'board']];
+    pairs.forEach(([selectSel, targetSel, wants]) => {
+        document.querySelectorAll(selectSel).forEach((select) => {
+            const form = select.form;
+            const target = form ? form.querySelector(targetSel) : null;
+            if (!target) return;
+            const sync = () => { target.hidden = !wants(select.value); };
+            select.addEventListener('change', sync);
+            sync();
+        });
+    });
+})();

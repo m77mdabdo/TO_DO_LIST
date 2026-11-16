@@ -14,7 +14,7 @@ use DateTimeImmutable;
 final class CardCopied implements DomainEvent
 {
     /** Parts other modules keep: labels (Label module), checklists (Checklist module). */
-    public const PARTS = ['labels', 'checklists'];
+    public const PARTS = ['labels', 'checklists', 'fields'];
 
     /** @param list<string> $parts which of PARTS to copy */
     public function __construct(

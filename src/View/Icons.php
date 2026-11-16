@@ -26,6 +26,7 @@ final class Icons
         'fire'     => '<path d="M12 21a7 7 0 0 0 7-7c0-4-3-6-4-9-1 2-2 3-3 3 0-2-1-4-3-5 0 4-4 6-4 11a7 7 0 0 0 7 7Z"/>',
         'broom'    => '<path d="M14 4 9 13M6 14h7l1 7H5l1-7ZM8 17v4M11 17v4"/>',
         'download' => '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+        'upload'   => '<path d="M12 16V5M7 10l5-5 5 5M5 20h14"/>',
         'board'    => '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 7v8M12 7v4M16 7v10"/>',
         'users'    => '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>',
         'archive'  => '<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/>',

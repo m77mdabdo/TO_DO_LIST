@@ -42,7 +42,7 @@ $cardPath = '/cards/' . $card->publicId;
                             <a class="icon-btn" href="<?= $this->url('/attachments/' . $attachment->publicId . '?download=1') ?>" title="<?= $this->te('Download') ?>" aria-label="<?= $this->te('Download') ?>"><?= $this->icon('download') ?></a>
                         <?php endif; ?>
                         <?php if ($canRemove($attachment)): ?>
-                            <form action="<?= $this->url('/attachments/' . $attachment->publicId . '/delete') ?>" method="post" data-confirm="<?= $this->te('Remove this attachment?') ?>">
+                            <form action="<?= $this->url('/attachments/' . $attachment->publicId . '/delete') ?>" method="post" data-confirm="<?= $attachment->id === $card->coverAttachmentId ? $this->te('Remove this attachment? It is the card’s cover, so the card goes back to no cover.') : $this->te('Remove this attachment?') ?>">
                                 <?= $this->csrfField() ?>
                                 <button class="icon-btn danger" type="submit" title="<?= $this->te('Remove') ?>" aria-label="<?= $this->te('Remove') ?>"><?= $this->icon('close') ?></button>
                             </form>

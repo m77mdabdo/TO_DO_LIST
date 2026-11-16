@@ -20,12 +20,13 @@ final class BoardCsv
      * @param list<ListSummary> $lists
      * @param array<int, list<CardSummary>> $cardsByList
      * @param array<int, list<Label>> $labels
+     * @param array{headers: list<string>, cells: array<int, list<string>>} $extra columns from other modules (custom fields)
      */
-    public static function make(array $lists, array $cardsByList, array $labels): string
+    public static function make(array $lists, array $cardsByList, array $labels, array $extra = ['headers' => [], 'cells' => []]): string
     {
         $out = fopen('php://temp', 'r+');
         fwrite($out, "\xEF\xBB\xBF"); // BOM, so Excel reads Arabic text correctly
-        fputcsv($out, self::HEADER, escape: '');
+        fputcsv($out, array_map(self::safe(...), [...self::HEADER, ...$extra['headers']]), escape: '');
 
         foreach ($lists as $list) {
             foreach ($cardsByList[$list->id] ?? [] as $card) {
@@ -37,6 +38,7 @@ final class BoardCsv
                     $card->dueDate(),
                     $card->completedAt,
                     $card->createdAt,
+                    ...array_pad($extra['cells'][$card->id] ?? [], count($extra['headers']), ''),
                 ]), escape: '');
             }
         }

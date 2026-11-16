@@ -14,6 +14,10 @@
  * @var \DateTimeImmutable $today
  * @var \App\Modules\Board\Contract\CardDisplay $display
  * @var list<\App\Modules\Card\Contract\CardSummary> $templates template cards on this board
+ * @var array<int, string> $cardCovers card id => cover picture path, added by the attachment module
+ * @var string|null $boardPicture path of the board's picture, added by the attachment module
+ * @var array<int, list<array{field: \App\Modules\Field\Contract\CustomField, text: string}>> $cardFields card id => custom fields shown on the tile
+ * @var array<int, \App\Modules\Board\Contract\BoardSummary> $linkedBoards boards that board-link cards point at, only openable ones
  */
 use App\Modules\Access\Contract\Permission;
 use App\Modules\Board\Contract\BoardSummary;
@@ -21,6 +25,10 @@ use App\Modules\Board\Contract\CardDisplay;
 
 $open = !$board->archived;
 $cardBadges ??= [];
+$cardCovers ??= [];
+$cardFields ??= [];
+$linkedBoards ??= [];
+$boardPicture ??= null;
 $canEdit = $open && $role->allows(Permission::EditCards);
 $canMove = $open && $role->allows(Permission::MoveCards);
 $canArchive = $open && $role->allows(Permission::ArchiveItems);
@@ -31,6 +39,9 @@ $templates ??= [];
 $selecting = ($selecting ?? false) && ($canEdit || $canMove || $canArchive);
 ?>
 <?= $this->partial('partials/app-header') ?>
+<?php if ($boardPicture !== null): ?>
+    <img class="board-picture" src="<?= $this->url($boardPicture) ?>" alt="" aria-hidden="true">
+<?php endif; ?>
 
 <div class="board-bar">
     <div class="board-bar-title">
@@ -57,6 +68,7 @@ $selecting = ($selecting ?? false) && ($canEdit || $canMove || $canArchive);
                 </form>
             </div>
         </details>
+        <a class="btn btn-ghost" href="<?= $this->url($base . '/fields') ?>" title="<?= $this->te('Custom fields') ?>"><?= $this->icon('table') ?><span class="hide-sm"><?= $this->te('Fields') ?></span></a>
         <a class="btn btn-ghost" href="<?= $this->url($base . '/archived') ?>"><?= $this->icon('archive') ?><span class="hide-sm"><?= $this->te('Archived items') ?></span></a>
         <?php if ($role->allows(Permission::Export)): ?>
             <details class="menu menu-end">
@@ -68,7 +80,7 @@ $selecting = ($selecting ?? false) && ($canEdit || $canMove || $canArchive);
             </details>
         <?php endif; ?>
         <?php if ($canManage): ?>
-            <details class="menu menu-end">
+            <details class="menu menu-end" id="board-settings" <?= $form->error('background_picture') || $form->error('background') ? 'open' : '' ?>>
                 <summary class="btn btn-ghost"><?= $this->icon('more') ?><span class="visually-hidden"><?= $this->te('Board settings') ?></span></summary>
                 <div class="menu-panel menu-wide">
                     <?php if ($open): ?>
@@ -107,8 +119,33 @@ $selecting = ($selecting ?? false) && ($canEdit || $canMove || $canArchive);
                                     </label>
                                 <?php endforeach; ?>
                             </fieldset>
+                            <label><span><?= $this->te('Background') ?></span>
+                                <select name="background">
+                                    <?php foreach (BoardSummary::BACKGROUNDS as $value => $text): ?>
+                                        <option value="<?= $value ?>" <?= $board->background === $value ? 'selected' : '' ?>><?= $this->te($text) ?></option>
+                                    <?php endforeach; ?>
+                                </select></label>
+                            <?= $this->partial('partials/field-error', ['field' => 'background']) ?>
                             <button class="btn btn-primary" type="submit"><?= $this->te('Save') ?></button>
                         </form>
+                        <hr>
+                        <form action="<?= $this->url($base . '/background') ?>" method="post" enctype="multipart/form-data" class="stack-sm">
+                            <?= $this->csrfField() ?>
+                            <label><span><?= $this->te('Background picture') ?></span>
+                                <input type="file" name="background_picture" accept=".jpg,.jpeg,.png,.gif,.webp" required
+                                       aria-describedby="background-help" aria-invalid="<?= $form->error('background_picture') ? 'true' : 'false' ?>"></label>
+                            <small class="muted" id="background-help"><?= $this->te('JPEG, PNG, GIF or WebP, up to 5 MB. Everyone who can see the board sees it.') ?></small>
+                            <?= $this->partial('partials/field-error', ['field' => 'background_picture']) ?>
+                            <div class="field-row">
+                                <button class="btn btn-ghost" type="submit"><?= $this->icon('upload') ?><?= $this->te('Upload picture') ?></button>
+                            </div>
+                        </form>
+                        <?php if ($boardPicture !== null): ?>
+                            <form action="<?= $this->url($base . '/background/remove') ?>" method="post">
+                                <?= $this->csrfField() ?>
+                                <button class="menu-item" type="submit"><?= $this->icon('trash') ?><?= $this->te('Remove the picture') ?></button>
+                            </form>
+                        <?php endif; ?>
                         <hr>
                         <form action="<?= $this->url($base . '/template') ?>" method="post">
                             <?= $this->csrfField() ?>
@@ -253,6 +290,8 @@ $selecting = ($selecting ?? false) && ($canEdit || $canMove || $canArchive);
                         <?= $this->partial('partials/card-tile', [
                             'card' => $card, 'labels' => $cardLabels[$card->id] ?? [], 'canMove' => $canMove, 'canEdit' => $canEdit,
                             'badges' => $cardBadges[$card->id] ?? [], 'display' => $display, 'selecting' => $selecting,
+                            'cover' => $cardCovers[$card->id] ?? null, 'fields' => $cardFields[$card->id] ?? [],
+                            'linkedBoard' => $card->linkBoardId !== null ? ($linkedBoards[$card->linkBoardId] ?? null) : null,
                             'members' => array_values(array_filter(array_map(static fn (int $id) => $people[$id] ?? null, $cardMembers[$card->id] ?? []))),
                         ]) ?>
                     <?php endforeach; ?>

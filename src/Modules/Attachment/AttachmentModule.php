@@ -13,6 +13,7 @@ use App\Http\Middleware\Authenticate;
 use App\Http\Router;
 use App\Modules\Access\Contract\AccessGate;
 use App\Modules\Attachment\Application\AttachmentService;
+use App\Modules\Attachment\Application\BoardBackgrounds;
 use App\Modules\Attachment\Domain\AttachmentRepository;
 use App\Modules\Attachment\Domain\FileStore;
 use App\Modules\Attachment\Domain\UploadPolicy;
@@ -65,6 +66,7 @@ final class AttachmentModule implements ModuleProvider
         ));
         $container->singleton(UploadPolicy::class, fn () => new UploadPolicy());
         $container->singleton(AttachmentService::class, fn (Container $c) => $c->build(AttachmentService::class));
+        $container->singleton(BoardBackgrounds::class, fn (Container $c) => $c->build(BoardBackgrounds::class));
         $container->singleton(\App\Modules\Attachment\Contract\AttachmentFiles::class, fn (Container $c) => $c->get(AttachmentService::class));
 
         $container->extend(View::class, function (object $view, Container $c): void {
@@ -99,7 +101,28 @@ final class AttachmentModule implements ModuleProvider
                     $badges[$cardId][] = ['icon' => 'paperclip', 'text' => (string) $count, 'class' => '', 'title' => 'Attachments'];
                 }
 
-                return ['cardBadges' => $badges];
+                // Cover pictures: the attachment's public id, so the tile loads it through the usual permission check.
+                $coverIds = [];
+                foreach ($data['cardsByList'] ?? [] as $cards) {
+                    foreach ($cards as $card) {
+                        if ($card->coverAttachmentId !== null) {
+                            $coverIds[$card->id] = $card->coverAttachmentId;
+                        }
+                    }
+                }
+                $publicIds = $c->get(AttachmentRepository::class)->imagePublicIds(array_values(array_unique($coverIds)));
+                $covers = [];
+                foreach ($coverIds as $cardId => $attachmentId) {
+                    if (isset($publicIds[$attachmentId])) {
+                        $covers[$cardId] = '/attachments/' . $publicIds[$attachmentId];
+                    }
+                }
+
+                return [
+                    'cardBadges'     => $badges,
+                    'cardCovers'     => $covers,
+                    'boardPicture'   => $c->get(BoardBackgrounds::class)->has($data['board']->id) ? '/boards/' . $data['board']->publicId . '/background' : null,
+                ];
             });
         });
     }
@@ -111,6 +134,9 @@ final class AttachmentModule implements ModuleProvider
             $router->post('/cards/{card:ulid}/links', [AttachmentController::class, 'link']);
             $router->get('/attachments/{attachment:ulid}', [AttachmentController::class, 'show']);
             $router->post('/attachments/{attachment:ulid}/delete', [AttachmentController::class, 'destroy']);
+            $router->get('/boards/{board:ulid}/background', [AttachmentController::class, 'background']);
+            $router->post('/boards/{board:ulid}/background', [AttachmentController::class, 'uploadBackground']);
+            $router->post('/boards/{board:ulid}/background/remove', [AttachmentController::class, 'removeBackground']);
         });
     }
 

@@ -20,6 +20,12 @@ interface AttachmentRepository
     public function countForCard(int $cardId): int;
 
     /**
+     * @param list<int> $ids
+     * @return array<int, string> attachment id => public id, images only
+     */
+    public function imagePublicIds(array $ids): array;
+
+    /**
      * @param list<int> $cardIds
      * @return array<int, int> card id => number of attachments
      */
