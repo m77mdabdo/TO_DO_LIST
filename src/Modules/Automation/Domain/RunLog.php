@@ -16,6 +16,9 @@ interface RunLog
     /** @return list<AutomationRun> newest first */
     public function latest(int $boardId, int $limit = 50): array;
 
+    /** @return array<int, AutomationRun> automation id => its latest failed run, for one board */
+    public function lastFailures(int $boardId): array;
+
     /** Deletes runs older than the date (Y-m-d H:i:s); returns how many. */
     public function pruneBefore(string $before): int;
 }

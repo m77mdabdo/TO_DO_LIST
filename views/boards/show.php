@@ -12,9 +12,12 @@
  * @var array<int, list<int>> $cardMembers card id => assigned user ids
  * @var array<int, list<array{icon: string, text: string, class: string, title: string}>> $cardBadges added by other modules
  * @var \DateTimeImmutable $today
+ * @var \App\Modules\Board\Contract\CardDisplay $display
+ * @var list<\App\Modules\Card\Contract\CardSummary> $templates template cards on this board
  */
 use App\Modules\Access\Contract\Permission;
 use App\Modules\Board\Contract\BoardSummary;
+use App\Modules\Board\Contract\CardDisplay;
 
 $open = !$board->archived;
 $cardBadges ??= [];
@@ -24,6 +27,8 @@ $canArchive = $open && $role->allows(Permission::ArchiveItems);
 $canManage = $role->allows(Permission::ManageSettings);
 $base = '/boards/' . $board->publicId;
 $form = $this->form;
+$templates ??= [];
+$selecting = ($selecting ?? false) && ($canEdit || $canMove || $canArchive);
 ?>
 <?= $this->partial('partials/app-header') ?>
 
@@ -36,6 +41,22 @@ $form = $this->form;
     <?= $this->partial('boards/view-tabs', ['board' => $board, 'current' => '', 'query' => $query ?? []]) ?>
     <div class="board-bar-actions">
         <?= $this->slot('board.actions', ['board' => $board, 'role' => $role]) ?>
+        <details class="menu menu-end">
+            <summary class="btn btn-ghost" title="<?= $this->te('Card display') ?>"><?= $this->icon('board') ?><span class="visually-hidden"><?= $this->te('Card display') ?></span></summary>
+            <div class="menu-panel">
+                <form action="<?= $this->url($base . '/display') ?>" method="post" class="stack">
+                    <?= $this->csrfField() ?>
+                    <fieldset class="stack-sm">
+                        <legend><?= $this->te('Show on the cards') ?></legend>
+                        <?php foreach (CardDisplay::PARTS as $part => $text): ?>
+                            <label class="check"><input type="checkbox" name="show[]" value="<?= $part ?>" <?= $display->shows($part) ? 'checked' : '' ?>> <?= $this->te($text) ?></label>
+                        <?php endforeach; ?>
+                    </fieldset>
+                    <p class="muted small"><?= $this->te('Only you see this choice.') ?></p>
+                    <button class="btn btn-primary" type="submit"><?= $this->te('Save') ?></button>
+                </form>
+            </div>
+        </details>
         <a class="btn btn-ghost" href="<?= $this->url($base . '/archived') ?>"><?= $this->icon('archive') ?><span class="hide-sm"><?= $this->te('Archived items') ?></span></a>
         <?php if ($role->allows(Permission::Export)): ?>
             <details class="menu menu-end">
@@ -120,7 +141,17 @@ $form = $this->form;
 
 <div class="board-tools">
     <?= $this->partial('boards/filters', compact('board', 'filter', 'boardLabels', 'audience', 'people', 'totalCards', 'shownCards')) ?>
+    <?php if ($canEdit || $canMove || $canArchive): ?>
+        <?php $selectQuery = $query ?? []; ?>
+        <a class="btn btn-ghost <?= $selecting ? 'is-active' : '' ?>" aria-pressed="<?= $selecting ? 'true' : 'false' ?>"
+           href="<?= $this->url($base . (($q = http_build_query($selecting ? $selectQuery : $selectQuery + ['select' => '1'])) !== '' ? '?' . $q : '')) ?>">
+            <?= $this->icon('checklist') ?><?= $this->te($selecting ? 'Stop selecting' : 'Select cards') ?></a>
+    <?php endif; ?>
 </div>
+
+<?php if ($selecting): ?>
+    <?= $this->partial('boards/bulk-bar', compact('board', 'lists', 'boardLabels', 'audience', 'people', 'canEdit', 'canMove', 'canArchive') + ['canDelete' => $role->allows(Permission::DeleteItems) && $canArchive]) ?>
+<?php endif; ?>
 
 <?php if (!$open): ?>
     <div class="banner">
@@ -142,7 +173,7 @@ $form = $this->form;
 <div class="board-layout">
     <main class="lists js-lists" data-board-move-base="<?= $this->url($base . '/lists') ?>">
         <?php foreach ($lists as $i => $list): $cards = $cardsByList[$list->id] ?? []; ?>
-            <section class="list" data-list-id="<?= $list->id ?>" <?= $canMove ? 'draggable="true"' : '' ?>
+            <section class="list <?= $list->color ? 'list-color tile-' . $this->e($list->color) : '' ?>" data-list-id="<?= $list->id ?>" <?= $canMove ? 'draggable="true"' : '' ?>
                      data-move-url="<?= $this->url($base . '/lists/' . $list->id . '/move') ?>">
                 <header class="list-head">
                     <h2 dir="auto"><?= $this->e($list->name) ?> <span class="count"><?= count($cards) ?></span></h2>
@@ -155,7 +186,34 @@ $form = $this->form;
                                         <?= $this->csrfField() ?>
                                         <label><span><?= $this->te('List name') ?></span>
                                             <input name="name" required maxlength="100" dir="auto" value="<?= $this->e($list->name) ?>"></label>
-                                        <button class="btn btn-ghost" type="submit"><?= $this->te('Rename') ?></button>
+                                        <fieldset class="swatches swatches-sm">
+                                            <legend><?= $this->te('List color') ?></legend>
+                                            <label class="swatch swatch-none" title="<?= $this->te('No color') ?>">
+                                                <input type="radio" name="color" value="" <?= $list->color === null ? 'checked' : '' ?>>
+                                                <span class="visually-hidden"><?= $this->te('No color') ?></span>
+                                            </label>
+                                            <?php foreach (BoardSummary::COLORS as $color): ?>
+                                                <label class="swatch tile-<?= $color ?>" title="<?= $this->te(ucfirst($color)) ?>">
+                                                    <input type="radio" name="color" value="<?= $color ?>" <?= $color === $list->color ? 'checked' : '' ?>>
+                                                    <span class="visually-hidden"><?= $this->te(ucfirst($color)) ?></span>
+                                                </label>
+                                            <?php endforeach; ?>
+                                        </fieldset>
+                                        <button class="btn btn-ghost" type="submit"><?= $this->te('Save') ?></button>
+                                    </form>
+                                <?php endif; ?>
+                                <?php if ($canEdit && $templates): ?>
+                                    <form action="<?= $this->url($base . '/cards') ?>" method="post" class="stack">
+                                        <?= $this->csrfField() ?>
+                                        <input type="hidden" name="list_id" value="<?= $list->id ?>">
+                                        <label><span><?= $this->te('New card from a template') ?></span>
+                                            <select name="template">
+                                                <?php foreach ($templates as $template): ?>
+                                                    <option value="<?= $this->e($template->publicId) ?>"><?= $this->e($template->title) ?></option>
+                                                <?php endforeach; ?>
+                                            </select></label>
+                                        <input name="title" maxlength="200" dir="auto" placeholder="<?= $this->te('Title (optional)') ?>" aria-label="<?= $this->te('Title (optional)') ?>">
+                                        <button class="btn btn-ghost" type="submit"><?= $this->icon('copy') ?><?= $this->te('Create card') ?></button>
                                     </form>
                                 <?php endif; ?>
                                 <?php if ($canMove && count($lists) > 1): ?>
@@ -186,7 +244,7 @@ $form = $this->form;
                     <?php foreach ($cards as $card): ?>
                         <?= $this->partial('partials/card-tile', [
                             'card' => $card, 'labels' => $cardLabels[$card->id] ?? [], 'canMove' => $canMove, 'canEdit' => $canEdit,
-                            'badges' => $cardBadges[$card->id] ?? [],
+                            'badges' => $cardBadges[$card->id] ?? [], 'display' => $display, 'selecting' => $selecting,
                             'members' => array_values(array_filter(array_map(static fn (int $id) => $people[$id] ?? null, $cardMembers[$card->id] ?? []))),
                         ]) ?>
                     <?php endforeach; ?>

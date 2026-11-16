@@ -82,6 +82,9 @@ final class AutomationModule implements ModuleProvider
         $router->group([Authenticate::class], function (Router $router): void {
             $router->get('/boards/{board:ulid}/automation', [AutomationController::class, 'index']);
             $router->post('/boards/{board:ulid}/automation', [AutomationController::class, 'store']);
+            $router->get('/automations/{automation:ulid}/edit', [AutomationController::class, 'edit']);
+            $router->post('/automations/{automation:ulid}', [AutomationController::class, 'update']);
+            $router->post('/automations/{automation:ulid}/duplicate', [AutomationController::class, 'duplicate']);
             $router->post('/automations/{automation:ulid}/toggle', [AutomationController::class, 'toggle']);
             $router->post('/automations/{automation:ulid}/delete', [AutomationController::class, 'destroy']);
             $router->post('/automations/{automation:ulid}/run', [AutomationController::class, 'pressBoard']);

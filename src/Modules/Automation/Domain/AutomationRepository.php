@@ -26,6 +26,9 @@ interface AutomationRepository
 
     public function setEnabled(int $id, bool $enabled): void;
 
+    /** Replaces the settings (kind, name, trigger, scope, conditions, actions, schedule) and clears the failure count. @param array<string, mixed> $fields */
+    public function update(int $id, array $fields): void;
+
     /** Records a run: resets the failure count on success, otherwise adds one and returns the new count. */
     public function recordRun(int $id, bool $ok): int;
 
