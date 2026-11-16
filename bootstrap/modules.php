@@ -15,6 +15,7 @@ return [
     App\Modules\Access\AccessModule::class,
     App\Modules\Card\CardModule::class,
     App\Modules\Label\LabelModule::class,
+    App\Modules\Field\FieldModule::class,
     App\Modules\Checklist\ChecklistModule::class,
     App\Modules\Attachment\AttachmentModule::class,
     App\Modules\Discussion\DiscussionModule::class,

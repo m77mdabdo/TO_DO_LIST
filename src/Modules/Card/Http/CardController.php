@@ -36,6 +36,7 @@ final class CardController extends Controller
         private ActivityFeed $activity,
         private UserDirectory $users,
         private BulkCardActions $bulk,
+        private \App\Modules\Attachment\Contract\AttachmentFiles $files,
     ) {
         parent::__construct($view, $url, $session);
     }
@@ -125,6 +126,12 @@ final class CardController extends Controller
             'query'       => ['comments_before' => $request->input('comments_before')],
             'assigned'    => $assigned,
             'copyTargets' => $this->copyTargets($user->id, $board),
+            'coverImages' => array_values(array_filter($this->files->forCard($card->id), static fn ($a) => $a->isImage())),
+            'linkBoards'  => array_values(array_filter(
+                $this->boards->allInWorkspace($board->workspaceId),
+                fn ($b) => $b->id !== $board->id && !$b->archived && $this->gate->can($user->id, $b->id, Permission::ViewBoard),
+            )),
+            'linkedBoard' => $card->linkBoardId !== null && $this->gate->can($user->id, $card->linkBoardId, Permission::ViewBoard) ? $this->boards->find($card->linkBoardId) : null,
         ]);
     }
 
@@ -155,6 +162,25 @@ final class CardController extends Controller
      *
      * @param array{card: string} $params
      */
+    /**
+     * Body: cover, cover_size, sticker, kind, link_board.
+     *
+     * @param array{card: string} $params
+     */
+    public function looks(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        [$card] = $this->cards->cardFor($user->id, $params['card'], Permission::EditCards);
+
+        try {
+            $this->cards->setLooks($user->id, $card, $request->only(['cover', 'cover_size', 'sticker', 'kind', 'link_board']));
+        } catch (ValidationException $e) {
+            return $this->backWithErrors($e, $request, '/cards/' . $card->publicId . '#looks');
+        }
+
+        return $this->redirect('/cards/' . $card->publicId . '#looks', 'Card look saved.');
+    }
+
     public function template(Request $request, array $params): Response
     {
         $user = $this->user($request);

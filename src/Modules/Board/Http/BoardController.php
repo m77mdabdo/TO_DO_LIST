@@ -49,6 +49,7 @@ final class BoardController extends Controller
         private BoardExport $exporter,
         private BoardPreferences $preferences,
         private BoardVersions $versions,
+        private \App\Shared\Export\ExportColumns $columns,
     ) {
         parent::__construct($view, $url, $session);
     }
@@ -110,9 +111,13 @@ final class BoardController extends Controller
         $lists = $this->boards->listsOf($board);
         $cardsByList = $this->cards->openCardsByList($board->id);
         $cardIds = [];
+        $linkIds = [];
         foreach ($cardsByList as $cards) {
             foreach ($cards as $card) {
                 $cardIds[] = $card->id;
+                if ($card->kind === 'board' && $card->linkBoardId !== null) {
+                    $linkIds[] = $card->linkBoardId;
+                }
             }
         }
         $activity = $role->allows(Permission::ViewActivity) ? $this->activity->forBoard($board->id, null, 15) : [];
@@ -125,7 +130,7 @@ final class BoardController extends Controller
 
         return $this->render('boards/show', [
             'title'       => $board->name,
-            'bodyClass'   => 'page-board board-' . $board->color,
+            'bodyClass'   => 'page-board board-' . $board->color . ' board-bg-' . $board->background,
             'board'       => $board,
             'role'        => $role,
             'lists'       => $lists,
@@ -144,6 +149,7 @@ final class BoardController extends Controller
             'version'     => $this->versions->current($board->id)['version'],
             'selecting'   => $request->input('select') === '1' && !$board->archived,
             'templates'   => array_values(array_filter(array_merge([], ...array_values($cardsByList)), static fn ($card) => $card->isTemplate)),
+            'linkedBoards' => $this->boards->openable($user->id, $linkIds),
         ]);
     }
 
@@ -260,7 +266,7 @@ final class BoardController extends Controller
         $board = $this->boards->boardFor($user->id, $params['board'], Permission::ManageSettings);
 
         try {
-            $this->boards->updateBoard($user->id, $board, $request->only(['name', 'description', 'color', 'visibility', 'commenting', 'voting']));
+            $this->boards->updateBoard($user->id, $board, $request->only(['name', 'description', 'color', 'visibility', 'commenting', 'voting', 'background']));
         } catch (ValidationException $e) {
             return $this->backWithErrors($e, $request, '/boards/' . $board->publicId);
         }
@@ -306,12 +312,13 @@ final class BoardController extends Controller
     {
         $board = $this->boards->boardFor($this->user($request)->id, $params['board'], Permission::Export);
         $cardsByList = $this->cards->openCardsByList($board->id);
-        $labels = $this->labels->forCards(array_merge([], ...array_map(
+        $cardIds = array_merge([], ...array_map(
             static fn (array $cards) => array_map(static fn ($c) => $c->id, $cards),
             array_values($cardsByList),
-        )));
+        ));
+        $labels = $this->labels->forCards($cardIds);
 
-        $csv = BoardCsv::make($this->boards->listsOf($board), $cardsByList, $labels);
+        $csv = BoardCsv::make($this->boards->listsOf($board), $cardsByList, $labels, $this->columns->forBoard($board->id, $cardIds));
         $filename = 'board-' . preg_replace('/[^A-Za-z0-9]+/', '-', $board->publicId) . '.csv';
 
         return (new Response($csv))

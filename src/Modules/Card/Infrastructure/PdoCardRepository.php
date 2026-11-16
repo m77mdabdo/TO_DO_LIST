@@ -13,10 +13,10 @@ use PDO;
 
 final class PdoCardRepository implements CardRepository
 {
-    private const COLUMNS = 'id, public_id, board_id, list_id, title, description, position, start_at, due_at, completed_at, archived_at, created_at, is_template';
+    private const COLUMNS = 'id, public_id, board_id, list_id, title, description, position, start_at, due_at, completed_at, archived_at, created_at, is_template, cover_color, cover_attachment_id, cover_size, sticker, kind, link_board_id';
 
     /** Columns update() may write: an allow-list, never names from the request. */
-    private const UPDATABLE = ['title', 'description', 'start_at', 'due_at', 'completed_at', 'list_id', 'position', 'is_template'];
+    private const UPDATABLE = ['title', 'description', 'start_at', 'due_at', 'completed_at', 'list_id', 'position', 'is_template', 'cover_color', 'cover_attachment_id', 'cover_size', 'sticker', 'kind', 'link_board_id'];
 
     private OrderedRows $order;
 

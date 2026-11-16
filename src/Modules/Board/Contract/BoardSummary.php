@@ -8,6 +8,9 @@ final class BoardSummary
 {
     public const COLORS = ['violet', 'sky', 'mint', 'amber', 'coral', 'slate'];
 
+    /** How the board color fills the page when there is no picture. */
+    public const BACKGROUNDS = ['tint' => 'Light tint', 'solid' => 'Solid color', 'gradient' => 'Gradient'];
+
     public function __construct(
         public readonly int $id,
         public readonly string $publicId,
@@ -20,6 +23,7 @@ final class BoardSummary
         public readonly Participation $commenting = Participation::Everyone,
         public readonly Participation $voting = Participation::Members,
         public readonly bool $isTemplate = false,
+        public readonly string $background = 'tint',
     ) {
     }
 
@@ -38,6 +42,7 @@ final class BoardSummary
             Participation::tryFrom((string) ($row['commenting'] ?? '')) ?? Participation::Everyone,
             Participation::tryFrom((string) ($row['voting'] ?? '')) ?? Participation::Members,
             (bool) ($row['is_template'] ?? false),
+            isset(self::BACKGROUNDS[(string) ($row['background'] ?? '')]) ? (string) $row['background'] : 'tint',
         );
     }
 }

@@ -15,8 +15,12 @@
  * @var bool $desc
  * @var array<string, string> $query
  * @var \DateTimeImmutable $today
+ * @var list<\App\Modules\Field\Contract\CustomField> $fieldColumns added by the Field module
+ * @var array<int, array<int, string>> $fieldValues card id => field id => stored value
  */
 $progress ??= [];
+$fieldColumns ??= [];
+$fieldValues ??= [];
 $base = '/boards/' . $board->publicId . '/table';
 $columns = ['title' => 'Card', 'list' => 'List', 'start' => 'Start', 'due' => 'Due', 'status' => 'Status'];
 $link = function (string $column) use ($base, $query, $sort, $desc): string {
@@ -49,6 +53,9 @@ $link = function (string $column) use ($base, $query, $sort, $desc): string {
                         <th scope="col"><?= $this->te('Labels') ?></th>
                         <th scope="col"><?= $this->te('People') ?></th>
                         <th scope="col"><?= $this->te('Checklist') ?></th>
+                        <?php foreach ($fieldColumns as $field): ?>
+                            <th scope="col" dir="auto"><?= $this->e($field->name) ?></th>
+                        <?php endforeach; ?>
                     </tr>
                 </thead>
                 <tbody>
@@ -71,6 +78,9 @@ $link = function (string $column) use ($base, $query, $sort, $desc): string {
                                 <?php endforeach; ?>
                             </td>
                             <td class="nowrap"><?php if (isset($progress[$card->id])): ?><?= $progress[$card->id]['done'] ?>/<?= $progress[$card->id]['total'] ?><?php endif; ?></td>
+                            <?php foreach ($fieldColumns as $field): ?>
+                                <td dir="auto" class="<?= $field->type === 'number' || $field->type === 'date' ? 'nowrap' : '' ?>"><?= $this->e($field->display($fieldValues[$card->id][$field->id] ?? null)) ?></td>
+                            <?php endforeach; ?>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>

@@ -23,6 +23,7 @@ $places = [
     'comment'     => 'In a comment',
     'checklist'   => 'In a checklist',
     'attachment'  => 'In an attachment',
+    'field'       => 'In a custom field',
 ];
 $q = $query->query();
 $value = static fn (string $key): string => $q[$key] ?? '';

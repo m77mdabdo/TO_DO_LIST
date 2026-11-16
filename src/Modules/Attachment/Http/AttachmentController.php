@@ -12,6 +12,9 @@ use App\Modules\Access\Contract\AccessDenied;
 use App\Modules\Access\Contract\AccessGate;
 use App\Modules\Access\Contract\Permission;
 use App\Modules\Attachment\Application\AttachmentService;
+use App\Modules\Attachment\Application\BoardBackgrounds;
+use App\Modules\Board\Contract\BoardDirectory;
+use App\Modules\Board\Contract\BoardSummary;
 use App\Modules\Card\Contract\CardQueries;
 use App\Modules\Card\Contract\CardSummary;
 use App\Session\Session;
@@ -27,6 +30,8 @@ final class AttachmentController extends Controller
         private AttachmentService $attachments,
         private CardQueries $cards,
         private AccessGate $gate,
+        private BoardBackgrounds $backgrounds,
+        private BoardDirectory $boards,
     ) {
         parent::__construct($view, $url, $session);
     }
@@ -89,6 +94,54 @@ final class AttachmentController extends Controller
         $card = $this->attachments->remove($this->user($request)->id, $params['attachment']);
 
         return $this->redirect($this->cardPath($card) . '#attachments', 'Attachment removed.');
+    }
+
+    /** The board's picture, for anyone who may see the board. @param array{board: string} $params */
+    public function background(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        $file = $this->backgrounds->file($user->id, $this->board($user->id, $params['board']));
+
+        return (new Response((string) file_get_contents($file['path'])))
+            ->withHeader('Content-Type', $file['mime'])
+            ->withHeader('Content-Length', (string) filesize($file['path']))
+            ->withHeader('Content-Disposition', 'inline; filename="background"')
+            ->withHeader('Content-Security-Policy', "default-src 'none'; sandbox")
+            ->withHeader('Cache-Control', 'private, max-age=300')
+            ->withHeader('Cross-Origin-Resource-Policy', 'same-origin');
+    }
+
+    /** Multipart field: background_picture. @param array{board: string} $params */
+    public function uploadBackground(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        $board = $this->board($user->id, $params['board']);
+
+        try {
+            $this->backgrounds->upload($user->id, $board, $request->file('background_picture'));
+        } catch (ValidationException $e) {
+            return $this->backWithErrors($e, $request, '/boards/' . $board->publicId . '#board-settings');
+        }
+
+        return $this->redirect('/boards/' . $board->publicId, 'Background picture saved.');
+    }
+
+    /** @param array{board: string} $params */
+    public function removeBackground(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        $board = $this->board($user->id, $params['board']);
+        $this->backgrounds->remove($user->id, $board);
+
+        return $this->redirect('/boards/' . $board->publicId, 'Background picture removed.');
+    }
+
+    private function board(int $userId, string $publicId): BoardSummary
+    {
+        $board = $this->boards->findByPublicId($publicId) ?? throw AccessDenied::hidden();
+        $this->gate->authorize($userId, $board->id, Permission::ViewBoard);
+
+        return $board;
     }
 
     private function card(int $userId, string $publicId): CardSummary
