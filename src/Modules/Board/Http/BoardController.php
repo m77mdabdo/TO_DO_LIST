@@ -50,6 +50,7 @@ final class BoardController extends Controller
         private BoardPreferences $preferences,
         private BoardVersions $versions,
         private \App\Shared\Export\ExportColumns $columns,
+        private \App\Modules\Board\Application\BoardGroups $groups,
     ) {
         parent::__construct($view, $url, $session);
     }
@@ -60,16 +61,87 @@ final class BoardController extends Controller
         $user = $this->user($request);
         $workspace = $this->workspaces->current($user->id) ?? throw HttpException::notFound();
 
+        $boards = $this->boards->boardsInWorkspace($user->id, $workspace->id);
+
         return $this->render('boards/index', [
             'title'     => 'Boards',
             'workspace' => $workspace,
-            'boards'    => $this->boards->boardsInWorkspace($user->id, $workspace->id),
+            'boards'    => $boards,
+            'groups'    => $this->groups->inWorkspace($workspace->id),
+            'boardGroup' => $this->groups->groupOfBoards(array_map(static fn ($b) => $b->id, $boards)),
+            'canManageGroups' => $this->groups->canManage($user->id, $workspace->id),
             'archived'  => $this->boards->boardsInWorkspace($user->id, $workspace->id, archived: true),
             'greeting'  => $this->greeting->forNow(),
             'templates' => $this->boards->templatesIn($user->id, $workspace->id),
             'builtIns'  => array_map(static fn (array $t) => ['name' => $t['name'], 'description' => $t['description'], 'lists' => $t['lists']], BuiltInTemplates::all()),
             'user'      => $user,
         ]);
+    }
+
+    /** Body: name. A group in the current workspace. */
+    public function groupStore(Request $request): Response
+    {
+        $user = $this->user($request);
+        $workspace = $this->workspaces->current($user->id) ?? throw HttpException::notFound();
+
+        try {
+            $this->groups->create($user->id, $workspace->id, $request->input('name'));
+        } catch (ValidationException $e) {
+            return $this->backWithErrors($e, $request, '/#board-groups');
+        }
+
+        return $this->redirect('/#board-groups', 'Group added.');
+    }
+
+    /** Body: name. @param array{id: string} $params */
+    public function groupUpdate(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        $workspace = $this->workspaces->current($user->id) ?? throw HttpException::notFound();
+
+        try {
+            $this->groups->rename($user->id, $workspace->id, (int) $params['id'], $request->input('name'));
+        } catch (ValidationException $e) {
+            return $this->backWithErrors($e, $request, '/#board-groups');
+        }
+
+        return $this->redirect('/#group-' . (int) $params['id'], 'Group saved.');
+    }
+
+    /** Body: up (1 = earlier). @param array{id: string} $params */
+    public function groupMove(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        $workspace = $this->workspaces->current($user->id) ?? throw HttpException::notFound();
+        $this->groups->move($user->id, $workspace->id, (int) $params['id'], $request->input('up') === '1');
+
+        return $this->redirect('/#group-' . (int) $params['id']);
+    }
+
+    /** @param array{id: string} $params */
+    public function groupDelete(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        $workspace = $this->workspaces->current($user->id) ?? throw HttpException::notFound();
+        $this->groups->delete($user->id, $workspace->id, (int) $params['id']);
+
+        return $this->redirect('/', 'Group deleted. Its boards are still here.');
+    }
+
+    /** Body: group (a group id, or "" for none). @param array{board: string} $params */
+    public function place(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        $board = $this->boards->boardFor($user->id, $params['board']);
+        $group = $request->input('group');
+
+        try {
+            $this->groups->place($user->id, $board, ctype_digit($group) ? (int) $group : null);
+        } catch (ValidationException $e) {
+            return $this->backWithErrors($e, $request, '/boards/' . $board->publicId);
+        }
+
+        return $this->redirect('/boards/' . $board->publicId, 'Board group saved.');
     }
 
     public function store(Request $request): Response
@@ -150,6 +222,9 @@ final class BoardController extends Controller
             'selecting'   => $request->input('select') === '1' && !$board->archived,
             'templates'   => array_values(array_filter(array_merge([], ...array_values($cardsByList)), static fn ($card) => $card->isTemplate)),
             'linkedBoards' => $this->boards->openable($user->id, $linkIds),
+            'collapsed'   => $this->preferences->collapsedLists($user->id, $board->id),
+            'groups'      => $this->groups->inWorkspace($board->workspaceId),
+            'boardGroupId' => $this->groups->groupOfBoards([$board->id])[$board->id] ?? null,
         ]);
     }
 

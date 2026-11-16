@@ -17,6 +17,8 @@ final class ChecklistItem
         public readonly ?string $doneAt,
         public readonly ?int $assigneeId,
         public readonly ?string $dueAt,
+        /** The card this item was turned into, if any. */
+        public readonly ?int $cardLinkId = null,
     ) {
     }
 
@@ -32,6 +34,7 @@ final class ChecklistItem
             $row['done_at'] !== null ? (string) $row['done_at'] : null,
             $row['assignee_id'] !== null ? (int) $row['assignee_id'] : null,
             $row['due_at'] !== null ? (string) $row['due_at'] : null,
+            isset($row['card_link_id']) ? (int) $row['card_link_id'] : null,
         );
     }
 

@@ -56,6 +56,25 @@ final class OrderedRows
         return FractionalIndex::between($last === false ? null : (string) $last, null);
     }
 
+    /**
+     * Puts $ids first, in that order, then the scope's other rows as they
+     * were, with fresh evenly spaced keys: O(n).
+     *
+     * @param list<int> $ids
+     */
+    public function arrange(int $scope, array $ids): void
+    {
+        $stmt = $this->db->prepare("SELECT id FROM {$this->table} WHERE {$this->scopeColumn} = ? ORDER BY position, id");
+        $stmt->execute([$scope]);
+        $all = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        $ordered = [...array_values(array_intersect($ids, $all)), ...array_values(array_diff($all, $ids))];
+
+        $update = $this->db->prepare("UPDATE {$this->table} SET position = ? WHERE id = ?");
+        foreach (FractionalIndex::spread(count($ordered)) as $i => $key) {
+            $update->execute([$key, $ordered[$i]]);
+        }
+    }
+
     /** Renumbers the whole scope with short, evenly spaced keys: O(n). */
     public function rebalance(int $scope): void
     {

@@ -46,6 +46,7 @@ $templates = [
     'checklist.item_completed' => ':actor completed :subject on :card',
     'checklist.item_reopened'  => ':actor reopened :subject on :card',
     'checklist.item_assigned'  => ':actor gave :subject on :card to :member',
+    'checklist.item_converted' => ':actor turned :subject on :card into a card',
     'attachment.added'   => ':actor attached :subject to :card',
     'attachment.removed' => ':actor removed the attachment :subject from :card',
     'comment.posted'    => ':actor commented on :subject',
@@ -63,6 +64,8 @@ $templates = [
     'card.cover_changed' => ':actor changed the cover of :subject',
     'card.sticker_changed' => ':actor changed the sticker on :subject',
     'card.kind_changed' => ':actor changed what kind of card :subject is',
+    'card.recurred' => ':actor completed :subject, the next due date is :to',
+    'card.recurrence_changed' => ':actor changed how :subject repeats',
     'board.background'  => ':actor changed the board background',
 ];
 // Translate the sentence first, then drop the names in as isolated, bold

@@ -21,7 +21,6 @@ use App\Modules\Card\Contract\Events\CardMemberChanged;
 use App\Modules\Card\Contract\Events\CardMoved;
 use App\Modules\Card\Domain\CardRepository;
 use App\Shared\Events\EventBus;
-use App\Shared\Ordering\FractionalIndex;
 use App\Support\Clock;
 use App\Validation\ValidationException;
 use App\Validation\ValidationResult;
@@ -147,6 +146,90 @@ final class CardService implements CardWriter
         });
     }
 
+    public const SORTS = ['due' => 'Due date', 'created' => 'Date created', 'name' => 'Name'];
+
+    /**
+     * Sorts the open cards of a list once, by due date (cards without one
+     * last), date created or name, either way. It is a one-time reorder:
+     * cards added later go to the end as usual.
+     */
+    public function sortList(int $actorId, int $boardId, int $listId, string $by = 'due', bool $desc = false): void
+    {
+        $by = $by === 'title' ? 'name' : $by;
+        $this->gate->authorize($actorId, $boardId, Permission::MoveCards);
+        $this->assertOpenList($boardId, $listId);
+        if (!isset(self::SORTS[$by])) {
+            throw new ValidationException(new ValidationResult(['sort' => 'Choose how to sort the cards.']));
+        }
+
+        $cards = $this->cards->openCardsByList($boardId)[$listId] ?? [];
+        $key = static fn (CardSummary $c): string => match ($by) {
+            'due'     => (string) $c->dueAt,
+            'created' => (string) $c->createdAt,
+            default   => mb_strtolower($c->title),
+        };
+        usort($cards, static function (CardSummary $a, CardSummary $b) use ($key, $desc, $by): int {
+            // Cards without a due date stay at the end whichever way.
+            if ($by === 'due' && ($a->dueAt === null) !== ($b->dueAt === null)) {
+                return $a->dueAt === null ? 1 : -1;
+            }
+            $cmp = strcmp($key($a), $key($b)) ?: $a->id <=> $b->id;
+
+            return $desc ? -$cmp : $cmp;
+        });
+
+        $this->transactions->run(function () use ($listId, $cards, $actorId, $boardId): void {
+            $this->cards->arrange($listId, array_map(static fn (CardSummary $c) => $c->id, $cards));
+            if ($cards !== []) {
+                $this->events->publish(new CardMoved($cards[0]->id, $boardId, $actorId, $cards[0]->title, $listId, $listId, $this->clock->now()));
+            }
+        });
+    }
+
+    /**
+     * The card's repeating due date and its reminder.
+     *
+     * @param array<string, string> $input recurrence ("" or a RECURRENCES key), remind ("" or a REMINDERS key), remind_hour (0-23)
+     */
+    public function setSchedule(int $actorId, CardSummary $card, array $input): CardSummary
+    {
+        $this->gate->authorize($actorId, $card->boardId, Permission::EditCards);
+        $this->assertBoardOpen($card->boardId);
+        if ($card->archived) {
+            throw AccessDenied::forbidden();
+        }
+
+        $recurrence = (string) ($input['recurrence'] ?? '');
+        if ($recurrence !== '' && !isset(CardSummary::RECURRENCES[$recurrence])) {
+            throw new ValidationException(new ValidationResult(['recurrence' => 'Choose how the due date repeats.']));
+        }
+        if ($recurrence !== '' && $card->dueAt === null) {
+            throw new ValidationException(new ValidationResult(['recurrence' => 'Give the card a due date first, then choose how it repeats.']));
+        }
+        $remind = (string) ($input['remind'] ?? '');
+        if (!array_key_exists($remind, CardSummary::REMINDERS)) {
+            throw new ValidationException(new ValidationResult(['remind' => 'Choose when to be reminded.']));
+        }
+        $hour = (string) ($input['remind_hour'] ?? '9');
+        if (!ctype_digit($hour) || (int) $hour > 23) {
+            throw new ValidationException(new ValidationResult(['remind_hour' => 'Choose an hour of the day.']));
+        }
+
+        $fields = ['recurrence' => $recurrence !== '' ? $recurrence : null, 'remind' => $remind !== '' ? $remind : null, 'remind_hour' => (int) $hour];
+        if ($fields['recurrence'] === $card->recurrence && $fields['remind'] === $card->remind && $fields['remind_hour'] === $card->remindHour) {
+            return $card;
+        }
+
+        $this->transactions->run(function () use ($actorId, $card, $fields): void {
+            $this->cards->update($card->id, $fields);
+            if ($fields['recurrence'] !== $card->recurrence) {
+                $this->events->publish(new CardChanged($card->id, $card->boardId, $actorId, 'recurrence_changed', $card->title, [], $this->clock->now()));
+            }
+        });
+
+        return $this->cards->find($card->id) ?? $card;
+    }
+
     /**
      * Changes how the card looks: its cover (none, a color, or one of the
      * card's own images, shown at the top or filling the tile), its sticker,
@@ -269,6 +352,16 @@ final class CardService implements CardWriter
      * Assigns $memberId to the card, or takes them off if already on it.
      * Only people who can see the board can be assigned.
      */
+    public function assign(int $actorId, CardSummary $card, int $memberId): bool
+    {
+        if (!$this->gate->can($memberId, $card->boardId, Permission::ViewBoard)
+            || in_array($memberId, $this->cards->membersForCards([$card->id])[$card->id] ?? [], true)) {
+            return false;
+        }
+
+        return $this->toggleMember($actorId, $card, $memberId);
+    }
+
     public function toggleMember(int $actorId, CardSummary $card, int $memberId): bool
     {
         $this->gate->authorize($actorId, $card->boardId, Permission::EditCards);
@@ -296,6 +389,21 @@ final class CardService implements CardWriter
         $this->assertBoardOpen($card->boardId);
 
         if ($complete === $card->isComplete()) {
+            return;
+        }
+
+        // A repeating card is not closed: its dates move to the next time and it stays open.
+        if ($complete && $card->recurrence !== null && $card->dueAt !== null) {
+            $today = $this->clock->now()->format('Y-m-d');
+            $next = CardSummary::nextOccurrence((string) $card->dueDate(), $card->recurrence, $today);
+            $shift = (int) (new \DateTimeImmutable((string) $card->dueDate()))->diff(new \DateTimeImmutable($next))->format('%a');
+            $start = $card->startAt !== null ? (new \DateTimeImmutable((string) $card->startDate()))->modify('+' . $shift . ' days')->format('Y-m-d') . ' 00:00:00' : null;
+
+            $this->transactions->run(function () use ($actorId, $card, $next, $start): void {
+                $this->cards->update($card->id, ['due_at' => $next . ' 00:00:00', 'start_at' => $start, 'completed_at' => null]);
+                $this->events->publish(new CardChanged($card->id, $card->boardId, $actorId, 'recurred', $card->title, ['to' => $next], $this->clock->now()));
+            });
+
             return;
         }
 
@@ -349,29 +457,6 @@ final class CardService implements CardWriter
             'description' => (string) $card->description,
             'due_date'    => (string) $date,
         ] + ($date !== null && $card->startDate() !== null && $card->startDate() > $date ? ['start_date' => $date] : []));
-    }
-
-    /**
-     * Reorders a list's open cards by due date (undated last) or by title,
-     * writing fresh, evenly spread positions in one pass.
-     */
-    public function sortList(int $actorId, int $boardId, int $listId, string $by = 'due'): void
-    {
-        $this->gate->authorize($actorId, $boardId, Permission::MoveCards);
-        $this->assertOpenList($boardId, $listId);
-        $cards = $this->cards->openCardsByList($boardId)[$listId] ?? [];
-
-        usort($cards, static fn (CardSummary $a, CardSummary $b): int => $by === 'title'
-            ? strcmp(mb_strtolower($a->title), mb_strtolower($b->title))
-            : (([$a->dueAt === null, (string) $a->dueAt] <=> [$b->dueAt === null, (string) $b->dueAt]) ?: strcmp($a->position, $b->position)));
-
-        $this->transactions->run(function () use ($cards): void {
-            foreach (array_map(null, $cards, FractionalIndex::spread(count($cards))) as [$card, $position]) {
-                if ($card->position !== $position) {
-                    $this->cards->update($card->id, ['position' => $position]);
-                }
-            }
-        });
     }
 
     public function archive(int $actorId, CardSummary $card, bool $archive = true): void

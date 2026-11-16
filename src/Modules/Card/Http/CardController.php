@@ -37,6 +37,7 @@ final class CardController extends Controller
         private UserDirectory $users,
         private BulkCardActions $bulk,
         private \App\Modules\Attachment\Contract\AttachmentFiles $files,
+        private \App\Modules\Card\Application\RecurringCards $repeats,
     ) {
         parent::__construct($view, $url, $session);
     }
@@ -126,6 +127,7 @@ final class CardController extends Controller
             'query'       => ['comments_before' => $request->input('comments_before')],
             'assigned'    => $assigned,
             'copyTargets' => $this->copyTargets($user->id, $board),
+            'repeat'      => $this->repeats->forCard($card->id),
             'coverImages' => array_values(array_filter($this->files->forCard($card->id), static fn ($a) => $a->isImage())),
             'linkBoards'  => array_values(array_filter(
                 $this->boards->allInWorkspace($board->workspaceId),
@@ -179,6 +181,71 @@ final class CardController extends Controller
         }
 
         return $this->redirect('/cards/' . $card->publicId . '#looks', 'Card look saved.');
+    }
+
+    /**
+     * Body: recurrence, remind, remind_hour.
+     *
+     * @param array{card: string} $params
+     */
+    public function schedule(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        [$card] = $this->cards->cardFor($user->id, $params['card'], Permission::EditCards);
+
+        try {
+            $this->cards->setSchedule($user->id, $card, $request->only(['recurrence', 'remind', 'remind_hour']));
+        } catch (ValidationException $e) {
+            return $this->backWithErrors($e, $request, '/cards/' . $card->publicId . '#schedule');
+        }
+
+        return $this->redirect('/cards/' . $card->publicId . '#schedule', 'Repeat and reminder saved.');
+    }
+
+    /**
+     * Body: frequency ("" to stop), weekdays[], month_day, hour, list_id.
+     *
+     * @param array{card: string} $params
+     */
+    public function repeat(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        [$card] = $this->cards->cardFor($user->id, $params['card'], Permission::EditCards);
+        $body = $request->body();
+
+        try {
+            $this->repeats->set($user->id, $card, [
+                'frequency' => $request->input('frequency'),
+                'weekdays'  => is_array($body['weekdays'] ?? null) ? $body['weekdays'] : [],
+                'month_day' => $request->input('month_day', '1'),
+                'hour'      => $request->input('hour', '6'),
+                'list_id'   => $request->input('list_id'),
+            ]);
+        } catch (ValidationException $e) {
+            return $this->backWithErrors($e, $request, '/cards/' . $card->publicId . '#schedule');
+        }
+
+        return $this->redirect('/cards/' . $card->publicId . '#schedule', $request->input('frequency') === '' ? 'The card is no longer copied.' : 'Copies are scheduled.');
+    }
+
+    /**
+     * Body: by (due, created, name), dir (asc, desc).
+     *
+     * @param array{board: string, id: string} $params
+     */
+    public function sortList(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        $board = $this->boards->findByPublicId($params['board']) ?? throw AccessDenied::hidden();
+        $this->gate->authorize($user->id, $board->id, Permission::ViewBoard);
+
+        try {
+            $this->cards->sortList($user->id, $board->id, ctype_digit((string) $params['id']) ? (int) $params['id'] : 0, $request->input('by'), $request->input('dir') === 'desc');
+        } catch (ValidationException $e) {
+            return $this->backWithErrors($e, $request, '/boards/' . $board->publicId);
+        }
+
+        return $this->redirect('/boards/' . $board->publicId, 'List sorted.');
     }
 
     public function template(Request $request, array $params): Response

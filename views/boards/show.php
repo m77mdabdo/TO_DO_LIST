@@ -18,6 +18,9 @@
  * @var string|null $boardPicture path of the board's picture, added by the attachment module
  * @var array<int, list<array{field: \App\Modules\Field\Contract\CustomField, text: string}>> $cardFields card id => custom fields shown on the tile
  * @var array<int, \App\Modules\Board\Contract\BoardSummary> $linkedBoards boards that board-link cards point at, only openable ones
+ * @var list<int> $collapsed lists this person folded away
+ * @var list<array{id: int, name: string}> $groups board groups of the workspace
+ * @var int|null $boardGroupId
  */
 use App\Modules\Access\Contract\Permission;
 use App\Modules\Board\Contract\BoardSummary;
@@ -29,6 +32,9 @@ $cardCovers ??= [];
 $cardFields ??= [];
 $linkedBoards ??= [];
 $boardPicture ??= null;
+$collapsed ??= [];
+$groups ??= [];
+$boardGroupId ??= null;
 $canEdit = $open && $role->allows(Permission::EditCards);
 $canMove = $open && $role->allows(Permission::MoveCards);
 $canArchive = $open && $role->allows(Permission::ArchiveItems);
@@ -128,6 +134,20 @@ $selecting = ($selecting ?? false) && ($canEdit || $canMove || $canArchive);
                             <?= $this->partial('partials/field-error', ['field' => 'background']) ?>
                             <button class="btn btn-primary" type="submit"><?= $this->te('Save') ?></button>
                         </form>
+                        <?php if ($groups): ?>
+                            <hr>
+                            <form action="<?= $this->url($base . '/group') ?>" method="post" class="stack-sm">
+                                <?= $this->csrfField() ?>
+                                <label><span><?= $this->te('Board group') ?></span>
+                                    <select name="group">
+                                        <option value=""><?= $this->te('No group') ?></option>
+                                        <?php foreach ($groups as $group): ?>
+                                            <option value="<?= $group['id'] ?>" <?= $boardGroupId === $group['id'] ? 'selected' : '' ?>><?= $this->e($group['name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select></label>
+                                <div><button class="btn btn-ghost" type="submit"><?= $this->te('Save') ?></button></div>
+                            </form>
+                        <?php endif; ?>
                         <hr>
                         <form action="<?= $this->url($base . '/background') ?>" method="post" enctype="multipart/form-data" class="stack-sm">
                             <?= $this->csrfField() ?>
@@ -217,11 +237,19 @@ $selecting = ($selecting ?? false) && ($canEdit || $canMove || $canArchive);
     <main class="lists js-lists" data-board-move-base="<?= $this->url($base . '/lists') ?>"
           data-version="<?= (int) ($version ?? 0) ?>" data-changes-url="<?= $this->url($base . '/changes') ?>"
           data-updated-by="<?= $this->te(':name changed the board') ?>" data-updated="<?= $this->te('The board was updated') ?>">
-        <?php foreach ($lists as $i => $list): $cards = $cardsByList[$list->id] ?? []; ?>
-            <section class="list <?= $list->color ? 'list-color tile-' . $this->e($list->color) : '' ?>" data-list-id="<?= $list->id ?>" <?= $canMove ? 'draggable="true"' : '' ?>
+        <?php foreach ($lists as $i => $list): $cards = $cardsByList[$list->id] ?? []; $isCollapsed = in_array($list->id, $collapsed, true); ?>
+            <section class="list <?= $list->color ? 'list-color tile-' . $this->e($list->color) : '' ?> <?= $isCollapsed ? 'is-collapsed' : '' ?>" id="list-<?= $list->id ?>" data-list-id="<?= $list->id ?>" <?= $canMove ? 'draggable="true"' : '' ?>
                      data-move-url="<?= $this->url($base . '/lists/' . $list->id . '/move') ?>">
                 <header class="list-head">
                     <h2 dir="auto"><?= $this->e($list->name) ?> <span class="count"><?= count($cards) ?></span></h2>
+                    <form action="<?= $this->url($base . '/lists/' . $list->id . '/collapse') ?>" method="post" class="list-collapse">
+                        <?= $this->csrfField() ?>
+                        <input type="hidden" name="collapsed" value="<?= $isCollapsed ? '0' : '1' ?>">
+                        <button class="icon-btn" type="submit" aria-expanded="<?= $isCollapsed ? 'false' : 'true' ?>"
+                                title="<?= $isCollapsed ? $this->te('Expand list') : $this->te('Collapse list') ?>"
+                                aria-label="<?= $isCollapsed ? $this->te('Expand list') : $this->te('Collapse list') ?>"><?= $this->icon($isCollapsed ? 'chevron' : 'up') ?></button>
+                    </form>
+                    <?php if (!$isCollapsed): ?>
                     <?php if ($canEdit || $canArchive || $canMove): ?>
                         <details class="menu menu-end">
                             <summary class="icon-btn" title="<?= $this->te('List actions') ?>"><?= $this->icon('more') ?></summary>
@@ -274,6 +302,26 @@ $selecting = ($selecting ?? false) && ($canEdit || $canMove || $canArchive);
                                         <button class="btn btn-ghost" type="submit"><?= $this->te('Move') ?></button>
                                     </form>
                                 <?php endif; ?>
+                                <?php if ($canMove && count($cards) > 1): ?>
+                                    <form action="<?= $this->url($base . '/lists/' . $list->id . '/sort') ?>" method="post" class="stack">
+                                        <?= $this->csrfField() ?>
+                                        <div class="field-row">
+                                            <label><span><?= $this->te('Sort cards by') ?></span>
+                                                <select name="by">
+                                                    <?php foreach (['due' => 'Due date', 'created' => 'Date created', 'name' => 'Name'] as $value => $text): ?>
+                                                        <option value="<?= $value ?>"><?= $this->te($text) ?></option>
+                                                    <?php endforeach; ?>
+                                                </select></label>
+                                            <label><span><?= $this->te('Order') ?></span>
+                                                <select name="dir">
+                                                    <option value="asc"><?= $this->te('Ascending (earliest, A to Z)') ?></option>
+                                                    <option value="desc"><?= $this->te('Descending (latest, Z to A)') ?></option>
+                                                </select></label>
+                                        </div>
+                                        <small class="muted"><?= $this->te('Sorts once, for everyone. Cards without a due date go last.') ?></small>
+                                        <button class="btn btn-ghost" type="submit"><?= $this->te('Sort') ?></button>
+                                    </form>
+                                <?php endif; ?>
                                 <?php if ($canArchive): ?>
                                     <form action="<?= $this->url($base . '/lists/' . $list->id . '/archive') ?>" method="post">
                                         <?= $this->csrfField() ?>
@@ -283,8 +331,9 @@ $selecting = ($selecting ?? false) && ($canEdit || $canMove || $canArchive);
                             </div>
                         </details>
                     <?php endif; ?>
+                    <?php endif; ?>
                 </header>
-
+                <?php if (!$isCollapsed): ?>
                 <div class="list-cards js-cards" data-list-id="<?= $list->id ?>">
                     <?php foreach ($cards as $card): ?>
                         <?= $this->partial('partials/card-tile', [
@@ -304,6 +353,7 @@ $selecting = ($selecting ?? false) && ($canEdit || $canMove || $canArchive);
                         <input name="title" required maxlength="200" dir="auto" class="js-add-card" placeholder="<?= $this->te('Add a card') ?>" aria-label="<?= $this->te('Add a card') ?>">
                         <button class="icon-btn" type="submit" title="<?= $this->te('Add card') ?>"><?= $this->icon('plus') ?></button>
                     </form>
+                <?php endif; ?>
                 <?php endif; ?>
             </section>
         <?php endforeach; ?>
