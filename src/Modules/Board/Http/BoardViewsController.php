@@ -11,9 +11,11 @@ use App\Http\Url;
 use App\Modules\Access\Contract\AccessGate;
 use App\Modules\Access\Contract\BoardRole;
 use App\Modules\Board\Application\BoardService;
+use App\Modules\Board\Application\ViewSettings;
 use App\Modules\Board\Contract\BoardStats;
 use App\Modules\Board\Contract\BoardSummary;
 use App\Modules\Board\Contract\CardFilter;
+use App\Modules\Board\Contract\TableLayout;
 use App\Modules\Card\Contract\CardQueries;
 use App\Modules\Card\Contract\CardSummary;
 use App\Modules\Identity\Contract\UserDirectory;
@@ -21,6 +23,7 @@ use App\Modules\Label\Contract\LabelCatalog;
 use App\Session\Session;
 use App\Support\Clock;
 use App\Support\MonthGrid;
+use App\Validation\ValidationException;
 use App\View\View;
 
 /**
@@ -42,16 +45,23 @@ final class BoardViewsController extends Controller
         private LabelCatalog $labels,
         private UserDirectory $users,
         private Clock $clock,
+        private ViewSettings $settings,
     ) {
         parent::__construct($view, $url, $session);
     }
 
-    /** Query: the board filters, plus sort (title|list|start|due|status) and dir (asc|desc). @param array{board: string} $params */
+    /**
+     * Query: the board filters, plus sort (title|list|start|due|status) and
+     * dir (asc|desc), which win over the person's saved table settings.
+     *
+     * @param array{board: string} $params
+     */
     public function table(Request $request, array $params): Response
     {
         $data = $this->load($request, $params['board']);
-        $sort = in_array($request->input('sort'), self::SORTS, true) ? $request->input('sort') : 'list';
-        $desc = $request->input('dir') === 'desc';
+        $layout = $this->settings->table($this->user($request)->id, $data['board']->id);
+        $sort = in_array($request->input('sort'), self::SORTS, true) ? $request->input('sort') : $layout->sort;
+        $desc = $request->input('sort') !== '' ? $request->input('dir') === 'desc' : $layout->desc;
 
         $listOrder = array_flip(array_map(static fn ($l) => $l->id, $data['lists']));
         $listName = array_column(array_map(static fn ($l) => ['id' => $l->id, 'name' => $l->name], $data['lists']), 'name', 'id');
@@ -76,11 +86,104 @@ final class BoardViewsController extends Controller
         return $this->render('boards/table', $data + [
             'title'    => $data['board']->name,
             'rows'     => $rows,
+            'groups'   => $this->groupRows($rows, $layout->group, $data),
             'listName' => $listName,
             'sort'     => $sort,
             'desc'     => $desc,
+            'layout'   => $layout,
             'viewPath' => '/table',
         ]);
+    }
+
+    /** Body: columns[] (in order), sort, dir, group; or reset=1. @param array{board: string} $params */
+    public function saveTable(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        $board = $this->boards->boardFor($user->id, $params['board']);
+        $path = '/boards/' . $board->publicId . '/table';
+        if ($request->input('reset') === '1') {
+            $this->settings->forget($user->id, $board->id, 'table');
+
+            return $this->redirect($path, 'Table set back to every column.');
+        }
+        try {
+            $this->settings->saveTable($user->id, $board->id, $request->body() + ['columns' => []]);
+        } catch (ValidationException $e) {
+            return $this->backWithErrors($e, $request, $path);
+        }
+
+        return $this->redirect($path, 'Your table view is saved. Others keep their own.');
+    }
+
+    /** Body: action (add|remove|up|down|reset), widget. @param array{board: string} $params */
+    public function changeDashboard(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        $board = $this->boards->boardFor($user->id, $params['board']);
+        try {
+            $this->settings->changeDashboard($user->id, $board->id, $request->input('action'), $request->input('widget'));
+        } catch (ValidationException $e) {
+            return $this->backWithErrors($e, $request, '/boards/' . $board->publicId . '/dashboard');
+        }
+
+        return $this->redirect('/boards/' . $board->publicId . '/dashboard' . ($request->input('widget') !== '' ? '#widget-' . $request->input('widget') : ''), 'Dashboard updated.');
+    }
+
+    /**
+     * Rows in sections for the grouping. A card with two people (or labels)
+     * shows under each; cards with none come last.
+     *
+     * @param list<CardSummary> $rows
+     * @param array<string, mixed> $data
+     * @return list<array{title: ?string, color: ?string, rows: list<CardSummary>}> one section with a null title when not grouped
+     */
+    private function groupRows(array $rows, string $group, array $data): array
+    {
+        if ($group === '') {
+            return [['title' => null, 'color' => null, 'rows' => $rows]];
+        }
+        $sections = [];
+        $none = [];
+        if ($group === 'list') {
+            foreach ($data['lists'] as $list) {
+                $sections['l' . $list->id] = ['title' => $list->name, 'color' => null, 'rows' => []];
+            }
+        }
+        foreach ($rows as $card) {
+            $keys = match ($group) {
+                'list'   => ['l' . $card->listId],
+                'member' => array_map(static fn (int $id) => 'm' . $id, $data['cardMembers'][$card->id] ?? []),
+                default  => array_map(static fn ($label) => 'b' . $label->id, $data['cardLabels'][$card->id] ?? []),
+            };
+            if ($keys === []) {
+                $none[] = $card;
+            }
+            foreach ($keys as $key) {
+                if (!isset($sections[$key])) {
+                    $sections[$key] = ['title' => '', 'color' => null, 'rows' => []];
+                    if ($group === 'member') {
+                        $sections[$key]['title'] = $data['people'][(int) substr($key, 1)]->name ?? '?';
+                    } else {
+                        foreach ($data['cardLabels'][$card->id] ?? [] as $label) {
+                            if ('b' . $label->id === $key) {
+                                $sections[$key]['title'] = $label->name;
+                                $sections[$key]['color'] = $label->color;
+                            }
+                        }
+                    }
+                }
+                $sections[$key]['rows'][] = $card;
+            }
+        }
+        $sections = array_values(array_filter($sections, static fn (array $s) => $s['rows'] !== []));
+        if ($group !== 'list') {
+            usort($sections, static fn (array $a, array $b) => strcmp(mb_strtolower((string) $a['title']), mb_strtolower((string) $b['title'])));
+        }
+        if ($none !== []) {
+            $sections[] = ['title' => '', 'color' => null, 'rows' => $none];
+        }
+
+        return $sections;
     }
 
     /** Query: month (Y-m) and the board filters. @param array{board: string} $params */
@@ -179,6 +282,7 @@ final class BoardViewsController extends Controller
 
         return $this->render('boards/dashboard', $data + [
             'title' => $data['board']->name,
+            'layout' => $this->settings->dashboard($this->user($request)->id, $data['board']->id),
             'stats' => BoardStats::from($data['lists'], $data['cardsByList'], $data['cardLabels'], $data['cardMembers'], $this->clock->now()),
         ]);
     }

@@ -140,6 +140,7 @@
             n: () => focusField($('.js-add-card')),
             e: () => focusField($('.js-edit-card input[name="title"]')),
             c: () => focusField($('.js-comment')),
+            q: () => focusField($('.js-quick-capture input[name="title"]')),
             '?': () => {
                 if (!shortcuts) return false;
                 shortcuts.showModal();
@@ -573,4 +574,88 @@
         select.addEventListener('change', sync);
         sync();
     });
+})();
+
+/* ---------- batch 6: quick capture, planner, table columns ---------- */
+(() => {
+    'use strict';
+    const $ = (sel, root = document) => root.querySelector(sel);
+    const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+    const say = (message, type) => {
+        const el = document.createElement('div');
+        el.className = `toast toast-${type}`;
+        el.textContent = message;
+        $('.toasts')?.appendChild(el);
+        setTimeout(() => el.remove(), 3500);
+    };
+
+    // Quick capture: add without leaving the page; the form still works without JS.
+    $$('.js-capture-form').forEach((form) => form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const button = form.querySelector('button[type="submit"]');
+        button.disabled = true;
+        try {
+            const response = await fetch(form.action, { method: 'POST', body: new FormData(form), headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+            const json = await response.json().catch(() => ({}));
+            if (!response.ok || !json.ok) throw new Error(json.message || 'Something went wrong.');
+            say(json.message, 'success');
+            form.reset();
+            form.closest('details')?.removeAttribute('open');
+            const count = $('.js-inbox-count');
+            if (count) count.textContent = json.count > 99 ? '99+' : json.count;
+        } catch (error) {
+            say(error.message, 'error');
+        } finally {
+            button.disabled = false;
+        }
+    }));
+
+    // Planner: drag a task to a day and time, or back to the list to unplan it.
+    // Each drop sends an ordinary form, so the page shows the saved plan.
+    const planForm = $('.js-plan-form');
+    const urls = $('.js-plan-urls');
+    if (planForm && urls) {
+        let dragged = null;
+        const send = (action, fields) => {
+            planForm.action = action;
+            Object.entries(fields).forEach(([name, value]) => { planForm.elements[name].value = value; });
+            planForm.submit();
+        };
+        $$('.js-plan-item').forEach((item) => {
+            item.addEventListener('dragstart', (event) => {
+                dragged = item;
+                item.classList.add('is-dragging');
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', item.dataset.session || item.dataset.card || '');
+            });
+            item.addEventListener('dragend', () => { item.classList.remove('is-dragging'); dragged = null; });
+        });
+        const target = (zone, onDrop) => {
+            zone.addEventListener('dragover', (event) => { if (dragged) { event.preventDefault(); zone.classList.add('is-drop'); } });
+            zone.addEventListener('dragleave', () => zone.classList.remove('is-drop'));
+            zone.addEventListener('drop', (event) => {
+                event.preventDefault();
+                zone.classList.remove('is-drop');
+                if (dragged) onDrop(dragged);
+            });
+        };
+        $$('.js-plan-drop').forEach((cell) => target(cell, (item) => {
+            const fields = { day: cell.dataset.day, hour: cell.dataset.hour };
+            if (item.dataset.session) send(urls.dataset.session + item.dataset.session, fields);
+            else send(urls.dataset.create, { ...fields, card: item.dataset.card });
+        }));
+        $$('.js-plan-unplan').forEach((zone) => target(zone, (item) => {
+            if (item.dataset.session) send(urls.dataset.session + item.dataset.session + '/delete', {});
+        }));
+    }
+
+    // Table settings: move a column up or down; the order of the boxes is the saved order.
+    $$('.js-column-choices').forEach((list) => list.addEventListener('click', (event) => {
+        const button = event.target.closest('.js-column-up, .js-column-down');
+        if (!button) return;
+        const row = button.closest('li');
+        if (button.classList.contains('js-column-up') && row.previousElementSibling) row.parentNode.insertBefore(row, row.previousElementSibling);
+        if (button.classList.contains('js-column-down') && row.nextElementSibling) row.parentNode.insertBefore(row.nextElementSibling, row);
+        button.focus();
+    }));
 })();
