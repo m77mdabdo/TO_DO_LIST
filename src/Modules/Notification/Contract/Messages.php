@@ -21,6 +21,7 @@ final class Messages
         'card.moved'             => ':actor moved :subject to :to',
         'card.due_soon'          => ':subject is due :date',
         'card.overdue'           => ':subject is overdue since :date',
+        'card.reminder'          => 'Reminder: :subject is due :date',
         'board.added'            => ':actor added you to the board :subject',
         'invitation.accepted'    => ':actor accepted your invitation to :subject',
         'workspace.role_changed' => ':actor made you :role in :subject',
@@ -30,7 +31,7 @@ final class Messages
 
     /** Kinds important enough to email (when the person has email on). */
     public const EMAILED = [
-        'card.assigned', 'checklist.assigned', 'comment.mentioned', 'card.due_soon', 'card.overdue',
+        'card.assigned', 'checklist.assigned', 'comment.mentioned', 'card.due_soon', 'card.overdue', 'card.reminder',
         'board.added', 'workspace.role_changed', 'workspace.removed', 'automation.notice',
     ];
 

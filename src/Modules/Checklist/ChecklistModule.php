@@ -9,6 +9,8 @@ use App\Shared\Automation\ActionContext;
 use App\Shared\Automation\ActionType;
 use App\Shared\Automation\AutomationActions;
 use App\Modules\Card\Contract\CardQueries;
+use App\Modules\Board\Contract\BoardDirectory;
+use App\Modules\Identity\Contract\Authenticator;
 use App\Shared\Export\ExportParts;
 use App\Modules\Card\Contract\Events\CardCopied;
 use App\Modules\Checklist\Application\ChecklistCopier;
@@ -88,11 +90,44 @@ final class ChecklistModule implements ModuleProvider
                 $card = $data['card'];
                 $gate = $c->get(AccessGate::class);
                 $audience = $gate->peopleOn($card->boardId);
+                $service = $c->get(ChecklistService::class);
+                $userId = $c->get(Authenticator::class)->user()?->id ?? 0;
+                $checklists = $service->forCard($card->id);
+                $canEdit = !$card->archived && !$data['board']->archived && $data['role']->allows(Permission::EditCards);
+
+                // Cards made from items: shown as links only when this person can open them.
+                $linked = [];
+                foreach ($checklists as $checklist) {
+                    foreach ($checklist->items as $item) {
+                        if ($item->cardLinkId !== null && !isset($linked[$item->cardLinkId])) {
+                            $target = $c->get(CardQueries::class)->find($item->cardLinkId);
+                            $linked[$item->cardLinkId] = $target !== null && $gate->can($userId, $target->boardId, Permission::ViewBoard) ? $target : null;
+                        }
+                    }
+                }
+
+                // Where an item can become a card: open lists of open boards of this workspace where this person adds cards.
+                $targets = [];
+                if ($canEdit) {
+                    $directory = $c->get(BoardDirectory::class);
+                    foreach ($directory->allInWorkspace($data['board']->workspaceId) as $other) {
+                        if (!$other->archived && !$other->isTemplate && $gate->can($userId, $other->id, Permission::EditCards)) {
+                            $lists = $directory->openLists($other->id);
+                            if ($lists !== []) {
+                                $targets[] = ['board' => $other, 'lists' => $lists];
+                            }
+                        }
+                    }
+                }
 
                 return [
-                    'checklists' => $c->get(ChecklistService::class)->forCard($card->id),
-                    'audience'   => $c->get(UserDirectory::class)->findMany(array_keys($audience)),
-                    'canEditChecklists' => !$card->archived && !$data['board']->archived && $data['role']->allows(Permission::EditCards),
+                    'checklists'  => $checklists,
+                    'audience'    => $c->get(UserDirectory::class)->findMany(array_keys($audience)),
+                    'canEditChecklists' => $canEdit,
+                    'hiddenDone'  => $service->hiddenFor($userId, array_map(static fn ($l) => $l->id, $checklists)),
+                    'linkedCards' => $linked,
+                    'copySources' => $canEdit ? $service->copySources($card) : [],
+                    'convertTargets' => $targets,
                 ];
             });
 
@@ -140,7 +175,10 @@ final class ChecklistModule implements ModuleProvider
     {
         $router->group([Authenticate::class], function (Router $router): void {
             $router->post('/cards/{card:ulid}/checklists', [ChecklistController::class, 'store']);
+            $router->post('/cards/{card:ulid}/checklists/copy', [ChecklistController::class, 'copy']);
             $router->post('/checklists/{id}', [ChecklistController::class, 'rename']);
+            $router->post('/checklists/{id}/hide-done', [ChecklistController::class, 'hideDone']);
+            $router->post('/checklist-items/{id}/convert', [ChecklistController::class, 'convert']);
             $router->post('/checklists/{id}/delete', [ChecklistController::class, 'destroy']);
             $router->post('/checklists/{id}/items', [ChecklistController::class, 'addItem']);
             $router->post('/checklist-items/{id}', [ChecklistController::class, 'updateItem']);

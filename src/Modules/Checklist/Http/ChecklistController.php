@@ -9,6 +9,7 @@ use App\Http\Request;
 use App\Http\Response;
 use App\Http\Url;
 use App\Modules\Access\Contract\AccessDenied;
+use App\Modules\Board\Contract\BoardDirectory;
 use App\Modules\Card\Contract\CardQueries;
 use App\Modules\Card\Contract\CardSummary;
 use App\Modules\Checklist\Application\ChecklistService;
@@ -25,6 +26,7 @@ final class ChecklistController extends Controller
         Session $session,
         private ChecklistService $checklists,
         private CardQueries $cards,
+        private BoardDirectory $boards,
     ) {
         parent::__construct($view, $url, $session);
     }
@@ -46,6 +48,60 @@ final class ChecklistController extends Controller
         }
 
         return $this->done($request, $card);
+    }
+
+    /**
+     * Body: from (the id of a checklist on another card of the board).
+     *
+     * @param array{card: string} $params
+     */
+    public function copy(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        $card = $this->cards->findByPublicId($params['card']) ?? throw AccessDenied::hidden();
+        $from = $request->input('from');
+
+        try {
+            $this->checklists->copyChecklist($user->id, $card, ctype_digit($from) ? (int) $from : 0);
+        } catch (ValidationException $e) {
+            return $this->backWithErrors($e, $request, $this->cardPath($card) . '#checklists');
+        }
+
+        return $this->done($request, $card, 'Checklist copied.');
+    }
+
+    /**
+     * Body: hide (1 to hide ticked items, 0 to show them). Only for this person.
+     *
+     * @param array{id: int} $params checklist id
+     */
+    public function hideDone(Request $request, array $params): Response
+    {
+        $card = $this->checklists->setHideDone($this->user($request)->id, $params['id'], $request->input('hide') === '1');
+
+        return $this->done($request, $card);
+    }
+
+    /**
+     * Body: target ("<board public id>:<list id>").
+     *
+     * @param array{id: int} $params item id
+     */
+    public function convert(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        [$boardPublicId, $listId] = explode(':', $request->input('target'), 2) + [1 => ''];
+        $board = $this->boards->findByPublicId($boardPublicId);
+
+        try {
+            $card = $this->checklists->convertItem($user->id, $params['id'], $board?->id ?? 0, ctype_digit($listId) ? (int) $listId : 0);
+        } catch (ValidationException $e) {
+            return $this->backWithErrors($e, $request, $this->cardPath($this->checklists->cardOfItem($user->id, $params['id'])) . '#checklists');
+        }
+
+        return $request->wantsJson()
+            ? Response::json(['ok' => true, 'card' => $card->publicId])
+            : $this->redirect($this->cardPath($this->checklists->cardOfItem($user->id, $params['id'])) . '#checklists', 'Card created from the item.');
     }
 
     /** @param array{id: int} $params */

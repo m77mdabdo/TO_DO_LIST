@@ -15,6 +15,7 @@ declare(strict_types=1);
 
 use App\Core\Config;
 use App\Modules\Automation\Application\AutomationEngine;
+use App\Modules\Card\Application\RecurringCards;
 use App\Session\ArraySession;
 
 if (PHP_SAPI !== 'cli') {
@@ -26,5 +27,6 @@ require __DIR__ . '/../bootstrap/autoload.php';
 
 $app = (require __DIR__ . '/../bootstrap/app.php')(Config::load(dirname(__DIR__)), new ArraySession());
 $ran = $app->get(AutomationEngine::class)->tick();
+$copies = $app->get(RecurringCards::class)->run();
 
-echo "Ran $ran automation(s).\n";
+echo "Ran $ran automation(s), made $copies scheduled card copy(ies).\n";

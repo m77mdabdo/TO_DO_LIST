@@ -1113,3 +1113,45 @@ main.wrap > section.card:not(.table-wrap) { padding: clamp(1rem, 3vw, 1.6rem); }
 .field-values dd { margin: 0; overflow-wrap: anywhere; }
 .field-def-actions { display: flex; flex-wrap: wrap; gap: .3rem; margin-inline-start: auto; }
 .field-def-actions form { margin: 0; }
+
+/* ---------- batch 5: checklists, repeats, collapsed lists, board groups ---------- */
+.btn-sm { min-height: 30px; padding: .2rem .6rem; font-size: .85rem; }
+.checklist-hide { margin: 0; margin-inline-start: auto; }
+.checklist-head { flex-wrap: wrap; }
+.add-item textarea { flex: 1; min-height: 40px; resize: vertical; font: inherit; }
+.item-card-link { display: inline-flex; align-items: center; gap: .25rem; margin-inline-start: .4rem; font-size: .85rem; font-weight: 700; }
+.item-card-link .icon { width: 14px; height: 14px; }
+.copy-checklist summary, .repeat-copies summary { list-style: none; }
+.copy-checklist summary::-webkit-details-marker, .repeat-copies summary::-webkit-details-marker { display: none; }
+.copy-checklist select { flex: 1; min-width: 0; }
+.weekday-choices { display: flex; flex-wrap: wrap; gap: .3rem .9rem; border: 0; padding: 0; margin: 0; }
+.weekday-choices legend { font-weight: 700; margin-bottom: .3rem; }
+.repeat-status { display: grid; gap: .25rem; margin: 0; }
+.repeat-status div { display: flex; flex-wrap: wrap; gap: .4rem; }
+.repeat-status dt { color: var(--muted); font-weight: 700; }
+.repeat-status dd { margin: 0; }
+
+.list-collapse { margin: 0; }
+.list-head h2 { flex: 1; min-width: 0; }
+.list.is-collapsed { flex: 0 0 56px; padding: .6rem .3rem; align-items: center; }
+.list.is-collapsed .list-head { flex-direction: column-reverse; gap: .6rem; }
+.list.is-collapsed .list-head h2 { writing-mode: vertical-rl; flex: none; max-height: 60vh; overflow: hidden; }
+.list.is-collapsed .list-head .menu { display: none; }
+@media (max-width: 720px) {
+    .list.is-collapsed { flex: 0 0 auto; width: 85vw; }
+    .list.is-collapsed .list-head { flex-direction: row; }
+    .list.is-collapsed .list-head h2 { writing-mode: horizontal-tb; }
+}
+
+.board-group { margin-top: 1.6rem; }
+.board-group-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem; margin-bottom: .7rem; }
+.board-group-head h2, .board-group-other { display: flex; align-items: center; gap: .45rem; font-size: 1.1rem; font-weight: 800; word-break: break-word; }
+.board-group-other { margin: 1.6rem 0 .7rem; }
+.board-group .board-grid > p { margin: 0; align-self: center; }
+.board-group-head .row-actions form { margin: 0; }
+.board-groups-manage { margin-top: 1.4rem; display: grid; gap: .6rem; }
+.board-groups-manage summary { list-style: none; justify-self: start; }
+.board-groups-manage summary::-webkit-details-marker { display: none; }
+.board-groups-manage .inline-form { max-width: 520px; }
+.repeat-copies summary, .copy-checklist summary { white-space: normal; text-align: start; max-width: 100%; height: auto; }
+#schedule { min-width: 0; overflow-wrap: anywhere; }
