@@ -37,6 +37,23 @@ interface ChecklistRepository
     public function deleteItem(int $id): void;
 
     /**
+     * Of these checklists, the ones whose ticked items the user hides.
+     *
+     * @param list<int> $checklistIds
+     * @return list<int>
+     */
+    public function hiddenFor(int $userId, array $checklistIds): array;
+
+    public function setHidden(int $userId, int $checklistId, bool $hidden): void;
+
+    /**
+     * Checklists on the other open cards of a board, to copy from.
+     *
+     * @return list<array{id: int, title: string, card: string, items: int}>
+     */
+    public function onBoard(int $boardId, int $exceptCardId, int $limit = 100): array;
+
+    /**
      * Done and total items per card, in one grouped query.
      *
      * @param list<int> $cardIds

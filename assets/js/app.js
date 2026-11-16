@@ -547,3 +547,30 @@
         });
     });
 })();
+
+/* ---------- batch 5: checklist paste, repeat options ---------- */
+(() => {
+    'use strict';
+    // Enter adds the item(s); Shift+Enter (or pasting) gives more lines, one item each.
+    document.querySelectorAll('textarea.js-add-item').forEach((area) => {
+        area.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+                e.preventDefault();
+                if (area.value.trim() !== '') area.form.requestSubmit();
+            }
+        });
+        const grow = () => { area.rows = Math.min(8, Math.max(1, area.value.split('\n').length)); };
+        area.addEventListener('input', grow);
+    });
+    document.querySelectorAll('.js-repeat-frequency').forEach((select) => {
+        const form = select.form;
+        const weekly = form.querySelector('.js-repeat-weekly');
+        const monthly = form.querySelector('.js-repeat-monthly');
+        const sync = () => {
+            if (weekly) weekly.hidden = select.value !== 'weekly';
+            if (monthly) monthly.hidden = select.value !== 'monthly';
+        };
+        select.addEventListener('change', sync);
+        sync();
+    });
+})();

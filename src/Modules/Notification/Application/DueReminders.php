@@ -16,6 +16,10 @@ use App\Support\Clock;
  * reminder has a key made of the card and its due date, so running the job
  * every few minutes still sends each one once, and moving the date sends
  * a new one.
+ *
+ * A card can choose its own reminder instead: a number of days before the
+ * due date, at an hour (app time zone), which replaces "due soon"; or none
+ * at all. Done and archived cards get nothing.
  */
 final class DueReminders
 {
@@ -38,8 +42,26 @@ final class DueReminders
         // Every card's assignees in one query.
         $assignees = $this->cards->membersForCards(array_map(static fn ($card) => $card->id, [...$soon, ...$late]));
 
+        // Cards with their own reminder, due within the next week.
+        $own = array_values(array_filter($this->cards->dueBetween($today->format('Y-m-d'), $today->modify('+7 days')->format('Y-m-d')),
+            static fn ($card) => $card->remind !== null && ctype_digit($card->remind)));
+        $assignees += $this->cards->membersForCards(array_map(static fn ($card) => $card->id, $own));
+        foreach ($own as $card) {
+            $fires = (new \DateTimeImmutable((string) $card->dueDate()))->modify('-' . (int) $card->remind . ' days')->setTime($card->remindHour, 0);
+            if ($today < $fires) {
+                continue;
+            }
+            $people = [...($assignees[$card->id] ?? []), ...$this->store->watchersOfCard($card->id, $card->boardId)];
+            $sent += $this->notifier->notify($people, 'card.reminder', null, $card->boardId, $card->id, $card->title,
+                ['date' => (string) $card->dueDate()], '/cards/' . $card->publicId, 'reminder:' . $card->id . ':' . $card->dueDate() . ':' . $card->remind . ':' . $card->remindHour);
+        }
+
         foreach (['card.due_soon' => $soon, 'card.overdue' => $late] as $type => $cards) {
             foreach ($cards as $card) {
+                // "none" turns every reminder off; a reminder of its own replaces "due soon".
+                if ($card->remind === 'none' || ($type === 'card.due_soon' && $card->remind !== null)) {
+                    continue;
+                }
                 $people = [...($assignees[$card->id] ?? []), ...$this->store->watchersOfCard($card->id, $card->boardId)];
                 $sent += $this->notifier->notify($people, $type, null, $card->boardId, $card->id, $card->title,
                     ['date' => (string) $card->dueDate()], '/cards/' . $card->publicId, $type . ':' . $card->id . ':' . $card->dueDate());

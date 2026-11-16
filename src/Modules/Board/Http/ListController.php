@@ -15,12 +15,37 @@ use App\View\View;
 
 final class ListController extends Controller
 {
-    public function __construct(View $view, Url $url, Session $session, private BoardService $boards)
+    public function __construct(View $view, Url $url, Session $session, private BoardService $boards, private \App\Modules\Board\Domain\BoardPreferences $preferences)
     {
         parent::__construct($view, $url, $session);
     }
 
     /** @param array{board: string} $params */
+    /**
+     * Folds a list away (collapsed=1) or opens it again, for this person only.
+     *
+     * @param array{board: string, id: string} $params
+     */
+    public function collapse(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        $board = $this->boards->boardFor($user->id, $params['board']);
+        $list = $this->boards->listsOf($board);
+        $listId = (int) $params['id'];
+        if (!in_array($listId, array_map(static fn ($l) => $l->id, $list), true)) {
+            throw \App\Modules\Access\Contract\AccessDenied::hidden();
+        }
+        $collapsed = array_values(array_diff($this->preferences->collapsedLists($user->id, $board->id), [$listId]));
+        if ($request->input('collapsed') === '1') {
+            $collapsed[] = $listId;
+        }
+        $this->preferences->saveCollapsedLists($user->id, $board->id, $collapsed);
+
+        return $request->wantsJson()
+            ? Response::json(['ok' => true])
+            : $this->redirect('/boards/' . $board->publicId . '#list-' . $listId);
+    }
+
     public function store(Request $request, array $params): Response
     {
         $user = $this->user($request);

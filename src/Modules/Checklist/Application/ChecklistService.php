@@ -11,6 +11,7 @@ use App\Modules\Access\Contract\AccessGate;
 use App\Modules\Access\Contract\Permission;
 use App\Modules\Board\Contract\BoardDirectory;
 use App\Modules\Card\Contract\CardQueries;
+use App\Modules\Card\Contract\CardWriter;
 use App\Modules\Card\Contract\CardSummary;
 use App\Modules\Checklist\Contract\Events\ChecklistChanged;
 use App\Modules\Checklist\Contract\Checklist;
@@ -42,6 +43,7 @@ final class ChecklistService implements ChecklistQueries
         private EventBus $events,
         private Clock $clock,
         private Validator $validator,
+        private CardWriter $writer,
     ) {
     }
 
@@ -118,18 +120,128 @@ final class ChecklistService implements ChecklistQueries
         return $card;
     }
 
+    /**
+     * Adds one item, or one item per line when several lines are pasted
+     * (blank lines are skipped). All are checked first; none is added if
+     * one is too long or they would not fit.
+     */
     public function addItem(int $actorId, int $checklistId, string $text): CardSummary
     {
         [$checklist, $card] = $this->checklistFor($actorId, $checklistId);
-        $text = $this->validText($text);
+        $lines = array_values(array_filter(array_map('trim', preg_split('/\R/u', $text) ?: []), static fn (string $line) => $line !== ''));
+        if ($lines === []) {
+            $this->validText('');
+        }
+        foreach ($lines as $line) {
+            $this->validText($line);
+        }
 
-        if ($this->checklists->countItems($checklist->id) >= self::MAX_ITEMS) {
+        if ($this->checklists->countItems($checklist->id) + count($lines) > self::MAX_ITEMS) {
             throw self::invalid('text', 'A checklist can have up to 200 items.');
         }
 
-        $this->checklists->addItem($checklist->id, $card->id, $text, $actorId);
+        $this->transactions->run(function () use ($lines, $checklist, $card, $actorId): void {
+            foreach ($lines as $line) {
+                $this->checklists->addItem($checklist->id, $card->id, $line, $actorId);
+            }
+        });
 
         return $card;
+    }
+
+    /**
+     * Copies a checklist from another card of the same board onto this card:
+     * same title and items, all unticked, keeping who they are assigned to
+     * and their due dates.
+     */
+    public function copyChecklist(int $actorId, CardSummary $card, int $sourceId): CardSummary
+    {
+        $this->authorize($actorId, $card);
+        $source = $this->checklists->find($sourceId);
+        $sourceCard = $source !== null ? $this->cards->find($source->cardId) : null;
+        if ($source === null || $sourceCard === null || $sourceCard->boardId !== $card->boardId || $sourceCard->archived) {
+            throw self::invalid('copy_from', 'Choose a checklist from this board.');
+        }
+        if ($this->checklists->countOnCard($card->id) >= self::MAX_CHECKLISTS) {
+            throw self::invalid('copy_from', 'A card can have up to 20 checklists.');
+        }
+        $items = [];
+        foreach ($this->checklists->forCard($sourceCard->id) as $list) {
+            if ($list->id === $source->id) {
+                $items = $list->items;
+            }
+        }
+
+        $this->transactions->run(function () use ($actorId, $card, $source, $items): void {
+            $id = $this->checklists->create($card->id, $source->title, $actorId);
+            foreach (array_slice($items, 0, self::MAX_ITEMS) as $item) {
+                $itemId = $this->checklists->addItem($id, $card->id, $item->text, $actorId);
+                $this->checklists->updateItem($itemId, ['assignee_id' => $item->assigneeId, 'due_at' => $item->dueAt]);
+            }
+            $this->announce($card, $actorId, 'added', $source->title);
+        });
+
+        return $card;
+    }
+
+    /** @return list<array{id: int, title: string, card: string, items: int}> checklists to copy from */
+    public function copySources(CardSummary $card): array
+    {
+        return $this->checklists->onBoard($card->boardId, $card->id);
+    }
+
+    /**
+     * Hides or shows the ticked items of a checklist, for this person only.
+     * Anyone who can see the card may choose.
+     */
+    public function setHideDone(int $userId, int $checklistId, bool $hide): CardSummary
+    {
+        $card = $this->cardOfChecklist($userId, $checklistId);
+        $this->checklists->setHidden($userId, $checklistId, $hide);
+
+        return $card;
+    }
+
+    /**
+     * @param list<int> $checklistIds
+     * @return list<int> the ones whose ticked items the user hides
+     */
+    public function hiddenFor(int $userId, array $checklistIds): array
+    {
+        return $this->checklists->hiddenFor($userId, $checklistIds);
+    }
+
+    /**
+     * Turns an item into a card in a list the actor chooses (on any board of
+     * the workspace where they may add cards). The card gets the item's
+     * text, due date and assignee (if that person can see the target board),
+     * and a description that links back; the item keeps a link to the card.
+     */
+    public function convertItem(int $actorId, int $itemId, int $boardId, int $listId): CardSummary
+    {
+        [$item, $card] = $this->itemFor($actorId, $itemId);
+        $from = $this->boards->find($card->boardId);
+        $target = $this->boards->find($boardId);
+        if ($from === null || $target === null || $target->workspaceId !== $from->workspaceId || $target->archived
+            || !$this->gate->can($actorId, $target->id, Permission::EditCards)
+            || $this->boards->listOnBoard($listId, $target->id) === null) {
+            throw self::invalid('convert_to', 'Choose a list on a board of this workspace where you can add cards.');
+        }
+        $checklist = $this->checklists->find($item->checklistId);
+
+        return $this->transactions->run(function () use ($actorId, $item, $card, $target, $listId, $checklist): CardSummary {
+            $new = $this->writer->createCard($actorId, $target->id, $listId, mb_substr($item->text, 0, 200), [
+                'description' => 'From the checklist “' . ($checklist?->title ?? '') . '” on [' . str_replace(['[', ']'], ['(', ')'], $card->title) . '](/cards/' . $card->publicId . ')',
+                'due_date'    => $item->dueDate(),
+            ]);
+            if ($item->assigneeId !== null) {
+                $this->writer->assign($actorId, $new, $item->assigneeId);
+            }
+            $this->checklists->updateItem($item->id, ['card_link_id' => $new->id]);
+            $this->announce($card, $actorId, 'item_converted', $item->text);
+
+            return $new;
+        });
     }
 
     /**

@@ -52,6 +52,7 @@ final class BoardModule implements ModuleProvider
         $container->singleton(BoardCatalog::class, fn (Container $c) => $c->get(BoardService::class));
         $container->singleton(SavedSearches::class, fn (Container $c) => new PdoSavedSearches($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(BoardPreferences::class, fn (Container $c) => new PdoBoardPreferences($c->get(PDO::class), $c->get(Clock::class)));
+        $container->singleton(\App\Modules\Board\Application\BoardGroups::class, fn (Container $c) => $c->build(\App\Modules\Board\Application\BoardGroups::class));
         $container->singleton(BoardVersions::class, fn (Container $c) => new PdoBoardVersions($c->get(PDO::class), $c->get(Clock::class)));
     }
 
@@ -88,6 +89,12 @@ final class BoardModule implements ModuleProvider
             $router->post('/boards/{board:ulid}/lists', [ListController::class, 'store']);
             $router->post('/boards/{board:ulid}/lists/{id}', [ListController::class, 'update']);
             $router->post('/boards/{board:ulid}/lists/{id}/move', [ListController::class, 'move']);
+            $router->post('/boards/{board:ulid}/lists/{id}/collapse', [ListController::class, 'collapse']);
+            $router->post('/board-groups', [BoardController::class, 'groupStore']);
+            $router->post('/board-groups/{id}', [BoardController::class, 'groupUpdate']);
+            $router->post('/board-groups/{id}/move', [BoardController::class, 'groupMove']);
+            $router->post('/board-groups/{id}/delete', [BoardController::class, 'groupDelete']);
+            $router->post('/boards/{board:ulid}/group', [BoardController::class, 'place']);
             $router->post('/boards/{board:ulid}/lists/{id}/archive', [ListController::class, 'archive']);
             $router->post('/boards/{board:ulid}/lists/{id}/restore', [ListController::class, 'restore']);
         });

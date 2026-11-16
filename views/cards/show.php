@@ -192,6 +192,8 @@ $editErrors = $form->error('title') || $form->error('description') || $form->err
                 <?php endif; ?>
             </section>
 
+            <?= $this->partial('cards/schedule', ['card' => $card, 'lists' => $lists, 'repeat' => $repeat ?? null, 'canEdit' => $canEdit]) ?>
+
             <?= $this->partial('cards/looks', ['card' => $card, 'coverImages' => $coverImages ?? [], 'linkBoards' => $linkBoards ?? [], 'canEdit' => $canEdit]) ?>
 
             <?php if ($canEdit || $canMove || $canArchive): ?>
