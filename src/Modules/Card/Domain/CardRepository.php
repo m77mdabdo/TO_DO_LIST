@@ -70,6 +70,9 @@ interface CardRepository
 
     public function positionAtEnd(int $listId): string;
 
+    /** @param list<int> $cardIds the list's cards in their new order */
+    public function arrange(int $listId, array $cardIds): void;
+
     /** @return list<CardSummary> open, unfinished cards the person is on, soonest due first */
     public function openCardsAssignedTo(int $userId, int $limit): array;
 

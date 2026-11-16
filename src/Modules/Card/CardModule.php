@@ -77,6 +77,7 @@ final class CardModule implements ModuleProvider
         $container->singleton(CardRepository::class, fn (Container $c) => new PdoCardRepository($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(CardQueries::class, fn (Container $c) => $c->build(CardQueryService::class));
         $container->singleton(CardService::class, fn (Container $c) => $c->build(CardService::class));
+        $container->singleton(\App\Modules\Card\Application\RecurringCards::class, fn (Container $c) => $c->build(\App\Modules\Card\Application\RecurringCards::class));
         $container->singleton(CardWriter::class, fn (Container $c) => $c->get(CardService::class));
     }
 
@@ -92,6 +93,9 @@ final class CardModule implements ModuleProvider
             $router->post('/cards/{card:ulid}/move', [CardController::class, 'move']);
             $router->post('/cards/{card:ulid}/template', [CardController::class, 'template']);
             $router->post('/cards/{card:ulid}/looks', [CardController::class, 'looks']);
+            $router->post('/cards/{card:ulid}/schedule', [CardController::class, 'schedule']);
+            $router->post('/cards/{card:ulid}/repeat', [CardController::class, 'repeat']);
+            $router->post('/boards/{board:ulid}/lists/{id}/sort', [CardController::class, 'sortList']);
             $router->post('/cards/{card:ulid}/copy', [CardController::class, 'copy']);
             $router->post('/cards/{card:ulid}/archive', [CardController::class, 'archive']);
             $router->post('/cards/{card:ulid}/restore', [CardController::class, 'restore']);

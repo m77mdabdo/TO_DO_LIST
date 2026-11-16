@@ -13,10 +13,10 @@ use PDO;
 
 final class PdoChecklists implements ChecklistRepository
 {
-    private const ITEM_COLUMNS = 'id, checklist_id, card_id, text, position, done_at, assignee_id, due_at';
+    private const ITEM_COLUMNS = 'id, checklist_id, card_id, text, position, done_at, assignee_id, due_at, card_link_id';
 
     /** Columns updateItem() may write: an allow-list, never names from the request. */
-    private const ITEM_UPDATABLE = ['text', 'assignee_id', 'due_at', 'done_at'];
+    private const ITEM_UPDATABLE = ['text', 'assignee_id', 'due_at', 'done_at', 'card_link_id'];
 
     private OrderedRows $lists;
     private OrderedRows $items;
@@ -134,6 +134,39 @@ final class PdoChecklists implements ChecklistRepository
     public function deleteItem(int $id): void
     {
         $this->db->prepare('DELETE FROM checklist_items WHERE id = ?')->execute([$id]);
+    }
+
+    public function hiddenFor(int $userId, array $checklistIds): array
+    {
+        if ($checklistIds === []) {
+            return [];
+        }
+        $marks = implode(', ', array_fill(0, count($checklistIds), '?'));
+        $stmt = $this->db->prepare("SELECT checklist_id FROM checklist_hidden WHERE user_id = ? AND checklist_id IN ($marks)");
+        $stmt->execute([$userId, ...array_values($checklistIds)]);
+
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
+
+    public function setHidden(int $userId, int $checklistId, bool $hidden): void
+    {
+        $this->db->prepare('DELETE FROM checklist_hidden WHERE user_id = ? AND checklist_id = ?')->execute([$userId, $checklistId]);
+        if ($hidden) {
+            $this->db->prepare('INSERT INTO checklist_hidden (user_id, checklist_id) VALUES (?, ?)')->execute([$userId, $checklistId]);
+        }
+    }
+
+    public function onBoard(int $boardId, int $exceptCardId, int $limit = 100): array
+    {
+        $stmt = $this->db->prepare('SELECT l.id, l.title, c.title AS card, (SELECT COUNT(*) FROM checklist_items i WHERE i.checklist_id = l.id) AS items
+            FROM checklists l JOIN cards c ON c.id = l.card_id
+            WHERE c.board_id = ? AND c.id <> ? AND c.archived_at IS NULL
+            ORDER BY c.title, l.position, l.id LIMIT ' . max(1, $limit));
+        $stmt->execute([$boardId, $exceptCardId]);
+
+        return array_map(static fn (array $row) => [
+            'id' => (int) $row['id'], 'title' => (string) $row['title'], 'card' => (string) $row['card'], 'items' => (int) $row['items'],
+        ], $stmt->fetchAll());
     }
 
     public function progressForCards(array $cardIds): array
