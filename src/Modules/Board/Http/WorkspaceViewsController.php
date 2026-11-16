@@ -26,6 +26,7 @@ use App\Modules\Workspace\Contract\WorkspaceDirectory;
 use App\Modules\Workspace\Contract\WorkspaceSummary;
 use App\Session\Session;
 use App\Support\Clock;
+use App\Support\MonthGrid;
 use App\View\View;
 
 /**
@@ -136,6 +137,50 @@ final class WorkspaceViewsController extends Controller
             'labels'    => $labels,
             'people'    => $this->users->findMany(array_values(array_unique(array_merge([], ...array_values($members))))),
             'filter'    => $filter,
+        ]);
+    }
+
+    /**
+     * Due and start dates of every open card on the workspace's boards that I
+     * can see, on a month calendar. Query: month (Y-m), board (public id).
+     *
+     * @param array{workspace: string} $params
+     */
+    public function calendar(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        $workspace = $this->workspace($user->id, $params['workspace']);
+        $boards = $this->visibleBoards($user->id, $workspace);
+        $chosen = $request->input('board');
+        $shownBoards = $chosen !== '' ? array_filter($boards, static fn (BoardSummary $b) => $b->publicId === $chosen) : $boards;
+        $grid = MonthGrid::for($request->input('month'), $this->clock->now(), $this->view->locale() === 'ar' ? 6 : 0);
+
+        $byDay = [];
+        $count = 0;
+        foreach ($this->cards->scheduledBetween(array_keys($shownBoards), $grid->first(), $grid->last()) as $card) {
+            if ($card->archived || $card->isTemplate) {
+                continue;
+            }
+            $due = $card->dueDate();
+            $start = $card->startDate();
+            if ($due !== null && $due >= $grid->first() && $due <= $grid->last()) {
+                $byDay[$due][] = ['card' => $card, 'kind' => 'due'];
+                $count++;
+            }
+            if ($start !== null && $start !== $due && $start >= $grid->first() && $start <= $grid->last()) {
+                $byDay[$start][] = ['card' => $card, 'kind' => 'start'];
+                $count++;
+            }
+        }
+
+        return $this->render('workspaces/calendar', [
+            'title'     => $workspace->name,
+            'workspace' => $workspace,
+            'boards'    => $boards,
+            'chosen'    => $chosen,
+            'grid'      => $grid,
+            'byDay'     => $byDay,
+            'count'     => $count,
         ]);
     }
 

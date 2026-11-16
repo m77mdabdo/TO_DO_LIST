@@ -63,7 +63,7 @@ $currentWorkspace ??= null;
     <div class="topbar-actions">
         <?php if (isset($user)): ?>
             <button class="icon-btn hide-sm js-shortcuts" type="button" title="<?= $this->te('Keyboard shortcuts') ?> (?)" aria-label="<?= $this->te('Keyboard shortcuts') ?>"><?= $this->icon('keyboard') ?></button>
-            <a class="icon-btn" href="<?= $this->url('/my-tasks') ?>" title="<?= $this->te('My tasks') ?>" aria-label="<?= $this->te('My tasks') ?>"><?= $this->icon('inbox') ?></a>
+            <a class="icon-btn" href="<?= $this->url('/my-tasks') ?>" title="<?= $this->te('My tasks') ?>" aria-label="<?= $this->te('My tasks') ?>"><?= $this->icon('checklist') ?></a>
             <?= $this->slot('header.actions', ['user' => $user]) ?>
         <?php endif; ?>
         <button class="icon-btn js-theme" type="button" title="<?= $this->te('Toggle dark mode') ?>">

@@ -1155,3 +1155,72 @@ main.wrap > section.card:not(.table-wrap) { padding: clamp(1rem, 3vw, 1.6rem); }
 .board-groups-manage .inline-form { max-width: 520px; }
 .repeat-copies summary, .copy-checklist summary { white-space: normal; text-align: start; max-width: 100%; height: auto; }
 #schedule { min-width: 0; overflow-wrap: anywhere; }
+
+/* ---------- batch 6: inbox, planner, workspace calendar, table and dashboard settings ---------- */
+.has-count { position: relative; }
+.icon-count { position: absolute; top: -2px; inset-inline-end: -2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--violet); color: #fff; font-size: .7rem; font-weight: 700; line-height: 18px; text-align: center; }
+.quick-capture .menu-panel { inset-inline-start: auto; inset-inline-end: 0; width: min(340px, calc(100vw - 32px)); padding: .9rem; }
+.capture-more > summary, .inbox-edit > summary, .plan-card > summary { width: fit-content; }
+
+.inbox-list { list-style: none; margin: 0; padding: 0; }
+.inbox-head { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; justify-content: space-between; }
+.inbox-title { margin: 0; font-size: 1.05rem; overflow-wrap: anywhere; }
+.inbox-description { margin: 0; white-space: normal; overflow-wrap: anywhere; color: var(--text); }
+.inbox-files { list-style: none; margin: 0; padding: 0; display: grid; gap: .25rem; }
+.inbox-files li { display: flex; align-items: center; gap: .4rem; min-width: 0; }
+.inbox-files a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.inbox-actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .5rem; }
+.inbox-move { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; min-width: 0; }
+.inbox-move select { max-width: min(320px, 100%); }
+.inbox-edit[open] { flex-basis: 100%; }
+
+.planner-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 1rem; align-items: start; }
+@media (max-width: 960px) { .planner-layout { grid-template-columns: minmax(0, 1fr); } }
+.planner-week .table-wrap { overflow-x: auto; }
+.planner-grid { width: 100%; min-width: 760px; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+.planner-grid th, .planner-grid td { border-bottom: 1px solid var(--border); border-inline-start: 1px solid var(--border); padding: .3rem; vertical-align: top; }
+.planner-grid thead th { font-size: .8rem; text-align: center; background: var(--surface-2); }
+.planner-grid thead th small { display: block; color: var(--muted); font-weight: 600; }
+.planner-grid tbody th { width: 64px; font-size: .75rem; color: var(--muted); text-align: center; white-space: nowrap; }
+.planner-grid thead th:first-child { width: 64px; }
+.planner-grid .is-today { background: color-mix(in srgb, var(--violet) 7%, var(--surface)); }
+.planner-grid .is-any-time td, .planner-grid .is-any-time th { background: var(--surface-2); }
+.planner-cell { height: 2.6rem; min-width: 0; }
+.planner-cell.is-drop, .js-plan-unplan.is-drop { outline: 2px dashed var(--violet); outline-offset: -3px; }
+.plan-chip { position: relative; display: grid; gap: .1rem; padding: .35rem .45rem; margin-bottom: .25rem; border-radius: 8px; background: color-mix(in srgb, var(--violet) 14%, var(--surface)); border-inline-start: 3px solid var(--violet); font-size: .78rem; cursor: grab; min-width: 0; }
+.plan-chip.is-done .plan-title { text-decoration: line-through; color: var(--muted); }
+.plan-chip.is-dragging { opacity: .5; }
+.plan-title { font-weight: 700; color: var(--text); overflow-wrap: anywhere; padding-inline-end: 1.6rem; }
+.plan-chip small { overflow-wrap: anywhere; }
+.plan-chip .plan-menu { position: absolute; top: .1rem; inset-inline-end: .1rem; }
+.planner-tasks .plan-chip .plan-menu { position: static; }
+.plan-menu > summary.icon-btn { width: 24px; height: 24px; }
+.plan-menu .menu-panel { inset-inline-start: auto; inset-inline-end: 0; width: min(260px, calc(100vw - 32px)); padding: .7rem; cursor: auto; }
+.planner-tasks ul { list-style: none; margin: 0; padding: 0; }
+.planner-tasks .plan-chip { background: var(--surface-2); }
+.planned-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .3rem; }
+.planned-list li { display: flex; align-items: center; justify-content: space-between; gap: .4rem; }
+.warning-text { color: color-mix(in srgb, var(--amber) 70%, var(--text)); font-weight: 700; }
+
+.board-dot-violet { --dot: var(--violet); } .board-dot-sky { --dot: var(--sky); } .board-dot-mint { --dot: var(--mint); }
+.board-dot-amber { --dot: var(--amber); } .board-dot-coral { --dot: var(--coral); } .board-dot-slate { --dot: #64748b; }
+.calendar-entry[class*="board-dot-"] { border-inline-start-color: var(--dot); background: color-mix(in srgb, var(--dot) 14%, var(--surface)); }
+.calendar-entry[class*="board-dot-"].is-late { box-shadow: inset 0 0 0 1px var(--coral); }
+
+.table-settings .menu-panel { width: min(420px, calc(100vw - 32px)); padding: .9rem; }
+.column-choices { list-style: none; margin: 0; padding: 0; display: grid; gap: .2rem; max-height: 50vh; overflow-y: auto; }
+.column-choice { display: flex; align-items: center; justify-content: space-between; gap: .4rem; padding: .15rem .3rem; border-radius: 8px; background: var(--surface-2); }
+.column-choice .icon-btn { width: 28px; height: 28px; }
+.data-table .group-row th { background: var(--surface-2); text-align: start; font-weight: 800; padding-top: .7rem; }
+
+.widget { min-width: 0; }
+.widget-wide { grid-column: 1 / -1; }
+.widget-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap; }
+.progress-head .widget-tools { margin-inline-start: auto; }
+.widget-tools { display: flex; align-items: center; gap: .2rem; }
+.widget-tools .icon-btn { width: 28px; height: 28px; }
+.widget-source { position: relative; }
+.widget-source > summary { list-style: none; cursor: pointer; font-weight: 800; }
+.widget-source > summary::-webkit-details-marker { display: none; }
+.widget-source[open] p { position: absolute; inset-inline-end: 0; top: calc(100% + .3rem); z-index: 30; width: min(280px, calc(100vw - 48px)); margin: 0; padding: .7rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: var(--shadow-lg); }
+.dashboard-settings .row-actions { flex-wrap: wrap; }
