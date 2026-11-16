@@ -81,7 +81,54 @@ final class AttachmentService implements AttachmentFiles
     public function upload(int $actorId, CardSummary $card, ?UploadedFile $file): Attachment
     {
         $this->assertCanAdd($actorId, $card);
+        [$file, $mime] = $this->checked($file);
+        $this->assertRoom($card, $file->size);
 
+        $stored = $this->files->put($file);
+        try {
+            $attachment = $this->attachments->addFile($card->id, $card->boardId, $actorId, $this->policy->cleanName($file->clientName), $mime, $file->size, $stored);
+        } catch (Throwable $e) {
+            $this->files->delete($stored);
+            throw $e;
+        }
+        $this->events->publish(new AttachmentAdded($attachment->id, $card->id, $card->boardId, $actorId, $card->title, $attachment->name, false, $this->clock->now()));
+
+        return $attachment;
+    }
+
+    public function hold(?UploadedFile $file): array
+    {
+        [$file, $mime] = $this->checked($file);
+
+        return ['name' => $this->policy->cleanName($file->clientName), 'mime' => $mime, 'size' => $file->size, 'stored' => $this->files->put($file)];
+    }
+
+    public function heldPath(string $stored): ?string
+    {
+        return $this->files->path($stored);
+    }
+
+    public function dropHeld(string $stored): void
+    {
+        $this->files->delete($stored);
+    }
+
+    public function adoptHeld(int $actorId, CardSummary $card, string $name, string $mime, int $size, string $stored): Attachment
+    {
+        $this->assertCanAdd($actorId, $card);
+        if ($this->files->path($stored) === null) {
+            $this->fail('file', 'The file could not be uploaded. Please try again.');
+        }
+        $this->assertRoom($card, $size);
+        $attachment = $this->attachments->addFile($card->id, $card->boardId, $actorId, $this->policy->cleanName($name), $mime, $size, $stored);
+        $this->events->publish(new AttachmentAdded($attachment->id, $card->id, $card->boardId, $actorId, $card->title, $attachment->name, false, $this->clock->now()));
+
+        return $attachment;
+    }
+
+    /** @return array{0: UploadedFile, 1: string} the file and its real type, once it passes every check */
+    private function checked(?UploadedFile $file): array
+    {
         if ($file === null || $file->error === UPLOAD_ERR_NO_FILE) {
             $this->fail('file', 'Choose a file.');
         }
@@ -95,18 +142,8 @@ final class AttachmentService implements AttachmentFiles
         if ($mime === null) {
             $this->fail('file', 'This type of file can not be attached. Use images, PDF, Office documents, text or zip.');
         }
-        $this->assertRoom($card, $file->size);
 
-        $stored = $this->files->put($file);
-        try {
-            $attachment = $this->attachments->addFile($card->id, $card->boardId, $actorId, $this->policy->cleanName($file->clientName), $mime, $file->size, $stored);
-        } catch (Throwable $e) {
-            $this->files->delete($stored);
-            throw $e;
-        }
-        $this->events->publish(new AttachmentAdded($attachment->id, $card->id, $card->boardId, $actorId, $card->title, $attachment->name, false, $this->clock->now()));
-
-        return $attachment;
+        return [$file, $mime];
     }
 
     public function addLink(int $actorId, CardSummary $card, string $url, string $title): Attachment
