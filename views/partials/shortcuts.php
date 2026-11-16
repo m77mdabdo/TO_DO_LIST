@@ -11,6 +11,7 @@ $shortcuts = [
     'N'   => 'Add a card to the first list',
     'E'   => 'Edit the open card',
     'C'   => 'Comment on the open card',
+    'Q'   => 'Add something to your inbox',
     '?'   => 'Show these shortcuts',
     'Esc' => 'Close menus and dialogs, leave a field',
 ];
