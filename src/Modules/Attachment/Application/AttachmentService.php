@@ -9,6 +9,7 @@ use App\Modules\Access\Contract\AccessDenied;
 use App\Modules\Access\Contract\AccessGate;
 use App\Modules\Access\Contract\Permission;
 use App\Modules\Attachment\Contract\Attachment;
+use App\Modules\Attachment\Contract\AttachmentFiles;
 use App\Modules\Attachment\Contract\Events\AttachmentAdded;
 use App\Modules\Attachment\Contract\Events\AttachmentRemoved;
 use App\Modules\Attachment\Domain\AttachmentRepository;
@@ -30,7 +31,7 @@ use Throwable;
  * is for the person who added it, or anyone who may delete items (board
  * managers). Downloading needs ViewBoard, checked on every request.
  */
-final class AttachmentService
+final class AttachmentService implements AttachmentFiles
 {
     public function __construct(
         private AttachmentRepository $attachments,

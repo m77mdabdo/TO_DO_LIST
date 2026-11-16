@@ -13,6 +13,7 @@ use App\Modules\Board\Contract\BoardCatalog;
 use App\Modules\Board\Contract\BoardDirectory;
 use App\Modules\Board\Domain\BoardPreferences;
 use App\Modules\Board\Domain\BoardRepository;
+use App\Modules\Board\Domain\BoardVersions;
 use App\Modules\Board\Domain\SavedSearches;
 use App\Modules\Board\Http\BoardController;
 use App\Modules\Board\Http\BoardViewsController;
@@ -21,8 +22,11 @@ use App\Modules\Board\Http\ListController;
 use App\Modules\Board\Http\SearchController;
 use App\Modules\Board\Infrastructure\PdoBoardPreferences;
 use App\Modules\Board\Infrastructure\PdoBoardRepository;
+use App\Modules\Board\Infrastructure\PdoBoardVersions;
 use App\Modules\Board\Infrastructure\PdoSavedSearches;
+use App\Shared\Events\DomainEvent;
 use App\Shared\Events\EventBus;
+use App\Shared\Events\SyncEventBus;
 use App\Shared\Module\ModuleProvider;
 use App\Support\Clock;
 use PDO;
@@ -48,6 +52,7 @@ final class BoardModule implements ModuleProvider
         $container->singleton(BoardCatalog::class, fn (Container $c) => $c->get(BoardService::class));
         $container->singleton(SavedSearches::class, fn (Container $c) => new PdoSavedSearches($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(BoardPreferences::class, fn (Container $c) => new PdoBoardPreferences($c->get(PDO::class), $c->get(Clock::class)));
+        $container->singleton(BoardVersions::class, fn (Container $c) => new PdoBoardVersions($c->get(PDO::class), $c->get(Clock::class)));
     }
 
     public function routes(Router $router): void
@@ -59,6 +64,7 @@ final class BoardModule implements ModuleProvider
             $router->post('/search/saved/{saved:ulid}', [SearchController::class, 'update']);
             $router->post('/search/saved/{saved:ulid}/delete', [SearchController::class, 'delete']);
             $router->post('/boards/{board:ulid}/display', [BoardController::class, 'display']);
+            $router->get('/boards/{board:ulid}/changes', [BoardController::class, 'changes']);
             $router->post('/boards', [BoardController::class, 'store']);
             $router->get('/boards/{board:ulid}', [BoardController::class, 'show']);
             $router->post('/boards/{board:ulid}', [BoardController::class, 'update']);
@@ -89,6 +95,14 @@ final class BoardModule implements ModuleProvider
 
     public function listeners(EventBus $events, Container $container): void
     {
+        // Any event about a board (it carries boardId) marks that board as changed for open pages.
+        $events->listen(SyncEventBus::ANY, static function (DomainEvent $event) use ($container): void {
+            $boardId = property_exists($event, 'boardId') ? $event->boardId : null;
+            if (is_int($boardId) && $boardId > 0) {
+                $actorId = property_exists($event, 'actorId') && is_int($event->actorId) ? $event->actorId : null;
+                $container->get(BoardVersions::class)->bump($boardId, $actorId);
+            }
+        });
     }
 
     public function migrationsPath(): ?string

@@ -17,6 +17,7 @@ use App\Modules\Board\Contract\BoardSummary;
 use App\Modules\Board\Contract\CardDisplay;
 use App\Modules\Board\Contract\CardFilter;
 use App\Modules\Board\Domain\BoardPreferences;
+use App\Modules\Board\Domain\BoardVersions;
 use App\Modules\Board\Contract\BoardVisibility;
 use App\Modules\Board\Domain\BuiltInTemplates;
 use App\Modules\Board\Application\BoardExport;
@@ -47,6 +48,7 @@ final class BoardController extends Controller
         private Clock $clock,
         private BoardExport $exporter,
         private BoardPreferences $preferences,
+        private BoardVersions $versions,
     ) {
         parent::__construct($view, $url, $session);
     }
@@ -139,9 +141,34 @@ final class BoardController extends Controller
             'audience'    => array_keys($audience),
             'query'       => array_filter($request->only(['q', 'label', 'member', 'due', 'status']), static fn ($v) => $v !== ''),
             'display'     => $this->preferences->cardDisplay($user->id, $board->id),
+            'version'     => $this->versions->current($board->id)['version'],
             'selecting'   => $request->input('select') === '1' && !$board->archived,
             'templates'   => array_values(array_filter(array_merge([], ...array_values($cardsByList)), static fn ($card) => $card->isTemplate)),
         ]);
+    }
+
+    /**
+     * "Has this board changed since version N?" for open board pages, which
+     * ask every few seconds. One indexed read; only people who can see the
+     * board get an answer.
+     *
+     * @param array{board: string} $params
+     */
+    public function changes(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        $board = $this->boards->boardFor($user->id, $params['board']);
+        $since = $request->input('since');
+        $current = $this->versions->current($board->id);
+        $by = $current['actorId'] !== null && $current['actorId'] !== $user->id ? $this->users->find($current['actorId'])?->name : null;
+
+        return Response::json([
+            'ok'      => true,
+            'version' => $current['version'],
+            'changed' => ctype_digit($since) && (int) $since !== $current['version'],
+            'by'      => $by,
+            'mine'    => $current['actorId'] === $user->id,
+        ])->withHeader('Cache-Control', 'no-store');
     }
 
     /**
