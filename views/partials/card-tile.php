@@ -10,9 +10,17 @@
  * @var \DateTimeImmutable $today
  * @var \App\Modules\Board\Contract\CardDisplay|null $display what this person chose to see
  * @var bool $selecting show a checkbox that belongs to the bulk form
+ * @var string|null $cover path of the cover picture, when the cover is an image
+ * @var list<array{field: \App\Modules\Field\Contract\CustomField, text: string}> $fields custom fields shown on the tile
+ * @var \App\Modules\Board\Contract\BoardSummary|null $linkedBoard for a board-link card, the board when the viewer can open it
  */
+use App\Modules\Card\Contract\CardSummary;
+
 $display ??= null;
 $selecting ??= false;
+$cover ??= null;
+$fields ??= [];
+$linkedBoard ??= null;
 $shows = static fn (string $part): bool => $display === null || $display->shows($part);
 $due = $card->dueDate();
 $dueClass = match (true) {
@@ -22,11 +30,27 @@ $dueClass = match (true) {
     $due === $today->format('Y-m-d') => 'due-today',
     default => '',
 };
+$showCover = $shows('covers') && ($card->coverColor !== null || $cover !== null);
+$sticker = $card->sticker !== null ? (CardSummary::STICKERS[$card->sticker] ?? null) : null;
 ?>
-<article class="card-tile <?= $card->isComplete() ? 'is-done' : '' ?> <?= $card->isTemplate ? 'is-template' : '' ?>"
+<?php if ($card->isSeparator()): ?>
+<article class="card-tile tile-separator" data-card-id="<?= $card->id ?>"
+         data-move-url="<?= $this->url('/cards/' . $card->publicId . '/move') ?>"
+         <?= $canMove ? 'draggable="true"' : '' ?>>
+    <?php if ($selecting): ?>
+        <label class="tile-select"><input type="checkbox" name="cards[]" value="<?= $this->e($card->publicId) ?>" form="bulk-form" class="js-bulk-card">
+            <span class="visually-hidden"><?= $this->te('Select :name', ['name' => $card->title]) ?></span></label>
+    <?php endif; ?>
+    <a class="separator-title" href="<?= $this->url('/cards/' . $card->publicId) ?>" dir="auto"><span class="visually-hidden"><?= $this->te('Separator') ?>: </span><?= $this->e($card->title) ?></a>
+</article>
+<?php return; endif; ?>
+<article class="card-tile <?= $card->isComplete() ? 'is-done' : '' ?> <?= $card->isTemplate ? 'is-template' : '' ?> <?= $showCover ? 'has-cover cover-' . $this->e($card->coverSize) : '' ?> <?= $showCover && $cover === null ? 'cover-color tile-' . $this->e((string) $card->coverColor) : '' ?> <?= $card->kind === 'board' ? 'is-board-link' : '' ?>"
          data-card-id="<?= $card->id ?>"
          data-move-url="<?= $this->url('/cards/' . $card->publicId . '/move') ?>"
          <?= $canMove ? 'draggable="true"' : '' ?>>
+    <?php if ($showCover): ?>
+        <div class="tile-cover" aria-hidden="true"><?php if ($cover !== null): ?><img src="<?= $this->url($cover) ?>" alt="" loading="lazy"><?php endif; ?></div>
+    <?php endif; ?>
     <?php if ($labels && $shows('labels')): ?>
         <div class="tile-labels">
             <?php foreach ($labels as $label): ?>
@@ -40,7 +64,23 @@ $dueClass = match (true) {
             <span class="visually-hidden"><?= $this->te('Select :name', ['name' => $card->title]) ?></span></label>
     <?php endif; ?>
     <?php if ($card->isTemplate): ?><span class="tile-template"><?= $this->icon('copy') ?><?= $this->te('Template') ?></span><?php endif; ?>
-    <a class="card-title" href="<?= $this->url('/cards/' . $card->publicId) ?>" dir="auto"><?= $this->e($card->title) ?></a>
+    <a class="card-title" href="<?= $this->url('/cards/' . $card->publicId) ?>" dir="auto"><?php if ($sticker !== null): ?><span class="sticker" title="<?= $this->te($sticker[1]) ?>" aria-label="<?= $this->te($sticker[1]) ?>"><?= $sticker[0] ?></span> <?php endif; ?><?= $this->e($card->title) ?></a>
+    <?php if ($card->kind === 'board'): ?>
+        <p class="tile-board-link">
+            <?php if ($linkedBoard !== null): ?>
+                <a href="<?= $this->url('/boards/' . $linkedBoard->publicId) ?>" dir="auto"><?= $this->icon('board') ?><?= $this->e($linkedBoard->name) ?></a>
+            <?php else: ?>
+                <span class="muted"><?= $this->icon('lock') ?><?= $this->te('A board you cannot open.') ?></span>
+            <?php endif; ?>
+        </p>
+    <?php endif; ?>
+    <?php if ($fields && $shows('fields')): ?>
+        <ul class="tile-fields">
+            <?php foreach ($fields as ['field' => $field, 'text' => $text]): ?>
+                <li class="field-chip" dir="auto"><span class="field-chip-name"><?= $this->e($field->name) ?>:</span> <bdi><?= $this->e($text) ?></bdi></li>
+            <?php endforeach; ?>
+        </ul>
+    <?php endif; ?>
 
     <div class="tile-foot">
         <?php if ($due !== null && $shows('dates')): ?>

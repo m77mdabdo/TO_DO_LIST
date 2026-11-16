@@ -22,6 +22,8 @@ use App\Modules\Attachment\Contract\Events\AttachmentAdded;
 use App\Modules\Attachment\Contract\Events\AttachmentRemoved;
 use App\Modules\Discussion\Contract\Events\CommentPosted;
 use App\Modules\Discussion\Contract\Events\VoteChanged;
+use App\Modules\Field\Contract\Events\FieldsChanged;
+use App\Modules\Field\Contract\Events\FieldValueChanged;
 use App\Modules\Label\Contract\Events\LabelAttached;
 use App\Modules\Label\Contract\Events\LabelDetached;
 use App\Shared\Events\DomainEvent;
@@ -45,7 +47,7 @@ final class ActivityRecorder
             CardCreated::name(), CardChanged::name(), CardMoved::name(), CardMemberChanged::name(), CardDeleted::name(),
             LabelAttached::name(), LabelDetached::name(), ChecklistChanged::name(),
             CommentPosted::name(), VoteChanged::name(), BoardMemberChanged::name(),
-            AttachmentAdded::name(), AttachmentRemoved::name(),
+            AttachmentAdded::name(), AttachmentRemoved::name(), FieldValueChanged::name(), FieldsChanged::name(),
         ];
     }
 
@@ -86,6 +88,9 @@ final class ActivityRecorder
             $event instanceof VoteChanged   => $event->added ? $this->log->record($event->boardId, $event->cardId, $event->actorId, 'vote.added', $event->cardTitle) : null,
             $event instanceof AttachmentAdded   => $this->log->record($event->boardId, $event->cardId, $event->actorId, 'attachment.added', $event->name, ['card' => $event->cardTitle]),
             $event instanceof AttachmentRemoved => $this->log->record($event->boardId, $event->cardId, $event->actorId, 'attachment.removed', $event->name, ['card' => $event->cardTitle]),
+            $event instanceof FieldValueChanged => $this->log->record($event->boardId, $event->cardId, $event->actorId, $event->value === '' ? 'field.cleared' : 'field.set', $event->fieldName, ['card' => $event->cardTitle, 'to' => $event->value]),
+            // Reordering or changing choices isn't worth a line; adding, renaming and deleting are.
+            $event instanceof FieldsChanged => in_array($event->change, ['added', 'renamed', 'deleted'], true) ? $this->log->record($event->boardId, null, $event->actorId, 'field.' . $event->change, $event->fieldName) : null,
             default => null,
         };
     }

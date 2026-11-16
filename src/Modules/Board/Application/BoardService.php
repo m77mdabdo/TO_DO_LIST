@@ -62,6 +62,25 @@ final class BoardService implements BoardCatalog
         return $board;
     }
 
+    /**
+     * The boards that board-link cards point at, only those the user may open.
+     *
+     * @param list<int> $boardIds
+     * @return array<int, BoardSummary> board id => board
+     */
+    public function openable(int $userId, array $boardIds): array
+    {
+        $out = [];
+        foreach (array_unique($boardIds) as $id) {
+            $board = $this->boards->find($id);
+            if ($board !== null && $this->gate->can($userId, $id, Permission::ViewBoard)) {
+                $out[$id] = $board;
+            }
+        }
+
+        return $out;
+    }
+
     /** @return list<BoardSummary> */
     public function boardsInWorkspace(int $userId, int $workspaceId, bool $archived = false): array
     {
@@ -127,6 +146,7 @@ final class BoardService implements BoardCatalog
             'visibility'  => ['Visibility', 'required|in:private,workspace'],
             'commenting'  => ['Commenting', 'in:off,members,everyone'],
             'voting'      => ['Voting', 'in:off,members,everyone'],
+            'background'  => ['Background', 'in:' . implode(',', array_keys(BoardSummary::BACKGROUNDS))],
         ]);
 
         $fields = [
@@ -136,6 +156,7 @@ final class BoardService implements BoardCatalog
             'visibility'  => (string) $input['visibility'],
             'commenting'  => (string) ($input['commenting'] ?? '') ?: $board->commenting->value,
             'voting'      => (string) ($input['voting'] ?? '') ?: $board->voting->value,
+            'background'  => (string) ($input['background'] ?? '') ?: $board->background,
         ];
 
         $this->transactions->run(function () use ($actorId, $board, $fields): void {
@@ -145,6 +166,7 @@ final class BoardService implements BoardCatalog
                 'renamed'    => $fields['name'] !== $board->name ? ['from' => $board->name, 'to' => $fields['name']] : null,
                 'visibility' => $fields['visibility'] !== $board->visibility->value ? ['to' => $fields['visibility']] : null,
                 'recolored'  => $fields['color'] !== $board->color ? ['to' => $fields['color']] : null,
+                'background' => $fields['background'] !== $board->background ? [] : null,
                 'described'  => $fields['description'] !== $board->description ? [] : null,
                 'participation' => $fields['commenting'] !== $board->commenting->value || $fields['voting'] !== $board->voting->value
                     ? ['commenting' => $fields['commenting'], 'voting' => $fields['voting']] : null,

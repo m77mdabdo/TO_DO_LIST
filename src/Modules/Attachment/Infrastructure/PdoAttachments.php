@@ -45,6 +45,24 @@ final class PdoAttachments implements AttachmentRepository
         return array_map(fn (array $row) => $this->hydrate($row), $stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 
+    public function imagePublicIds(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+        $marks = implode(',', array_fill(0, count($ids), '?'));
+        $types = implode(',', array_fill(0, count(Attachment::IMAGE_TYPES), '?'));
+        $stmt = $this->db->prepare("SELECT id, public_id FROM attachments WHERE id IN ($marks) AND kind = 'file' AND mime IN ($types)");
+        $stmt->execute([...array_values($ids), ...Attachment::IMAGE_TYPES]);
+
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_NUM) as [$id, $publicId]) {
+            $out[(int) $id] = (string) $publicId;
+        }
+
+        return $out;
+    }
+
     public function countForCard(int $cardId): int
     {
         $stmt = $this->db->prepare('SELECT COUNT(*) FROM attachments WHERE card_id = ?');

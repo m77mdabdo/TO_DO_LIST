@@ -18,6 +18,8 @@ final class CardDisplay
         'members'     => 'Members',
         'description' => 'Description icon',
         'badges'      => 'Checklist, comment and attachment counts',
+        'covers'      => 'Covers',
+        'fields'      => 'Custom fields',
     ];
 
     /** @param array<string, bool> $shown */

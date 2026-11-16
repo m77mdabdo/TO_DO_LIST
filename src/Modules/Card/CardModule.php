@@ -91,6 +91,7 @@ final class CardModule implements ModuleProvider
             $router->post('/cards/{card:ulid}/complete', [CardController::class, 'complete']);
             $router->post('/cards/{card:ulid}/move', [CardController::class, 'move']);
             $router->post('/cards/{card:ulid}/template', [CardController::class, 'template']);
+            $router->post('/cards/{card:ulid}/looks', [CardController::class, 'looks']);
             $router->post('/cards/{card:ulid}/copy', [CardController::class, 'copy']);
             $router->post('/cards/{card:ulid}/archive', [CardController::class, 'archive']);
             $router->post('/cards/{card:ulid}/restore', [CardController::class, 'restore']);
