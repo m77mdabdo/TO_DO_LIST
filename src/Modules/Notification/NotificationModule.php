@@ -89,6 +89,7 @@ final class NotificationModule implements ModuleProvider
     {
         $router->group([Authenticate::class], function (Router $router): void {
             $router->get('/notifications', [NotificationController::class, 'index']);
+            $router->get('/notifications/latest.json', [NotificationController::class, 'latestJson']);
             $router->post('/notifications/read-all', [NotificationController::class, 'readAll']);
             $router->post('/notifications/settings', [NotificationController::class, 'settings']);
             $router->post('/notifications/{id}/open', [NotificationController::class, 'open']);

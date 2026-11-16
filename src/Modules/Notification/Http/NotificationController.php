@@ -8,10 +8,12 @@ use App\Controllers\Controller;
 use App\Http\Request;
 use App\Http\Response;
 use App\Http\Url;
+use App\I18n\Translator;
 use App\Modules\Access\Contract\AccessDenied;
 use App\Modules\Board\Contract\BoardDirectory;
 use App\Modules\Identity\Contract\UserDirectory;
 use App\Modules\Notification\Application\NotificationCenter;
+use App\Modules\Notification\Contract\Messages;
 use App\Session\Session;
 use App\View\View;
 
@@ -24,6 +26,7 @@ final class NotificationController extends Controller
         private NotificationCenter $center,
         private UserDirectory $users,
         private BoardDirectory $boards,
+        private Translator $translator,
     ) {
         parent::__construct($view, $url, $session);
     }
@@ -43,6 +46,48 @@ final class NotificationController extends Controller
             'emailEnabled'  => $this->center->emailEnabled($user->id),
             'unread'        => $this->center->unreadCount($user->id),
         ]);
+    }
+
+    /**
+     * Unread notifications newer than ?after=ID, as plain text, for the
+     * browser's own notifications. Only ever the signed-in person's.
+     */
+    public function latestJson(Request $request): Response
+    {
+        $user = $this->user($request);
+        $after = $request->input('after');
+        $after = ctype_digit($after) ? (int) $after : 0;
+        $items = array_values(array_filter(
+            $this->center->latest($user->id),
+            static fn ($n) => $n->id > $after && !$n->isRead(),
+        ));
+        $people = $this->users->findMany(array_values(array_filter(array_map(static fn ($n) => $n->actorId, $items))));
+
+        $out = [];
+        foreach (array_slice($items, 0, 5) as $n) {
+            $replace = [
+                ':actor'   => $n->actorId !== null ? ($people[$n->actorId]->name ?? $this->translator->t('Someone')) : $this->translator->t('Someone'),
+                ':subject' => $n->subject,
+            ];
+            foreach ($n->data as $key => $value) {
+                if ($key !== 'excerpt') {
+                    $replace[':' . $key] = $key === 'role' ? $this->translator->t($value) : $value;
+                }
+            }
+            $out[] = [
+                'id'   => $n->id,
+                'text' => strtr($this->translator->t(Messages::sentence($n->type)), $replace),
+                'body' => (string) ($n->data['excerpt'] ?? ''),
+                'url'  => $this->url->to($n->link),
+            ];
+        }
+
+        return Response::json([
+            'ok'     => true,
+            'latest' => $this->center->latest($user->id)[0]->id ?? 0,
+            'unread' => $this->center->unreadCount($user->id),
+            'items'  => $out,
+        ])->withHeader('Cache-Control', 'no-store');
     }
 
     /** @param array{id: string} $params */

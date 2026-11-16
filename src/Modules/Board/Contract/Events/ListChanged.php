@@ -7,7 +7,7 @@ namespace App\Modules\Board\Contract\Events;
 use App\Shared\Events\DomainEvent;
 use DateTimeImmutable;
 
-/** change: renamed | moved | archived | restored */
+/** change: renamed | moved | archived | restored | recolored */
 final class ListChanged implements DomainEvent
 {
     public function __construct(

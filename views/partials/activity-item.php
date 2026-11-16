@@ -24,6 +24,7 @@ $templates = [
     'list.moved'        => ':actor moved the list :subject',
     'list.archived'     => ':actor archived the list :subject',
     'list.restored'     => ':actor restored the list :subject',
+    'list.recolored'    => ':actor changed the color of the list :subject',
     'card.created'      => ':actor added :subject to :list',
     'card.renamed'      => ':actor renamed :subject',
     'card.described'    => ':actor updated the description of :subject',

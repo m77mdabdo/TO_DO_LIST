@@ -17,6 +17,9 @@ namespace App\Shared\Events;
  */
 final class SyncEventBus implements EventBus
 {
+    /** Listen under this name to receive every event, after its own listeners (e.g. to mark a board as changed). */
+    public const ANY = '*';
+
     /** @var array<string, list<callable>> each listener takes the event published under its key */
     private array $listeners = [];
 
@@ -49,6 +52,9 @@ final class SyncEventBus implements EventBus
                 $current = $this->queue[$i];
 
                 foreach ($this->listeners[$current::name()] ?? [] as $listener) {
+                    $listener($current);
+                }
+                foreach ($this->listeners[self::ANY] ?? [] as $listener) {
                     $listener($current);
                 }
             }

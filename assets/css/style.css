@@ -371,6 +371,7 @@ label > span { display: block; font-weight: 700; font-size: .85rem; margin-botto
    English LTR both lay out correctly from the same rules.
    ========================================================= */
 
+[hidden] { display: none !important; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .narrow { max-width: 760px; }
 .row-end { display: flex; justify-content: flex-end; gap: .6rem; }
@@ -1025,3 +1026,31 @@ main.wrap > section.card:not(.table-wrap) { padding: clamp(1rem, 3vw, 1.6rem); }
 .compare h3 { margin: 0 0 .3rem; }
 .compare p { margin: 0; }
 .card-tile:has(.tile-select) { padding-inline-end: 2.2rem; }
+
+/* ---------- batch 3: live board, reactions, comment files, typing ---------- */
+.banner-updates { position: sticky; top: .5rem; z-index: 20; box-shadow: var(--shadow, 0 6px 20px rgb(0 0 0 / .12)); }
+.banner-updates button { margin-inline-start: auto; }
+.comments .banner { margin: 0; font-weight: 600; }
+.banner-warning p { margin: 0; flex: 1 1 18rem; }
+.comment:target .comment-body, .comment.is-target .comment-body { outline: 2px solid var(--violet); outline-offset: 4px; border-radius: var(--radius-sm); }
+.comment { scroll-margin-top: 5rem; }
+.comment-form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
+.comment-file { position: relative; cursor: pointer; }
+.comment-file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.comment-file:focus-within { outline: 2px solid var(--violet); outline-offset: 2px; }
+.comment-file-chip { display: inline-flex; flex-wrap: wrap; align-items: center; gap: .45rem; max-width: 100%; padding: .4rem .6rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); text-decoration: none; color: inherit; justify-self: start; }
+.comment-file-chip img { display: block; width: 120px; height: auto; max-height: 120px; object-fit: cover; border-radius: 6px; }
+.comment-file-chip bdi { overflow-wrap: anywhere; font-weight: 600; }
+.reactions { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; }
+.reactions form { margin: 0; }
+.reaction { display: inline-flex; align-items: center; gap: .25rem; min-height: 32px; padding: .15rem .55rem; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: inherit; font: inherit; font-size: .9rem; cursor: pointer; list-style: none; }
+.reaction::-webkit-details-marker { display: none; }
+.reaction:hover { border-color: var(--violet); }
+.reaction:focus-visible { outline: 2px solid var(--violet); outline-offset: 2px; }
+.reaction[aria-pressed="true"] { border-color: var(--violet); background: color-mix(in srgb, var(--violet) 14%, var(--surface)); }
+.reaction[disabled] { cursor: default; opacity: .85; }
+.reaction-count { font-weight: 700; font-variant-numeric: tabular-nums; }
+.reaction-add { color: var(--muted, inherit); }
+.reaction-panel { display: flex; flex-wrap: wrap; gap: .3rem; min-width: 0; padding: .4rem; }
+.reaction-pick { font-size: 1.15rem; padding: .2rem .45rem; }
+.typing-now { margin: 0; font-style: italic; }

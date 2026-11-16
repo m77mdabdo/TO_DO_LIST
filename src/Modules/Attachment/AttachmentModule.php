@@ -65,6 +65,7 @@ final class AttachmentModule implements ModuleProvider
         ));
         $container->singleton(UploadPolicy::class, fn () => new UploadPolicy());
         $container->singleton(AttachmentService::class, fn (Container $c) => $c->build(AttachmentService::class));
+        $container->singleton(\App\Modules\Attachment\Contract\AttachmentFiles::class, fn (Container $c) => $c->get(AttachmentService::class));
 
         $container->extend(View::class, function (object $view, Container $c): void {
             /** @var View $view */

@@ -280,7 +280,10 @@ final class BoardService implements BoardCatalog
             return;
         }
 
-        $this->boards->updateList($list->id, ['color' => $color]);
+        $this->transactions->run(function () use ($actorId, $board, $list, $color): void {
+            $this->boards->updateList($list->id, ['color' => $color]);
+            $this->events->publish(new ListChanged($list->id, $board->id, $actorId, 'recolored', ['name' => $list->name], $this->clock->now()));
+        });
     }
 
     /** Puts the list right after $afterListId (first when null). One row is written. */

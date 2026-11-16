@@ -15,6 +15,7 @@ use App\Core\Container;
 use App\Http\Middleware\Authenticate;
 use App\Http\Router;
 use App\Modules\Access\Contract\AccessGate;
+use App\Modules\Attachment\Contract\AttachmentFiles;
 use App\Modules\Discussion\Application\DiscussionService;
 use App\Modules\Discussion\Domain\DiscussionRepository;
 use App\Modules\Discussion\Domain\Mentions;
@@ -24,13 +25,14 @@ use App\Modules\Identity\Contract\Authenticator;
 use App\Modules\Identity\Contract\UserDirectory;
 use App\Shared\Events\EventBus;
 use App\Shared\Module\ModuleProvider;
+use App\Session\Session;
 use App\Support\Clock;
 use App\View\View;
 use PDO;
 
 /**
  * Comments (with @mentions) and votes on cards, as each board allows.
- * Publishes: comment.posted, vote.changed.
+ * Publishes: comment.posted, comment.changed (edits, deletes, reactions), vote.changed.
  * Adds to the card page (slots "card.main" and "card.side") and the board's tiles.
  */
 final class DiscussionModule implements ModuleProvider
@@ -82,10 +84,26 @@ final class DiscussionModule implements ModuleProvider
                 $before = (string) ($data['query']['comments_before'] ?? '');
                 $comments = $service->comments($data['card']->id, ctype_digit($before) ? (int) $before : null);
 
-                $people = $c->get(UserDirectory::class)->findMany([
+                $reactors = [];
+                foreach ($comments as $comment) {
+                    foreach ($comment->reactions as $userIds) {
+                        array_push($reactors, ...$userIds);
+                    }
+                }
+                $people = $c->get(UserDirectory::class)->findMany(array_values(array_unique([
                     ...array_keys($c->get(AccessGate::class)->peopleOn($data['card']->boardId)),
                     ...array_map(static fn ($comment) => $comment->authorId, $comments),
-                ]);
+                    ...$reactors,
+                ])));
+
+                // Files sent with comments are attachments of the card.
+                $files = [];
+                if (array_filter($comments, static fn ($comment) => $comment->attachmentId !== null)) {
+                    foreach ($c->get(AttachmentFiles::class)->forCard($data['card']->id) as $attachment) {
+                        $files[$attachment->id] = $attachment;
+                    }
+                }
+                $unreached = $c->get(Session::class)->pullFlash('mentions.unreached');
 
                 return [
                     'comments'   => $comments,
@@ -94,7 +112,10 @@ final class DiscussionModule implements ModuleProvider
                     'handles'    => Mentions::handles(array_map(static fn ($u) => $u->name, $people)),
                     'viewerId'   => $userId,
                     'canComment' => $service->canComment($userId, $data['board']) && !$data['card']->archived,
+                    'canAttach'  => $service->canAttach($userId, $data['card']),
                     'canModerate' => static fn ($comment) => $service->canDelete($userId, $comment),
+                    'files'      => $files,
+                    'unreached'  => is_array($unreached) ? $unreached : null,
                 ];
             });
 
@@ -142,6 +163,9 @@ final class DiscussionModule implements ModuleProvider
             $router->post('/cards/{card:ulid}/vote', [DiscussionController::class, 'vote']);
             $router->post('/comments/{id}', [DiscussionController::class, 'update']);
             $router->post('/comments/{id}/delete', [DiscussionController::class, 'destroy']);
+            $router->post('/comments/{id}/reactions', [DiscussionController::class, 'react']);
+            $router->get('/cards/{card:ulid}/typing', [DiscussionController::class, 'typing']);
+            $router->post('/cards/{card:ulid}/typing', [DiscussionController::class, 'typing']);
         });
     }
 
