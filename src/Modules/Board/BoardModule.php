@@ -85,6 +85,9 @@ final class BoardModule implements ModuleProvider
             $router->get('/workspaces/{workspace:ulid}/report', [WorkspaceViewsController::class, 'report']);
             $router->get('/workspaces/{workspace:ulid}/report.csv', [WorkspaceViewsController::class, 'reportCsv']);
             $router->get('/boards/{board:ulid}/dashboard', [BoardViewsController::class, 'dashboard']);
+            $router->post('/boards/{board:ulid}/table/settings', [BoardViewsController::class, 'saveTable']);
+            $router->post('/boards/{board:ulid}/dashboard/widgets', [BoardViewsController::class, 'changeDashboard']);
+            $router->get('/workspaces/{workspace:ulid}/calendar', [WorkspaceViewsController::class, 'calendar']);
 
             $router->post('/boards/{board:ulid}/lists', [ListController::class, 'store']);
             $router->post('/boards/{board:ulid}/lists/{id}', [ListController::class, 'update']);

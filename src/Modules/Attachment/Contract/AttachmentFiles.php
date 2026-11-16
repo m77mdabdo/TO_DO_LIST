@@ -21,4 +21,25 @@ interface AttachmentFiles
 
     /** @return list<Attachment> */
     public function forCard(int $cardId): array;
+
+    /**
+     * Checks and stores a file that is not on a card yet (a personal inbox
+     * item). The caller keeps the returned details and later adopts or drops it.
+     *
+     * @return array{name: string, mime: string, size: int, stored: string}
+     * @throws \App\Validation\ValidationException with the error on "file"
+     */
+    public function hold(?UploadedFile $file): array;
+
+    /** Absolute path of a held file, or null when it is missing. */
+    public function heldPath(string $stored): ?string;
+
+    public function dropHeld(string $stored): void;
+
+    /**
+     * Puts a held file on a card, with the same checks as an upload.
+     *
+     * @throws \App\Validation\ValidationException with the error on "file"
+     */
+    public function adoptHeld(int $actorId, CardSummary $card, string $name, string $mime, int $size, string $stored): Attachment;
 }
