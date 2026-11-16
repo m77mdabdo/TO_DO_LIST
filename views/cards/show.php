@@ -14,6 +14,9 @@
  * @var array<string, string> $query
  * @var bool $moreActivity
  * @var list<array{board: \App\Modules\Board\Contract\BoardSummary, lists: list<\App\Modules\Board\Contract\ListSummary>}> $copyTargets
+ * @var list<\App\Modules\Attachment\Contract\Attachment> $coverImages
+ * @var list<\App\Modules\Board\Contract\BoardSummary> $linkBoards
+ * @var \App\Modules\Board\Contract\BoardSummary|null $linkedBoard the linked board, only when the viewer can open it
  */
 use App\Modules\Access\Contract\Permission;
 use App\Modules\Label\Contract\Label;
@@ -47,7 +50,18 @@ $editErrors = $form->error('title') || $form->error('description') || $form->err
             </p>
 
             <?php if (!$canEdit || !$editErrors): ?>
-                <h1 class="card-heading" dir="auto"><?= $this->e($card->title) ?></h1>
+                <h1 class="card-heading" dir="auto"><?php if ($card->sticker !== null): ?><span class="sticker" title="<?= $this->te(\App\Modules\Card\Contract\CardSummary::STICKERS[$card->sticker][1] ?? '') ?>"><?= \App\Modules\Card\Contract\CardSummary::STICKERS[$card->sticker][0] ?? '' ?></span> <?php endif; ?><?= $this->e($card->title) ?></h1>
+                <?php if ($card->kind === 'separator'): ?>
+                    <p class="pill"><?= $this->te('Separator: shown as a heading between cards on the board.') ?></p>
+                <?php elseif ($card->kind === 'board'): ?>
+                    <p class="board-link-card"><?= $this->icon('board') ?>
+                        <?php if ($linkedBoard !== null): ?>
+                            <a href="<?= $this->url('/boards/' . $linkedBoard->publicId) ?>" dir="auto"><?= $this->e($linkedBoard->name) ?></a>
+                        <?php else: ?>
+                            <span class="muted"><?= $this->te('A board you cannot open.') ?></span>
+                        <?php endif; ?>
+                    </p>
+                <?php endif; ?>
                 <?php if ($card->startDate() || $card->dueDate()): ?>
                     <p class="date-range">
                         <?php if ($card->startDate()): ?><span class="due"><?= $this->te('Starts') ?> <?= $this->e($card->startDate()) ?></span><?php endif; ?>
@@ -178,6 +192,8 @@ $editErrors = $form->error('title') || $form->error('description') || $form->err
                 <?php endif; ?>
             </section>
 
+            <?= $this->partial('cards/looks', ['card' => $card, 'coverImages' => $coverImages ?? [], 'linkBoards' => $linkBoards ?? [], 'canEdit' => $canEdit]) ?>
+
             <?php if ($canEdit || $canMove || $canArchive): ?>
                 <section class="card stack">
                     <h2 class="section-title"><?= $this->te('Actions') ?></h2>
@@ -236,7 +252,7 @@ $editErrors = $form->error('title') || $form->error('description') || $form->err
                         <?= $this->partial('partials/field-error', ['field' => 'list']) ?>
                         <fieldset class="stack-sm">
                             <legend><?= $this->te('Keep') ?></legend>
-                            <?php foreach (['description' => 'Description', 'dates' => 'Dates', 'labels' => 'Labels', 'checklists' => 'Checklists', 'members' => 'Members who can see that board'] as $part => $text): ?>
+                            <?php foreach (['description' => 'Description', 'dates' => 'Dates', 'labels' => 'Labels', 'checklists' => 'Checklists', 'fields' => 'Custom fields', 'members' => 'Members who can see that board'] as $part => $text): ?>
                                 <label class="check"><input type="checkbox" name="keep[]" value="<?= $part ?>" <?= $part !== 'members' ? 'checked' : '' ?>> <?= $this->te($text) ?></label>
                             <?php endforeach; ?>
                         </fieldset>

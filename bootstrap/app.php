@@ -100,6 +100,7 @@ return static function (Config $config, Session $session, string $basePath = '',
     // Modules add what they can be searched for (see App\Shared\Search).
     $container->singleton(SearchSources::class, fn () => new SearchSources());
     $container->singleton(ExportParts::class, fn () => new ExportParts());
+    $container->singleton(\App\Shared\Export\ExportColumns::class, fn () => new \App\Shared\Export\ExportColumns());
     // ...and what automations can do with their things (see App\Shared\Automation).
     $container->singleton(AutomationActions::class, fn () => new AutomationActions());
     // ...and the request limits of their routes (see App\Security\RateLimits).

@@ -8,6 +8,7 @@ use App\Database\Transactions;
 use App\Modules\Access\Contract\AccessDenied;
 use App\Modules\Access\Contract\AccessGate;
 use App\Modules\Access\Contract\Permission;
+use App\Modules\Attachment\Contract\AttachmentFiles;
 use App\Modules\Board\Contract\BoardDirectory;
 use App\Modules\Board\Contract\BoardSummary;
 use App\Modules\Card\Contract\CardSummary;
@@ -36,7 +37,7 @@ final class CardService implements CardWriter
     public const TITLE_MAX = 200;
     public const DESCRIPTION_MAX = 10000;
     /** What a card copy can keep. */
-    public const COPY_PARTS = ['description', 'dates', 'labels', 'checklists', 'members'];
+    public const COPY_PARTS = ['description', 'dates', 'labels', 'checklists', 'fields', 'members'];
 
     public function __construct(
         private CardRepository $cards,
@@ -46,6 +47,7 @@ final class CardService implements CardWriter
         private EventBus $events,
         private Clock $clock,
         private Validator $validator,
+        private AttachmentFiles $files,
     ) {
     }
 
@@ -143,6 +145,78 @@ final class CardService implements CardWriter
             $this->cards->update($card->id, ['is_template' => $template ? 1 : 0]);
             $this->events->publish(new CardChanged($card->id, $card->boardId, $actorId, $template ? 'made_template' : 'unmade_template', $card->title, [], $this->clock->now()));
         });
+    }
+
+    /**
+     * Changes how the card looks: its cover (none, a color, or one of the
+     * card's own images, shown at the top or filling the tile), its sticker,
+     * and its kind (an ordinary card, a separator, or a link to another
+     * board in the same workspace that the actor can open).
+     *
+     * @param array<string, string> $input cover ("", "color:<color>", "image:<attachment public id>"), cover_size, sticker, kind, link_board (board public id)
+     */
+    public function setLooks(int $actorId, CardSummary $card, array $input): CardSummary
+    {
+        $this->gate->authorize($actorId, $card->boardId, Permission::EditCards);
+        $this->assertBoardOpen($card->boardId);
+        if ($card->archived) {
+            throw AccessDenied::forbidden();
+        }
+
+        $cover = (string) ($input['cover'] ?? '');
+        $fields = ['cover_color' => null, 'cover_attachment_id' => null];
+        if (str_starts_with($cover, 'color:') && in_array(substr($cover, 6), CardSummary::COVER_COLORS, true)) {
+            $fields['cover_color'] = substr($cover, 6);
+        } elseif (str_starts_with($cover, 'image:')) {
+            foreach ($this->files->forCard($card->id) as $attachment) {
+                if ($attachment->publicId === substr($cover, 6) && $attachment->isImage()) {
+                    $fields['cover_attachment_id'] = $attachment->id;
+                }
+            }
+            if ($fields['cover_attachment_id'] === null) {
+                throw new ValidationException(new ValidationResult(['cover' => 'Choose one of this card’s images for the cover.']));
+            }
+        } elseif ($cover !== '') {
+            throw new ValidationException(new ValidationResult(['cover' => 'Choose a cover from the list.']));
+        }
+        $fields['cover_size'] = in_array($input['cover_size'] ?? '', CardSummary::COVER_SIZES, true) ? (string) $input['cover_size'] : 'top';
+
+        $sticker = (string) ($input['sticker'] ?? '');
+        if ($sticker !== '' && !isset(CardSummary::STICKERS[$sticker])) {
+            throw new ValidationException(new ValidationResult(['sticker' => 'Choose a sticker from the list.']));
+        }
+        $fields['sticker'] = $sticker !== '' ? $sticker : null;
+
+        $kind = (string) ($input['kind'] ?? '') ?: $card->kind;
+        if (!in_array($kind, CardSummary::KINDS, true)) {
+            throw new ValidationException(new ValidationResult(['kind' => 'Choose what kind of card this is.']));
+        }
+        $fields['kind'] = $kind;
+        $fields['link_board_id'] = null;
+        if ($kind === 'board') {
+            $from = $this->boards->find($card->boardId);
+            $target = $this->boards->findByPublicId((string) ($input['link_board'] ?? ''));
+            if ($from === null || $target === null || $target->workspaceId !== $from->workspaceId || $target->id === $from->id
+                || !$this->gate->can($actorId, $target->id, Permission::ViewBoard)) {
+                throw new ValidationException(new ValidationResult(['link_board' => 'Choose a board of this workspace that you can open.']));
+            }
+            $fields['link_board_id'] = $target->id;
+        }
+
+        $this->transactions->run(function () use ($actorId, $card, $fields): void {
+            $this->cards->update($card->id, $fields);
+            if ($fields['cover_color'] !== $card->coverColor || $fields['cover_attachment_id'] !== $card->coverAttachmentId || $fields['cover_size'] !== $card->coverSize) {
+                $this->events->publish(new CardChanged($card->id, $card->boardId, $actorId, 'cover_changed', $card->title, [], $this->clock->now()));
+            }
+            if ($fields['sticker'] !== $card->sticker) {
+                $this->events->publish(new CardChanged($card->id, $card->boardId, $actorId, 'sticker_changed', $card->title, [], $this->clock->now()));
+            }
+            if ($fields['kind'] !== $card->kind || $fields['link_board_id'] !== $card->linkBoardId) {
+                $this->events->publish(new CardChanged($card->id, $card->boardId, $actorId, 'kind_changed', $card->title, ['kind' => $fields['kind']], $this->clock->now()));
+            }
+        });
+
+        return $this->cards->find($card->id) ?? $card;
     }
 
     /**

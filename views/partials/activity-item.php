@@ -55,6 +55,15 @@ $templates = [
     'board.member_added'   => ':actor added :member to the board as :subject',
     'board.member_role'    => ':actor made :member a board :subject',
     'board.member_removed' => ':actor took :member off the board',
+    'field.set'         => ':actor set :subject to :to on :card',
+    'field.cleared'     => ':actor cleared :subject on :card',
+    'field.added'       => ':actor added the custom field :subject',
+    'field.renamed'     => ':actor renamed a custom field to :subject',
+    'field.deleted'     => ':actor deleted the custom field :subject',
+    'card.cover_changed' => ':actor changed the cover of :subject',
+    'card.sticker_changed' => ':actor changed the sticker on :subject',
+    'card.kind_changed' => ':actor changed what kind of card :subject is',
+    'board.background'  => ':actor changed the board background',
 ];
 // Translate the sentence first, then drop the names in as isolated, bold
 // spans, so an English title inside an Arabic sentence keeps its place.
