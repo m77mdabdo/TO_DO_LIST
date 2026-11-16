@@ -84,11 +84,14 @@ final class CardModule implements ModuleProvider
     {
         $router->group([Authenticate::class], function (Router $router): void {
             $router->post('/boards/{board:ulid}/cards', [CardController::class, 'store']);
+            $router->post('/boards/{board:ulid}/cards/bulk', [CardController::class, 'bulk']);
             $router->get('/cards/{card:ulid}', [CardController::class, 'show']);
             $router->post('/cards/{card:ulid}', [CardController::class, 'update']);
             $router->post('/cards/{card:ulid}/members', [CardController::class, 'members']);
             $router->post('/cards/{card:ulid}/complete', [CardController::class, 'complete']);
             $router->post('/cards/{card:ulid}/move', [CardController::class, 'move']);
+            $router->post('/cards/{card:ulid}/template', [CardController::class, 'template']);
+            $router->post('/cards/{card:ulid}/copy', [CardController::class, 'copy']);
             $router->post('/cards/{card:ulid}/archive', [CardController::class, 'archive']);
             $router->post('/cards/{card:ulid}/restore', [CardController::class, 'restore']);
             $router->post('/cards/{card:ulid}/delete', [CardController::class, 'destroy']);

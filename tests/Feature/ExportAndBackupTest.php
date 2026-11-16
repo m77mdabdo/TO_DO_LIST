@@ -73,12 +73,20 @@ final class ExportAndBackupTest extends TestCase
         $backup = new Backup($this->f->app->container->get(PDO::class), $dir);
 
         $first = $backup->database('20260101-000000-aaaa');
-        $copy = new PDO('sqlite:' . $first);
-        $this->assertSame('Plan', $copy->query('SELECT title FROM cards')->fetchColumn());
+        if (\Tests\Support\TestDatabase::driver() === 'mysql') {
+            // MySQL backups are a gzipped SQL dump.
+            $dump = (string) gzdecode((string) file_get_contents($first));
+            $this->assertTrue(str_contains($dump, 'Plan') && str_contains($dump, 'INSERT INTO `cards`'));
+            $ext = '.sql.gz';
+        } else {
+            $copy = new PDO('sqlite:' . $first);
+            $this->assertSame('Plan', $copy->query('SELECT title FROM cards')->fetchColumn());
+            $ext = '.sqlite';
+        }
 
         $backup->database('20260102-000000-bbbb');
         $backup->database('20260103-000000-cccc');
         $this->assertCount(1, $backup->prune(2));
-        $this->assertSame(['database-20260102-000000-bbbb.sqlite', 'database-20260103-000000-cccc.sqlite'], array_map('basename', glob($dir . '/database-*') ?: []));
+        $this->assertSame(['database-20260102-000000-bbbb' . $ext, 'database-20260103-000000-cccc' . $ext], array_map('basename', glob($dir . '/database-*') ?: []));
     }
 }

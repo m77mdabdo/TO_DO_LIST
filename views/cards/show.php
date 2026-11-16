@@ -13,6 +13,7 @@
  * @var list<int> $assigned
  * @var array<string, string> $query
  * @var bool $moreActivity
+ * @var list<array{board: \App\Modules\Board\Contract\BoardSummary, lists: list<\App\Modules\Board\Contract\ListSummary>}> $copyTargets
  */
 use App\Modules\Access\Contract\Permission;
 use App\Modules\Label\Contract\Label;
@@ -42,6 +43,7 @@ $editErrors = $form->error('title') || $form->error('description') || $form->err
             <p class="eyebrow"><?= $this->te('In list') ?> <span dir="auto"><?= $this->e($listName) ?></span>
                 <?php if ($card->archived): ?><span class="pill"><?= $this->icon('archive') ?><?= $this->te('Archived') ?></span><?php endif; ?>
                 <?php if ($card->isComplete()): ?><span class="pill pill-done"><?= $this->icon('check') ?><?= $this->te('Done') ?></span><?php endif; ?>
+                <?php if ($card->isTemplate): ?><span class="pill pill-template"><?= $this->icon('copy') ?><?= $this->te('Template') ?></span><?php endif; ?>
             </p>
 
             <?php if (!$canEdit || !$editErrors): ?>
@@ -209,6 +211,43 @@ $editErrors = $form->error('title') || $form->error('description') || $form->err
                         <form action="<?= $this->url($cardPath . '/restore') ?>" method="post">
                             <?= $this->csrfField() ?>
                             <button class="btn btn-ghost btn-block" type="submit"><?= $this->icon('restore') ?><?= $this->te('Restore card') ?></button>
+                        </form>
+                    <?php endif; ?>
+                </section>
+            <?php endif; ?>
+            <?php if (!$card->archived && $copyTargets): ?>
+                <section class="card stack" aria-labelledby="copy-title">
+                    <h2 id="copy-title" class="section-title"><?= $this->icon('copy') ?> <?= $this->te($card->isTemplate ? 'New card from this template' : 'Copy card') ?></h2>
+                    <form action="<?= $this->url($cardPath . '/copy') ?>" method="post" class="stack">
+                        <?= $this->csrfField() ?>
+                        <input type="hidden" name="open" value="1">
+                        <label><span><?= $this->te('Title') ?></span>
+                            <input name="title" required maxlength="200" dir="auto" value="<?= $this->e($form->old('title', $card->isTemplate ? $card->title : $this->t(':name (copy)', ['name' => $card->title]))) ?>"></label>
+                        <label><span><?= $this->te('Put it in') ?></span>
+                            <select name="target">
+                                <?php foreach ($copyTargets as $target): ?>
+                                    <optgroup label="<?= $this->e($target['board']->name) ?>">
+                                        <?php foreach ($target['lists'] as $list): ?>
+                                            <option value="<?= $this->e($target['board']->publicId . ':' . $list->id) ?>" <?= $list->id === $card->listId ? 'selected' : '' ?>><?= $this->e($list->name) ?></option>
+                                        <?php endforeach; ?>
+                                    </optgroup>
+                                <?php endforeach; ?>
+                            </select></label>
+                        <?= $this->partial('partials/field-error', ['field' => 'list']) ?>
+                        <fieldset class="stack-sm">
+                            <legend><?= $this->te('Keep') ?></legend>
+                            <?php foreach (['description' => 'Description', 'dates' => 'Dates', 'labels' => 'Labels', 'checklists' => 'Checklists', 'members' => 'Members who can see that board'] as $part => $text): ?>
+                                <label class="check"><input type="checkbox" name="keep[]" value="<?= $part ?>" <?= $part !== 'members' ? 'checked' : '' ?>> <?= $this->te($text) ?></label>
+                            <?php endforeach; ?>
+                        </fieldset>
+                        <p class="muted small"><?= $this->te('Comments, attachments, votes and history are not copied. The new card starts open.') ?></p>
+                        <button class="btn btn-primary" type="submit"><?= $this->icon('copy') ?><?= $this->te($card->isTemplate ? 'Create card' : 'Copy card') ?></button>
+                    </form>
+                    <?php if ($canEdit): ?>
+                        <form action="<?= $this->url($cardPath . '/template') ?>" method="post">
+                            <?= $this->csrfField() ?>
+                            <input type="hidden" name="on" value="<?= $card->isTemplate ? '0' : '1' ?>">
+                            <button class="btn btn-ghost btn-block" type="submit"><?= $this->te($card->isTemplate ? 'Stop using as a template' : 'Make this card a template') ?></button>
                         </form>
                     <?php endif; ?>
                 </section>

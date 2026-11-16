@@ -21,6 +21,8 @@ final class CardSummary
         public readonly bool $archived,
         public readonly string $createdAt,
         public readonly ?string $startAt = null,
+        /** A template card: kept on the board to make new cards from. */
+        public readonly bool $isTemplate = false,
     ) {
     }
 
@@ -40,6 +42,7 @@ final class CardSummary
             $row['archived_at'] !== null,
             (string) $row['created_at'],
             isset($row['start_at']) ? (string) $row['start_at'] : null,
+            !empty($row['is_template']),
         );
     }
 

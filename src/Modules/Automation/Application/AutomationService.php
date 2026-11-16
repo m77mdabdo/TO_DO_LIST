@@ -97,19 +97,91 @@ final class AutomationService
      */
     public function create(int $actorId, BoardSummary $board, array $input): Automation
     {
-        $this->gate->authorize($actorId, $board->id, Permission::ManageSettings);
-        if ($board->archived) {
-            throw AccessDenied::forbidden();
-        }
-
+        $this->assertManages($actorId, $board);
         $kind = (string) ($input['kind'] ?? '');
-        $errors = [];
         if (!in_array($kind, Automation::KINDS, true)) {
             throw $this->invalid(['kind' => 'Choose what kind of automation this is.']);
         }
-        if ($this->automations->countForBoard($board->id) >= self::MAX_PER_BOARD) {
-            throw $this->invalid(['kind' => 'A board can have at most 50 automations.']);
-        }
+        $this->assertRoom($board);
+        [$fields] = $this->build($actorId, $board, $kind, $input);
+
+        return $this->automations->create($fields + ['board_id' => $board->id, 'created_by' => $actorId]);
+    }
+
+    /**
+     * What saving these changes would do, without saving: the automation as
+     * it reads now and as it would read after. Its kind never changes.
+     *
+     * @param array<string, mixed> $input same as create()
+     * @return array{automation: Automation, before: string, after: string}
+     */
+    public function preview(int $actorId, string $publicId, array $input): array
+    {
+        [$automation, $board] = $this->editable($actorId, $publicId);
+        [, $draft] = $this->build($actorId, $board, $automation->kind, $input);
+        [$lists, $labels, $names] = $this->vocabulary($board);
+
+        return [
+            'automation' => $automation,
+            'before'     => $this->describe($automation, $lists, $labels, $names),
+            'after'      => $this->describe($draft, $lists, $labels, $names),
+        ];
+    }
+
+    /**
+     * Saves new settings for an automation. It keeps its kind, its place in
+     * the list and whether it is on; its failure count starts again.
+     *
+     * @param array<string, mixed> $input same as create()
+     */
+    public function update(int $actorId, string $publicId, array $input): Automation
+    {
+        [$automation, $board] = $this->editable($actorId, $publicId);
+        [$fields] = $this->build($actorId, $board, $automation->kind, $input);
+        $this->automations->update($automation->id, $fields);
+
+        return $this->automations->findByPublicId($automation->publicId) ?? $automation;
+    }
+
+    /** A paused copy on the same board, named ":name (copy)", to change without touching the original. */
+    public function duplicate(int $actorId, string $publicId): Automation
+    {
+        [$automation, $board] = $this->editable($actorId, $publicId);
+        $this->assertRoom($board);
+        $copy = $this->automations->create([
+            'board_id'      => $board->id,
+            'kind'          => $automation->kind,
+            'name'          => mb_substr($this->translator->t(':name (copy)', ['name' => $automation->name]), 0, self::NAME_MAX),
+            'trigger_type'  => $automation->trigger,
+            'trigger_value' => $automation->triggerValue,
+            'scope_list_id' => $automation->scopeListId,
+            'conditions'    => json_encode($automation->conditions, JSON_UNESCAPED_UNICODE),
+            'actions'       => json_encode($automation->actions, JSON_UNESCAPED_UNICODE),
+            'schedule'      => json_encode((object) $automation->schedule),
+            'created_by'    => $actorId,
+        ]);
+        $this->automations->setEnabled($copy->id, false);
+
+        return $this->automations->findByPublicId($copy->publicId) ?? $copy;
+    }
+
+    /** @return array<int, AutomationRun> automation id => its latest failed run */
+    public function lastFailures(int $userId, BoardSummary $board): array
+    {
+        $this->gate->authorize($userId, $board->id, Permission::ManageSettings);
+
+        return $this->runs->lastFailures($board->id);
+    }
+
+    /**
+     * The form input checked against what is on the board now.
+     *
+     * @param array<string, mixed> $input
+     * @return array{0: array<string, mixed>, 1: Automation} the columns to save, and the automation they make
+     */
+    private function build(int $actorId, BoardSummary $board, string $kind, array $input): array
+    {
+        $errors = [];
 
         $lists = array_column(array_map(static fn ($l) => ['id' => $l->id, 'name' => $l->name], $this->boards->openLists($board->id)), 'name', 'id');
         $labels = array_column(array_map(static fn ($l) => ['id' => $l->id, 'name' => $l->name], $this->labels->forBoard($board->id)), 'name', 'id');
@@ -226,8 +298,9 @@ final class AutomationService
             $name = mb_substr($this->describe($draft, $lists, $labels, []), 0, self::NAME_MAX);
         }
 
-        return $this->automations->create([
-            'board_id'      => $board->id,
+        $draft = new Automation(0, '', $board->id, $kind, $name, $trigger, $triggerValue, $scope, $conditions, $actions, $schedule, true, 0, $actorId, '', null);
+
+        return [[
             'kind'          => $kind,
             'name'          => $name,
             'trigger_type'  => $trigger,
@@ -236,8 +309,42 @@ final class AutomationService
             'conditions'    => json_encode($conditions, JSON_UNESCAPED_UNICODE),
             'actions'       => json_encode($actions, JSON_UNESCAPED_UNICODE),
             'schedule'      => json_encode((object) $schedule),
-            'created_by'    => $actorId,
-        ]);
+        ], $draft];
+    }
+
+    private function assertManages(int $actorId, BoardSummary $board): void
+    {
+        $this->gate->authorize($actorId, $board->id, Permission::ManageSettings);
+        if ($board->archived) {
+            throw AccessDenied::forbidden();
+        }
+    }
+
+    private function assertRoom(BoardSummary $board): void
+    {
+        if ($this->automations->countForBoard($board->id) >= self::MAX_PER_BOARD) {
+            throw $this->invalid(['kind' => 'A board can have at most 50 automations.']);
+        }
+    }
+
+    /** @return array{0: Automation, 1: BoardSummary} an automation its board's manager may change */
+    private function editable(int $actorId, string $publicId): array
+    {
+        $automation = $this->manageable($actorId, $publicId);
+        $board = $this->boards->find($automation->boardId) ?? throw AccessDenied::hidden();
+        $this->assertManages($actorId, $board);
+
+        return [$automation, $board];
+    }
+
+    /** @return array{0: array<int, string>, 1: array<int, string>, 2: array<int, string>} lists, labels and people's names by id */
+    private function vocabulary(BoardSummary $board): array
+    {
+        $lists = array_column(array_map(static fn ($l) => ['id' => $l->id, 'name' => $l->name], $this->boards->openLists($board->id)), 'name', 'id');
+        $labels = array_column(array_map(static fn ($l) => ['id' => $l->id, 'name' => $l->name], $this->labels->forBoard($board->id)), 'name', 'id');
+        $names = array_map(static fn ($p) => $p->name, $this->users->findMany(array_keys($this->gate->peopleOn($board->id))));
+
+        return [$lists, $labels, $names];
     }
 
     /** The automation, only for someone who manages its board. */

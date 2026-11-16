@@ -11,13 +11,17 @@ use App\Modules\Board\Application\BoardQueries;
 use App\Modules\Board\Application\BoardService;
 use App\Modules\Board\Contract\BoardCatalog;
 use App\Modules\Board\Contract\BoardDirectory;
+use App\Modules\Board\Domain\BoardPreferences;
 use App\Modules\Board\Domain\BoardRepository;
+use App\Modules\Board\Domain\SavedSearches;
 use App\Modules\Board\Http\BoardController;
 use App\Modules\Board\Http\BoardViewsController;
 use App\Modules\Board\Http\WorkspaceViewsController;
 use App\Modules\Board\Http\ListController;
 use App\Modules\Board\Http\SearchController;
+use App\Modules\Board\Infrastructure\PdoBoardPreferences;
 use App\Modules\Board\Infrastructure\PdoBoardRepository;
+use App\Modules\Board\Infrastructure\PdoSavedSearches;
 use App\Shared\Events\EventBus;
 use App\Shared\Module\ModuleProvider;
 use App\Support\Clock;
@@ -42,6 +46,8 @@ final class BoardModule implements ModuleProvider
         $container->singleton(BoardDirectory::class, fn (Container $c) => $c->get(BoardQueries::class));
         $container->singleton(BoardService::class, fn (Container $c) => $c->build(BoardService::class));
         $container->singleton(BoardCatalog::class, fn (Container $c) => $c->get(BoardService::class));
+        $container->singleton(SavedSearches::class, fn (Container $c) => new PdoSavedSearches($c->get(PDO::class), $c->get(Clock::class)));
+        $container->singleton(BoardPreferences::class, fn (Container $c) => new PdoBoardPreferences($c->get(PDO::class), $c->get(Clock::class)));
     }
 
     public function routes(Router $router): void
@@ -49,6 +55,10 @@ final class BoardModule implements ModuleProvider
         $router->group([Authenticate::class], function (Router $router): void {
             $router->get('/', [BoardController::class, 'index']);
             $router->get('/search', [SearchController::class, 'index']);
+            $router->post('/search/saved', [SearchController::class, 'save']);
+            $router->post('/search/saved/{saved:ulid}', [SearchController::class, 'update']);
+            $router->post('/search/saved/{saved:ulid}/delete', [SearchController::class, 'delete']);
+            $router->post('/boards/{board:ulid}/display', [BoardController::class, 'display']);
             $router->post('/boards', [BoardController::class, 'store']);
             $router->get('/boards/{board:ulid}', [BoardController::class, 'show']);
             $router->post('/boards/{board:ulid}', [BoardController::class, 'update']);

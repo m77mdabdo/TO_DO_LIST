@@ -16,6 +16,10 @@ final class ChecklistCopier
 
     public function onCardCopied(CardCopied $event): void
     {
+        if (!$event->copies('checklists')) {
+            return;
+        }
+
         foreach ($this->checklists->forCard($event->sourceCardId) as $checklist) {
             $copy = $this->checklists->create($event->cardId, $checklist->title, $event->actorId);
             foreach ($checklist->items as $item) {

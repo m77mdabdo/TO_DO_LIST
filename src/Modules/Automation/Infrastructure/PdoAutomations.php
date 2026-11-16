@@ -65,6 +65,17 @@ final class PdoAutomations implements AutomationRepository
         $this->db->prepare('UPDATE automations SET enabled = ?, failures = 0 WHERE id = ?')->execute([$enabled ? 1 : 0, $id]);
     }
 
+    public function update(int $id, array $fields): void
+    {
+        $columns = ['kind', 'name', 'trigger_type', 'trigger_value', 'scope_list_id', 'conditions', 'actions', 'schedule'];
+        $fields = array_intersect_key($fields, array_flip($columns));
+        if ($fields === []) {
+            return;
+        }
+        $sets = implode(', ', array_map(static fn (string $c) => "$c = ?", array_keys($fields)));
+        $this->db->prepare("UPDATE automations SET $sets, failures = 0 WHERE id = ?")->execute([...array_values($fields), $id]);
+    }
+
     public function recordRun(int $id, bool $ok): int
     {
         $this->db->prepare('UPDATE automations SET last_run_at = ?, failures = ' . ($ok ? '0' : 'failures + 1') . ' WHERE id = ?')->execute([$this->now(), $id]);

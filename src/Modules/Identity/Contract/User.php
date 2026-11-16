@@ -10,13 +10,15 @@ final class User
         public readonly int $id,
         public readonly string $name,
         public readonly string $email,
+        /** False until the person opens the confirmation link sent to $email. */
+        public readonly bool $emailVerified = false,
     ) {
     }
 
     /** @param array<string, mixed> $row */
     public static function fromRow(array $row): self
     {
-        return new self((int) $row['id'], (string) $row['name'], (string) $row['email']);
+        return new self((int) $row['id'], (string) $row['name'], (string) $row['email'], !empty($row['email_verified_at']));
     }
 
     public function firstName(): string

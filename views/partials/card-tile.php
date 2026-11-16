@@ -8,7 +8,12 @@
  * @var bool $canMove
  * @var bool $canEdit
  * @var \DateTimeImmutable $today
+ * @var \App\Modules\Board\Contract\CardDisplay|null $display what this person chose to see
+ * @var bool $selecting show a checkbox that belongs to the bulk form
  */
+$display ??= null;
+$selecting ??= false;
+$shows = static fn (string $part): bool => $display === null || $display->shows($part);
 $due = $card->dueDate();
 $dueClass = match (true) {
     $due === null => '',
@@ -18,11 +23,11 @@ $dueClass = match (true) {
     default => '',
 };
 ?>
-<article class="card-tile <?= $card->isComplete() ? 'is-done' : '' ?>"
+<article class="card-tile <?= $card->isComplete() ? 'is-done' : '' ?> <?= $card->isTemplate ? 'is-template' : '' ?>"
          data-card-id="<?= $card->id ?>"
          data-move-url="<?= $this->url('/cards/' . $card->publicId . '/move') ?>"
          <?= $canMove ? 'draggable="true"' : '' ?>>
-    <?php if ($labels): ?>
+    <?php if ($labels && $shows('labels')): ?>
         <div class="tile-labels">
             <?php foreach ($labels as $label): ?>
                 <span class="label label-<?= $this->e($label->color) ?>" dir="auto"><?= $this->e($label->name) ?></span>
@@ -30,20 +35,25 @@ $dueClass = match (true) {
         </div>
     <?php endif; ?>
 
+    <?php if ($selecting): ?>
+        <label class="tile-select"><input type="checkbox" name="cards[]" value="<?= $this->e($card->publicId) ?>" form="bulk-form" class="js-bulk-card">
+            <span class="visually-hidden"><?= $this->te('Select :name', ['name' => $card->title]) ?></span></label>
+    <?php endif; ?>
+    <?php if ($card->isTemplate): ?><span class="tile-template"><?= $this->icon('copy') ?><?= $this->te('Template') ?></span><?php endif; ?>
     <a class="card-title" href="<?= $this->url('/cards/' . $card->publicId) ?>" dir="auto"><?= $this->e($card->title) ?></a>
 
     <div class="tile-foot">
-        <?php if ($due !== null): ?>
+        <?php if ($due !== null && $shows('dates')): ?>
             <span class="due <?= $dueClass ?>"><?= $this->icon('calendar') ?><?= $this->e($due) ?></span>
         <?php endif; ?>
-        <?php foreach ($badges as $badge): ?>
+        <?php foreach ($shows('badges') ? $badges : [] as $badge): ?>
             <span class="badge <?= $this->e($badge['class']) ?>" title="<?= $this->te($badge['title']) ?>"><?= $this->icon($badge['icon']) ?><?= $this->e($badge['text']) ?></span>
         <?php endforeach; ?>
-        <?php if ($card->description): ?>
+        <?php if ($card->description && $shows('description')): ?>
             <span class="muted" title="<?= $this->te('Has a description') ?>"><?= $this->icon('edit') ?></span>
         <?php endif; ?>
 
-        <?php if ($members): ?>
+        <?php if ($members && $shows('members')): ?>
             <span class="tile-people">
                 <?php foreach (array_slice($members, 0, 3) as $member): ?>
                     <span class="avatar avatar-xs" title="<?= $this->e($member->name) ?>"><?= $this->e(mb_strtoupper(mb_substr($member->name, 0, 1))) ?></span>

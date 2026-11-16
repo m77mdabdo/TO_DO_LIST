@@ -22,4 +22,7 @@ interface LabelCatalog
 
     /** Needs EditCards on the card's board. */
     public function attach(int $actorId, int $cardId, int $labelId): void;
+
+    /** Needs EditCards on the card's board. */
+    public function detach(int $actorId, int $cardId, int $labelId): void;
 }

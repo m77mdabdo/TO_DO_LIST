@@ -49,6 +49,20 @@ final class PdoRunLog implements RunLog
         return array_map([AutomationRun::class, 'fromRow'], $stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 
+    public function lastFailures(int $boardId): array
+    {
+        $stmt = $this->db->prepare("SELECT r.*, a.name AS automation_name FROM automation_runs r JOIN automations a ON a.id = r.automation_id
+            WHERE r.id IN (SELECT MAX(id) FROM automation_runs WHERE board_id = ? AND status = 'failed' GROUP BY automation_id)");
+        $stmt->execute([$boardId]);
+        $failures = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $run = AutomationRun::fromRow($row);
+            $failures[$run->automationId] = $run;
+        }
+
+        return $failures;
+    }
+
     public function pruneBefore(string $before): int
     {
         $stmt = $this->db->prepare('DELETE FROM automation_runs WHERE created_at < ?');
