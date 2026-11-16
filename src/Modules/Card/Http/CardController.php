@@ -13,6 +13,7 @@ use App\Modules\Access\Contract\AccessGate;
 use App\Modules\Access\Contract\Permission;
 use App\Modules\Activity\Contract\ActivityFeed;
 use App\Modules\Board\Contract\BoardDirectory;
+use App\Modules\Card\Application\BulkCardActions;
 use App\Modules\Card\Application\CardService;
 use App\Modules\Identity\Contract\UserDirectory;
 use App\Modules\Label\Contract\LabelCatalog;
@@ -34,12 +35,13 @@ final class CardController extends Controller
         private LabelCatalog $labels,
         private ActivityFeed $activity,
         private UserDirectory $users,
+        private BulkCardActions $bulk,
     ) {
         parent::__construct($view, $url, $session);
     }
 
     /**
-     * Body: list_id, title.
+     * Body: list_id, title, and optionally template (a template card's public id).
      *
      * @param array{board: string} $params
      */
@@ -48,9 +50,20 @@ final class CardController extends Controller
         $user = $this->user($request);
         $board = $this->boards->findByPublicId($params['board']) ?? throw AccessDenied::hidden();
         $listId = $request->input('list_id');
+        $listId = ctype_digit($listId) ? (int) $listId : 0;
 
         try {
-            $card = $this->cards->createCard($user->id, $board->id, ctype_digit($listId) ? (int) $listId : 0, $request->input('title'));
+            if ($request->input('template') !== '') {
+                // From a template card of this same board, keeping everything it has.
+                [$template] = $this->cards->cardFor($user->id, $request->input('template'));
+                if ($template->boardId !== $board->id || !$template->isTemplate || $template->archived) {
+                    throw AccessDenied::hidden();
+                }
+                $title = trim($request->input('title'));
+                $card = $this->cards->copyCard($user->id, $template, $board->id, $listId, $title !== '' ? $title : $template->title, CardService::COPY_PARTS);
+            } else {
+                $card = $this->cards->createCard($user->id, $board->id, $listId, $request->input('title'));
+            }
         } catch (ValidationException $e) {
             return $this->backWithErrors($e, $request, '/boards/' . $board->publicId);
         }
@@ -58,6 +71,32 @@ final class CardController extends Controller
         return $request->wantsJson()
             ? Response::json(['ok' => true, 'id' => $card->publicId])
             : $this->redirect('/boards/' . $board->publicId);
+    }
+
+    /**
+     * One action on the chosen cards of a board.
+     * Body: cards[] (public ids), action, value, confirm (for delete: the count).
+     *
+     * @param array{board: string} $params
+     */
+    public function bulk(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        $board = $this->boards->findByPublicId($params['board']) ?? throw AccessDenied::hidden();
+        $this->gate->authorize($user->id, $board->id, Permission::ViewBoard);
+        $ids = array_values(array_filter((array) ($request->body()['cards'] ?? []), 'is_string'));
+        $action = $request->input('action');
+        $value = $request->input('value_' . $action);
+        $confirm = $request->input('confirm');
+        $back = '/boards/' . $board->publicId . '?select=1';
+
+        try {
+            $count = $this->bulk->apply($user->id, $board, $ids, $action, $value, ctype_digit($confirm) ? (int) $confirm : 0);
+        } catch (ValidationException $e) {
+            return $this->backWithErrors($e, $request, $back);
+        }
+
+        return $this->redirect('/boards/' . $board->publicId, $this->view->t(':count cards updated.', ['count' => $count]));
     }
 
     /** @param array{card: string} $params */
@@ -85,6 +124,7 @@ final class CardController extends Controller
             'moreActivity' => count($activity) === self::ACTIVITY_PAGE,
             'query'       => ['comments_before' => $request->input('comments_before')],
             'assigned'    => $assigned,
+            'copyTargets' => $this->copyTargets($user->id, $board),
         ]);
     }
 
@@ -108,6 +148,56 @@ final class CardController extends Controller
         return $request->wantsJson()
             ? Response::json(['ok' => true])
             : $this->redirect('/cards/' . $card->publicId);
+    }
+
+    /**
+     * Body: on (1 makes it a template, 0 a plain card again).
+     *
+     * @param array{card: string} $params
+     */
+    public function template(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        [$card] = $this->cards->cardFor($user->id, $params['card'], Permission::EditCards);
+        $on = $request->input('on') === '1';
+        $this->cards->setTemplate($user->id, $card, $on);
+
+        return $this->redirect('/cards/' . $card->publicId, $on ? 'The card is now a template.' : 'The card is no longer a template.');
+    }
+
+    /**
+     * Copies the card, or makes a new card from a template.
+     * Body: target (board public id:list id) or list_id (same board), title, keep[].
+     *
+     * @param array{card: string} $params
+     */
+    public function copy(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        [$card, $board] = $this->cards->cardFor($user->id, $params['card']);
+        $back = $this->back($request, '/cards/' . $card->publicId);
+        $toBoard = $board;
+        $listId = $request->input('list_id');
+        if (preg_match('/^([0-9A-HJKMNP-TV-Z]{26}):(\d+)$/', $request->input('target'), $m) === 1) {
+            // A board the user can't see is treated like a missing one.
+            $toBoard = $this->boards->findByPublicId($m[1]);
+            if ($toBoard === null || $toBoard->workspaceId !== $board->workspaceId || !$this->gate->can($user->id, $toBoard->id, Permission::ViewBoard)) {
+                throw AccessDenied::hidden();
+            }
+            $listId = $m[2];
+        }
+        $keep = array_values(array_filter((array) ($request->body()['keep'] ?? []), 'is_string'));
+        $title = $request->input('title');
+
+        try {
+            $copy = $this->cards->copyCard($user->id, $card, $toBoard->id, ctype_digit($listId) ? (int) $listId : 0, $title !== '' ? $title : $card->title, $keep);
+        } catch (ValidationException $e) {
+            return $this->backWithErrors($e, $request, $back);
+        }
+
+        return $request->input('open') === '1'
+            ? $this->redirect('/cards/' . $copy->publicId, 'Card copied.')
+            : $this->redirect($back, $card->isTemplate ? 'Card created from the template.' : 'Card copied.');
     }
 
     /** @param array{card: string} $params */
@@ -214,5 +304,28 @@ final class CardController extends Controller
         $back = $request->input('back');
 
         return preg_match('#^/(?!/)[A-Za-z0-9/_-]*$#', $back) ? $back : $default;
+    }
+
+    /**
+     * Where a card of $board can be copied: open lists of the open boards of
+     * the same workspace that the user may edit, this board first.
+     *
+     * @return list<array{board: \App\Modules\Board\Contract\BoardSummary, lists: list<\App\Modules\Board\Contract\ListSummary>}>
+     */
+    private function copyTargets(int $userId, \App\Modules\Board\Contract\BoardSummary $board): array
+    {
+        $targets = [];
+        foreach ($this->boards->allInWorkspace($board->workspaceId) as $candidate) {
+            if ($candidate->archived || !$this->gate->can($userId, $candidate->id, Permission::EditCards)) {
+                continue;
+            }
+            $lists = $this->boards->openLists($candidate->id);
+            if ($lists !== []) {
+                $targets[$candidate->id === $board->id ? 0 : $candidate->id] = ['board' => $candidate, 'lists' => $lists];
+            }
+        }
+        ksort($targets);
+
+        return array_values($targets);
     }
 }

@@ -63,6 +63,11 @@ final class LabelService implements LabelCatalog
         $this->toggle($actorId, $cardId, $labelId, true);
     }
 
+    public function detach(int $actorId, int $cardId, int $labelId): void
+    {
+        $this->toggle($actorId, $cardId, $labelId, false);
+    }
+
     /** Adds or removes a label on a card. Returns whether it is now attached. */
     public function toggle(int $actorId, int $cardId, int $labelId, ?bool $attach = null): bool
     {

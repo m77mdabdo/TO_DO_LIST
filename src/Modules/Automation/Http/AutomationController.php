@@ -70,6 +70,7 @@ final class AutomationController extends Controller
             'cardTitles'  => array_map(static fn ($c) => $c->title, $this->cards->findMany(array_values(array_filter(array_map(static fn ($r) => $r->cardId, $runs))))),
             'people'      => $people,
             'options'     => $this->automations->options($board, $user->id),
+            'failures'    => $this->automations->lastFailures($user->id, $board),
             'kind'        => in_array($request->input('kind'), \App\Modules\Automation\Contract\Automation::KINDS, true) ? $request->input('kind') : 'rule',
             'bodyClass'   => 'page-board-view board-' . $board->color,
         ]);
@@ -89,6 +90,96 @@ final class AutomationController extends Controller
         }
 
         return $this->redirect($back, 'Automation saved.');
+    }
+
+    /** The form to change an automation, filled in with what it does now. @param array{automation: string} $params */
+    public function edit(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        $automation = $this->automations->manageable($user->id, $params['automation']);
+
+        return $this->editPage($user->id, $automation, self::formValues($automation), null);
+    }
+
+    /**
+     * Without confirm=1, shows what the changes would do (before and after)
+     * and saves nothing; with it, saves them.
+     *
+     * @param array{automation: string} $params
+     */
+    public function update(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        $automation = $this->automations->manageable($user->id, $params['automation']);
+        $input = $request->body();
+        $editPath = '/automations/' . $automation->publicId . '/edit';
+
+        try {
+            if ($request->input('confirm') !== '1') {
+                return $this->editPage($user->id, $automation, $input, $this->automations->preview($user->id, $automation->publicId, $input));
+            }
+            $this->automations->update($user->id, $automation->publicId, $input);
+        } catch (ValidationException $e) {
+            return $this->backWithErrors($e, $request, $editPath);
+        }
+
+        return $this->redirect($this->boardPath($automation->boardId) . '/automation', 'Automation updated.');
+    }
+
+    /** @param array{automation: string} $params */
+    public function duplicate(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        $automation = $this->automations->manageable($user->id, $params['automation']);
+        $back = $this->boardPath($automation->boardId) . '/automation';
+
+        try {
+            $copy = $this->automations->duplicate($user->id, $automation->publicId);
+        } catch (ValidationException $e) {
+            return $this->backWithErrors($e, $request, $back);
+        }
+
+        return $this->redirect('/automations/' . $copy->publicId . '/edit', 'Automation copied. The copy is paused until you turn it on.');
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     * @param array{automation: \App\Modules\Automation\Contract\Automation, before: string, after: string}|null $preview
+     */
+    private function editPage(int $userId, \App\Modules\Automation\Contract\Automation $automation, array $values, ?array $preview): Response
+    {
+        $board = $this->board($userId, $this->boards->find($automation->boardId)?->publicId ?? '');
+
+        return $this->render('automation/edit', [
+            'title'      => $board->name,
+            'board'      => $board,
+            'role'       => $this->gate->roleOn($userId, $board->id) ?? BoardRole::Viewer,
+            'automation' => $automation,
+            'values'     => $values,
+            'preview'    => $preview,
+            'options'    => $this->automations->options($board, $userId),
+            'bodyClass'  => 'page-board-view board-' . $board->color,
+        ]);
+    }
+
+    /** The automation as the form's fields. @return array<string, mixed> */
+    private static function formValues(\App\Modules\Automation\Contract\Automation $a): array
+    {
+        $join = static fn (string $type, ?string $value): string => $value !== null && $value !== '' ? $type . ':' . $value : $type;
+
+        return [
+            'name'       => $a->name,
+            'trigger'    => $a->trigger !== null ? $join($a->trigger, $a->triggerValue) : '',
+            'scope'      => $a->scopeListId !== null ? (string) $a->scopeListId : '',
+            'every'      => (string) ($a->schedule['every'] ?? 'day'),
+            'weekday'    => ($a->schedule['every'] ?? '') === 'week' ? (string) ($a->schedule['day'] ?? 0) : '0',
+            'monthday'   => ($a->schedule['every'] ?? '') === 'month' ? (string) ($a->schedule['day'] ?? 1) : '1',
+            'hour'       => (string) ($a->schedule['hour'] ?? 8),
+            'when'       => (string) ($a->schedule['when'] ?? 'before'),
+            'days'       => (string) ($a->schedule['days'] ?? 1),
+            'conditions' => array_map(static fn (array $c) => $join($c['type'], $c['value']), $a->conditions),
+            'actions'    => array_map(static fn (array $x) => ['do' => $join($x['type'], $x['value']), 'text' => $x['text']], $a->actions),
+        ];
     }
 
     /** Body: on (1 or 0). @param array{automation: string} $params */

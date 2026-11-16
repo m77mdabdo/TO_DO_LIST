@@ -14,7 +14,9 @@ use App\Modules\Access\Contract\Permission;
 use App\Modules\Activity\Contract\ActivityFeed;
 use App\Modules\Board\Application\BoardService;
 use App\Modules\Board\Contract\BoardSummary;
+use App\Modules\Board\Contract\CardDisplay;
 use App\Modules\Board\Contract\CardFilter;
+use App\Modules\Board\Domain\BoardPreferences;
 use App\Modules\Board\Contract\BoardVisibility;
 use App\Modules\Board\Domain\BuiltInTemplates;
 use App\Modules\Board\Application\BoardExport;
@@ -44,6 +46,7 @@ final class BoardController extends Controller
         private Greeting $greeting,
         private Clock $clock,
         private BoardExport $exporter,
+        private BoardPreferences $preferences,
     ) {
         parent::__construct($view, $url, $session);
     }
@@ -135,7 +138,30 @@ final class BoardController extends Controller
             'people'      => $this->users->findMany([...array_keys($audience), ...array_merge([], ...array_values($cardMembers)), ...array_map(static fn ($a) => $a->actorId, $activity)]),
             'audience'    => array_keys($audience),
             'query'       => array_filter($request->only(['q', 'label', 'member', 'due', 'status']), static fn ($v) => $v !== ''),
+            'display'     => $this->preferences->cardDisplay($user->id, $board->id),
+            'selecting'   => $request->input('select') === '1' && !$board->archived,
+            'templates'   => array_values(array_filter(array_merge([], ...array_values($cardsByList)), static fn ($card) => $card->isTemplate)),
         ]);
+    }
+
+    /**
+     * Which parts of the card tiles this person sees on this board. Anyone
+     * who can open the board may choose; it changes nothing for others.
+     *
+     * Body: show[] (the parts to show), or reset=1 to show everything.
+     *
+     * @param array{board: string} $params
+     */
+    public function display(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        $board = $this->boards->boardFor($user->id, $params['board']);
+        $parts = $request->input('reset') === '1'
+            ? array_keys(CardDisplay::PARTS)
+            : array_values(array_filter((array) ($request->body()['show'] ?? []), 'is_string'));
+        $this->preferences->saveCardDisplay($user->id, $board->id, CardDisplay::showing($parts));
+
+        return $this->redirect(self::boardPath($board), 'Card display saved.');
     }
 
     /** The whole board as JSON (lists, cards, labels, checklists, comments, attachment details). @param array{board: string} $params */

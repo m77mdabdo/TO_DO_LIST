@@ -16,7 +16,7 @@ use PDO;
 final class PdoBoardRepository implements BoardRepository
 {
     private const BOARD_COLUMNS = 'id, public_id, workspace_id, name, description, color, visibility, commenting, voting, is_template, archived_at';
-    private const LIST_COLUMNS = 'id, board_id, name, position, archived_at';
+    private const LIST_COLUMNS = 'id, board_id, name, position, archived_at, color';
 
     /** Columns update() may touch: an allow-list, never names from the request. */
     private const UPDATABLE = ['name', 'description', 'color', 'visibility', 'commenting', 'voting', 'is_template'];
@@ -136,7 +136,7 @@ final class PdoBoardRepository implements BoardRepository
 
     public function updateList(int $listId, array $fields): void
     {
-        $fields = array_intersect_key($fields, ['name' => true, 'position' => true]);
+        $fields = array_intersect_key($fields, ['name' => true, 'position' => true, 'color' => true]);
 
         if ($fields === []) {
             return;

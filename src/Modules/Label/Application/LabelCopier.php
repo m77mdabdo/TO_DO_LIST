@@ -37,6 +37,10 @@ final class LabelCopier
 
     public function onCardCopied(CardCopied $event): void
     {
+        if (!$event->copies('labels')) {
+            return;
+        }
+
         foreach ($this->labels->forCards([$event->sourceCardId])[$event->sourceCardId] ?? [] as $label) {
             $copy = $this->ensure($event->boardId, $label->name, $label->color);
             if (!$this->labels->isAttached($event->cardId, $copy->id)) {

@@ -44,7 +44,13 @@ final class ListController extends Controller
         $board = $this->boards->boardFor($user->id, $params['board']);
 
         try {
-            $this->boards->renameList($user->id, $board, $params['id'], $request->input('name'));
+            if ($request->input('name') !== '' || !array_key_exists('color', $request->body())) {
+                $this->boards->renameList($user->id, $board, $params['id'], $request->input('name'));
+            }
+            if (array_key_exists('color', $request->body())) {
+                $color = $request->input('color');
+                $this->boards->setListColor($user->id, $board, $params['id'], $color === '' ? null : $color);
+            }
         } catch (ValidationException $e) {
             return $this->backWithErrors($e, $request, '/boards/' . $board->publicId);
         }
