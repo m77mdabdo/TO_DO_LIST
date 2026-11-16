@@ -74,4 +74,18 @@ $sentence = function (\App\Modules\Notification\Contract\Notification $n) use ($
             <div><button class="btn btn-ghost" type="submit"><?= $this->te('Save') ?></button></div>
         </form>
     </section>
+
+    <section class="card stack js-push" hidden aria-labelledby="push-title"
+             data-on="<?= $this->te('Browser notifications are on in this browser.') ?>"
+             data-off="<?= $this->te('Browser notifications are off in this browser.') ?>"
+             data-blocked="<?= $this->te('This browser blocks notifications from this site. Allow them in the browser settings, then try again.') ?>"
+             data-unsupported="<?= $this->te('This browser cannot show notifications.') ?>">
+        <h2 class="section-title" id="push-title"><?= $this->icon('bell') ?> <?= $this->te('Browser notifications') ?></h2>
+        <p class="muted small"><?= $this->te('Get a pop-up from your browser when something new arrives here, while this site is open in a tab. Only this browser is affected.') ?></p>
+        <p class="js-push-state" role="status"></p>
+        <div class="form-actions">
+            <button class="btn btn-primary js-push-on" type="button"><?= $this->te('Turn on') ?></button>
+            <button class="btn btn-ghost js-push-off" type="button"><?= $this->te('Turn off') ?></button>
+        </div>
+    </section>
 </main>

@@ -52,12 +52,16 @@
 
     /* ---------- copy a link (invitations) ---------- */
 
+    /* data-copy="<link>" copies that link (made absolute); otherwise the
+     * .js-copy-source field next to the button. */
     $$('.js-copy').forEach((btn) => btn.addEventListener('click', async () => {
-        const source = $('.js-copy-source', btn.closest('.copy-row') || document);
-        if (!source) return;
+        const source = btn.dataset.copy ? null : $('.js-copy-source', btn.closest('.copy-row') || document);
+        const text = btn.dataset.copy ? new URL(btn.dataset.copy, window.location.href).href : (source && source.value);
+        if (!text) return;
         try {
-            await navigator.clipboard.writeText(source.value);
+            await navigator.clipboard.writeText(text);
         } catch (e) {
+            if (!source) { window.prompt('', text); return; }
             source.select();
             document.execCommand('copy');
         }
@@ -146,6 +150,45 @@
         const action = actions[event.key.length === 1 ? event.key.toLowerCase() : event.key];
         if (action && action()) event.preventDefault();
     });
+
+    /* ---------- polling ----------
+     * One request at a time, never while the tab is hidden, slower after
+     * errors (doubling up to 2 minutes), and back to normal once it works.
+     */
+
+    function poll(task, every) {
+        let delay = every;
+        let timer = null;
+        let running = false;
+        const schedule = () => {
+            clearTimeout(timer);
+            timer = setTimeout(tick, delay);
+        };
+        async function tick() {
+            if (running || document.hidden) return schedule();
+            running = true;
+            try {
+                await task();
+                delay = every;
+            } catch (e) {
+                delay = Math.min(delay * 2, 120000);
+            } finally {
+                running = false;
+                schedule();
+            }
+        }
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) { delay = every; clearTimeout(timer); tick(); }
+        });
+        schedule();
+        return { now: tick };
+    }
+
+    async function getJson(url) {
+        const response = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin', cache: 'no-store' });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        return response.json();
+    }
 
     /* ---------- fetch helper ---------- */
 
@@ -243,6 +286,134 @@
 
     /* Board: cards between lists, and the lists themselves. */
     const lists = $('.js-lists');
+
+    /* ---------- comments: reactions, file name, "is writing" ----------
+     * Reactions are plain forms; with JavaScript they are sent in the
+     * background and only that comment's reactions are redrawn.
+     */
+
+    document.addEventListener('submit', async (event) => {
+        const form = event.target.closest && event.target.closest('.js-react');
+        if (!form || event.defaultPrevented) return;
+        event.preventDefault();
+        const comment = form.closest('.comment');
+        try {
+            await post(form.action, { emoji: form.elements.emoji.value });
+            const response = await fetch(window.location.pathname + window.location.search, { credentials: 'same-origin', cache: 'no-store' });
+            const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+            const fresh = comment && $('#' + comment.id + ' .reactions', page);
+            const mine = comment && $('.reactions', comment);
+            if (fresh && mine) {
+                mine.replaceWith(document.importNode(fresh, true));
+                const add = $('.reaction-add', comment);
+                if (add) add.focus();
+            }
+        } catch (error) {
+            toast(error.message);
+        }
+    });
+
+    $$('.js-comment-file').forEach((input) => input.addEventListener('change', () => {
+        const label = $('.js-comment-file-name', input.closest('form'));
+        if (label) label.textContent = input.files[0] ? input.files[0].name : '';
+    }));
+
+    const store = {
+        get: (key) => { try { return localStorage.getItem(key); } catch (e) { return null; } },
+        set: (key, value) => { try { localStorage.setItem(key, value); } catch (e) { /* private mode */ } },
+    };
+
+    const commentBox = $('.js-comment[data-typing-url]');
+    if (commentBox) {
+        const share = $('.js-typing-share');
+        const shareRow = $('.js-typing-share-row');
+        if (share && shareRow) {
+            shareRow.hidden = false;
+            share.checked = store.get('typing-share') !== 'off';
+            share.addEventListener('change', () => store.set('typing-share', share.checked ? 'on' : 'off'));
+        }
+        let lastSent = 0;
+        commentBox.addEventListener('input', () => {
+            if ((share && !share.checked) || Date.now() - lastSent < 4000 || commentBox.value.trim() === '') return;
+            lastSent = Date.now();
+            post(commentBox.dataset.typingUrl, {}).catch(() => { /* only a hint; never in the way */ });
+        });
+    }
+
+    const typing = $('.js-typing');
+    if (typing) {
+        poll(async () => {
+            const { names = [] } = await getJson(typing.dataset.url);
+            typing.hidden = names.length === 0;
+            typing.textContent = names.length === 1
+                ? typing.dataset.one.replace(':name', names[0])
+                : typing.dataset.many.replace(':names', names.join('، '));
+        }, 5000);
+    }
+
+    /* ---------- browser notifications (optional, per browser) ----------
+     * Off until the person turns them on and the browser allows them. The
+     * last shown id is shared by the tabs, so each notification shows once.
+     */
+
+    const bell = $('.js-bell');
+    const pushSupported = 'Notification' in window;
+    const pushOn = () => pushSupported && Notification.permission === 'granted' && store.get('push') === 'on';
+    let pushStarted = false;
+
+    function startPush() {
+        if (pushStarted || !bell || !pushOn()) return;
+        pushStarted = true;
+        poll(async () => {
+            if (!pushOn()) return;
+            const last = Number(store.get('push-last') || 0);
+            const data = await getJson(bell.dataset.latestUrl + '?after=' + last);
+            if (!last) { store.set('push-last', String(data.latest)); return; }
+            data.items.slice().reverse().forEach((item) => {
+                if (item.id <= Number(store.get('push-last') || 0)) return;
+                const shown = new Notification(item.text, { body: item.body, tag: 'todo-' + item.id });
+                shown.onclick = () => { window.focus(); window.location.href = item.url; };
+            });
+            store.set('push-last', String(Math.max(last, data.latest)));
+        }, 45000);
+    }
+    startPush();
+
+    const pushPanel = $('.js-push');
+    if (pushPanel) {
+        pushPanel.hidden = false;
+        const state = $('.js-push-state', pushPanel);
+        const on = $('.js-push-on', pushPanel);
+        const off = $('.js-push-off', pushPanel);
+        const show = () => {
+            if (!pushSupported) {
+                state.textContent = pushPanel.dataset.unsupported;
+            } else if (Notification.permission === 'denied') {
+                state.textContent = pushPanel.dataset.blocked;
+            } else {
+                state.textContent = pushOn() ? pushPanel.dataset.on : pushPanel.dataset.off;
+            }
+            on.hidden = !pushSupported || Notification.permission === 'denied' || pushOn();
+            off.hidden = !pushOn();
+        };
+        on.addEventListener('click', async () => {
+            const permission = await Notification.requestPermission();
+            if (permission === 'granted') {
+                store.set('push', 'on');
+                store.set('push-last', '');
+                startPush();
+            }
+            show();
+            (pushOn() ? off : on).focus();
+        });
+        off.addEventListener('click', () => {
+            store.set('push', 'off');
+            show();
+            on.focus();
+        });
+        show();
+    }
+
     if (!lists) return;
 
     const refreshCounts = () => $$('.list[data-list-id]', lists).forEach((list) => {
@@ -293,4 +464,70 @@
             after_id: previous && previous.dataset.listId ? previous.dataset.listId : '',
         }).catch(failed);
     });
+    /* ---------- live board ----------
+     * Asks the server for the board's change counter; when it moved, fetches
+     * the board page again and swaps only the lists that differ. Never while
+     * the person is dragging, typing or has a menu open: then a banner offers
+     * to show the changes instead.
+     */
+
+    const stale = $('.js-board-stale');
+    let dragging = false;
+    lists.addEventListener('dragstart', () => { dragging = true; });
+    lists.addEventListener('dragend', () => { setTimeout(() => { dragging = false; }, 300); });
+
+    const busy = () => dragging
+        || $$('details[open]', lists).length > 0
+        || (document.activeElement && lists.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName));
+
+    async function applyBoard() {
+        const response = await fetch(location.href, { credentials: 'same-origin', cache: 'no-store' });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+        const fresh = $('.js-lists', page);
+        if (!fresh) return;
+        const old = new Map($$('.list[data-list-id]', lists).map((el) => [el.dataset.listId, el]));
+        const keep = new Set();
+        $$('.list[data-list-id]', fresh).forEach((el) => {
+            const id = el.dataset.listId;
+            keep.add(id);
+            const current = old.get(id);
+            const copy = document.importNode(el, true);
+            if (!current) {
+                lists.insertBefore(copy, $('.list-new', lists));
+            } else if (current.outerHTML !== el.outerHTML) {
+                current.replaceWith(copy);
+            }
+        });
+        old.forEach((el, id) => { if (!keep.has(id)) el.remove(); });
+        // Keep the lists in the server's order.
+        $$('.list[data-list-id]', fresh).forEach((el) => {
+            const mine = $(`.list[data-list-id="${el.dataset.listId}"]`, lists);
+            if (mine) lists.insertBefore(mine, $('.list-new', lists));
+        });
+        const activity = $('.js-board-activity');
+        const freshActivity = $('.js-board-activity', page);
+        if (activity && freshActivity) activity.replaceWith(document.importNode(freshActivity, true));
+        lists.dataset.version = fresh.dataset.version;
+        if (stale) stale.hidden = true;
+    }
+
+    if (lists.dataset.changesUrl) {
+        const checker = poll(async () => {
+            const url = lists.dataset.changesUrl + '?since=' + encodeURIComponent(lists.dataset.version || '0');
+            const state = await getJson(url);
+            if (!state.changed) return;
+            if (busy()) {
+                if (stale) {
+                    $('.js-board-stale-text', stale).textContent = state.by ? lists.dataset.updatedBy.replace(':name', state.by) : lists.dataset.updated;
+                    stale.hidden = false;
+                }
+                return;
+            }
+            await applyBoard();
+            if (state.by) toast(lists.dataset.updatedBy.replace(':name', state.by), 'success');
+        }, 8000);
+        $('.js-board-refresh')?.addEventListener('click', () => applyBoard().catch(() => window.location.reload()));
+        window.addEventListener('focus', () => checker.now());
+    }
 })();
