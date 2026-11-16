@@ -97,6 +97,7 @@ final class BulkCardActions
             'clear_due' => $this->service->setDueDate($actorId, $card, null),
             'archive'   => $this->service->archive($actorId, $card),
             'delete'    => $this->delete($actorId, $card),
+            default     => throw self::invalid('action', 'Choose what to do with the cards.'),
         };
     }
 
