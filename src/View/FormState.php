@@ -59,4 +59,12 @@ final class FormState
 
         return is_array($values) ? array_values(array_filter($values, 'is_string')) : [];
     }
+
+    /** The raw kept value (strings and nested arrays, e.g. rows of a repeating field), or null. */
+    public function oldValue(string $field): mixed
+    {
+        $this->old ??= (array) $this->session->pullFlash('old', []);
+
+        return $this->old[$field] ?? null;
+    }
 }

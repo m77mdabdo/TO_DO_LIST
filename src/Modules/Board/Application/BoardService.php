@@ -267,6 +267,22 @@ final class BoardService implements BoardCatalog
         });
     }
 
+    /** A color for the list, or null for none. The list keeps its name, so color is never the only cue. */
+    public function setListColor(int $actorId, BoardSummary $board, int $listId, ?string $color): void
+    {
+        $this->gate->authorize($actorId, $board->id, Permission::EditCards);
+        $this->assertOpen($board);
+        $list = $this->listOrFail($listId, $board->id);
+        if ($color !== null && !in_array($color, BoardSummary::COLORS, true)) {
+            throw new ValidationException(new ValidationResult(['color' => 'Choose one of the colors.']));
+        }
+        if ($color === $list->color) {
+            return;
+        }
+
+        $this->boards->updateList($list->id, ['color' => $color]);
+    }
+
     /** Puts the list right after $afterListId (first when null). One row is written. */
     public function moveList(int $actorId, BoardSummary $board, int $listId, ?int $afterListId): void
     {

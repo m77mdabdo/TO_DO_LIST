@@ -13,6 +13,8 @@ use App\Modules\Invitation\Application\InvitationService;
 use App\Modules\Invitation\Domain\InvitationRepository;
 use App\Modules\Invitation\Http\InvitationController;
 use App\Modules\Invitation\Infrastructure\PdoInvitations;
+use App\Security\RateLimitRule;
+use App\Security\RateLimits;
 use App\Session\Session;
 use App\Shared\Events\EventBus;
 use App\Shared\Module\ModuleProvider;
@@ -37,6 +39,14 @@ final class InvitationModule implements ModuleProvider
     {
         $container->singleton(InvitationRepository::class, fn (Container $c) => new PdoInvitations($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(InvitationService::class, fn (Container $c) => $c->build(InvitationService::class));
+
+        // Per sender, on top of the service's own cap on invitations per hour.
+        $container->extend(RateLimits::class, function (object $limits): void {
+            /** @var RateLimits $limits */
+            $limits->add(new RateLimitRule('invitations', 'POST', '/workspaces/*/invitations', 30, 3600, 'user'));
+            $limits->add(new RateLimitRule('invitation-resend', 'POST', '/invitations/*/resend', 30, 3600, 'user'));
+            $limits->add(new RateLimitRule('invitation-accept', 'POST', '/invitations/*/accept', 20, 900));
+        });
 
         $container->extend(View::class, function (object $view, Container $c): void {
             /** @var View $view */

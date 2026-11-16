@@ -11,4 +11,7 @@ interface LoginThrottle
     public function recordFailure(string $ip, string $email): void;
 
     public function clear(string $ip): void;
+
+    /** Deletes attempts older than the lockout window. Returns how many went. */
+    public function prune(): int;
 }

@@ -12,6 +12,7 @@
  * @var array<int, \App\Modules\Identity\Contract\User> $people
  * @var array{triggers: array<string, string>, conditions: array<string, string>, actions: array<string, string>, textActions: list<string>, lists: array<int, string>} $options
  * @var string $kind the kind the form is for
+ * @var array<int, \App\Modules\Automation\Contract\AutomationRun> $failures automation id => its latest failed run
  * @var \App\Support\TimeAgo $timeAgo
  */
 $form = $this->form;
@@ -26,7 +27,7 @@ $byKind = [];
 foreach ($automations as $automation) {
     $byKind[$automation->kind][] = $automation;
 }
-$weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+$failures ??= [];
 $detail = function (string $json): string {
     $data = json_decode($json, true);
     if (!is_array($data) || !isset($data['text'])) {
@@ -61,16 +62,29 @@ $base = '/boards/' . $board->publicId . '/automation';
                             <?php if ($own): ?><p dir="auto"><?= $this->e($sentence) ?></p><?php endif; ?>
                             <p class="muted small">
                                 <?= $this->te('Set up by :name', ['name' => $people[$automation->createdBy]->name ?? $this->t('Someone')]) ?>
-                                <?php if ($automation->lastRunAt !== null): ?> · <?= $this->te('last ran :when', ['when' => $timeAgo->format(new DateTimeImmutable($automation->lastRunAt))]) ?><?php endif; ?>
+                                <?php if ($automation->lastRunAt !== null): ?> · <?= $this->te('last ran :when', ['when' => $timeAgo->format(new DateTimeImmutable($automation->lastRunAt))]) ?><?php else: ?> · <?= $this->te('has not run yet') ?><?php endif; ?>
                             </p>
+                            <?php if ($automation->failures > 0 && isset($failures[$automation->id])): $failed = $failures[$automation->id]; ?>
+                                <p class="automation-failure small" role="note"><?= $this->icon('flag') ?>
+                                    <span><?= $this->te('Failed :count time(s) in a row. Last time (:when): :reason', [
+                                        'count'  => (string) $automation->failures,
+                                        'when'   => $timeAgo->format(new DateTimeImmutable($failed->createdAt)),
+                                        'reason' => $detail($failed->detail),
+                                    ]) ?></span></p>
+                            <?php endif; ?>
                         </div>
                         <div class="automation-tools">
+                            <a class="btn btn-ghost" href="<?= $this->url('/automations/' . $automation->publicId . '/edit') ?>"><?= $this->icon('edit') ?><span><?= $this->te('Edit') ?></span></a>
+                            <form action="<?= $this->url('/automations/' . $automation->publicId . '/duplicate') ?>" method="post">
+                                <?= $this->csrfField() ?>
+                                <button class="btn btn-ghost" type="submit" title="<?= $this->te('Duplicate (the copy starts paused)') ?>"><?= $this->icon('copy') ?><span class="visually-hidden"><?= $this->te('Duplicate (the copy starts paused)') ?></span></button>
+                            </form>
                             <form action="<?= $this->url('/automations/' . $automation->publicId . '/toggle') ?>" method="post">
                                 <?= $this->csrfField() ?>
                                 <input type="hidden" name="on" value="<?= $automation->enabled ? '0' : '1' ?>">
                                 <button class="btn btn-ghost" type="submit"><?= $this->icon($automation->enabled ? 'pause' : 'play') ?><span><?= $this->te($automation->enabled ? 'Pause' : 'Turn on') ?></span></button>
                             </form>
-                            <form action="<?= $this->url('/automations/' . $automation->publicId . '/delete') ?>" method="post">
+                            <form action="<?= $this->url('/automations/' . $automation->publicId . '/delete') ?>" method="post" data-confirm="<?= $this->te('Delete this automation? Its lines in the run log are deleted too.') ?>">
                                 <?= $this->csrfField() ?>
                                 <button class="btn btn-ghost btn-danger" type="submit"><?= $this->icon('trash') ?><span class="visually-hidden"><?= $this->te('Delete') ?></span></button>
                             </form>
@@ -93,122 +107,7 @@ $base = '/boards/' . $board->publicId . '/automation';
         </nav>
         <p class="muted"><?= $this->te($kinds[$kind][2]) ?></p>
 
-        <form action="<?= $this->url($base) ?>" method="post" class="stack automation-form" novalidate>
-            <?= $this->csrfField() ?>
-            <input type="hidden" name="kind" value="<?= $this->e($kind) ?>">
-
-            <label><span><?= $this->te(in_array($kind, ['card_button', 'board_button'], true) ? 'Button name' : 'Name (optional)') ?></span>
-                <input name="name" maxlength="120" dir="auto" value="<?= $this->e($form->old('name')) ?>" <?= in_array($kind, ['card_button', 'board_button'], true) ? 'required' : '' ?>
-                       placeholder="<?= $this->te($kind === 'card_button' ? 'e.g. Send for review' : (in_array($kind, ['rule', 'schedule', 'due'], true) ? 'Leave empty to describe it automatically' : 'e.g. Clean up Done')) ?>"
-                       aria-invalid="<?= $form->error('name') ? 'true' : 'false' ?>"></label>
-            <?php if ($form->error('name')): ?><p class="field-error"><?= $this->te((string) $form->error('name')) ?></p><?php endif; ?>
-
-            <?php if ($kind === 'rule'): ?>
-                <label><span><?= $this->te('When') ?></span>
-                    <select name="trigger" required aria-invalid="<?= $form->error('trigger') ? 'true' : 'false' ?>">
-                        <?php foreach ($options['triggers'] as $value => $label): ?>
-                            <option value="<?= $this->e($value) ?>" <?= $form->old('trigger') === $value ? 'selected' : '' ?>><?= $this->e($label) ?></option>
-                        <?php endforeach; ?>
-                    </select></label>
-                <?php if ($form->error('trigger')): ?><p class="field-error"><?= $this->te((string) $form->error('trigger')) ?></p><?php endif; ?>
-            <?php endif; ?>
-
-            <?php if ($kind === 'schedule'): ?>
-                <div class="field-row">
-                    <label><span><?= $this->te('Every') ?></span>
-                        <select name="every">
-                            <?php foreach (['day' => 'Day', 'week' => 'Week', 'month' => 'Month'] as $value => $label): ?>
-                                <option value="<?= $value ?>" <?= $form->old('every') === $value ? 'selected' : '' ?>><?= $this->te($label) ?></option>
-                            <?php endforeach; ?>
-                        </select></label>
-                    <label><span><?= $this->te('On (weekly)') ?></span>
-                        <select name="weekday">
-                            <?php foreach ($weekdays as $value => $label): ?>
-                                <option value="<?= $value ?>" <?= $form->old('weekday', '0') === (string) $value ? 'selected' : '' ?>><?= $this->te($label) ?></option>
-                            <?php endforeach; ?>
-                        </select></label>
-                    <label><span><?= $this->te('On day (monthly)') ?></span>
-                        <select name="monthday">
-                            <?php for ($d = 1; $d <= 28; $d++): ?>
-                                <option value="<?= $d ?>" <?= $form->old('monthday', '1') === (string) $d ? 'selected' : '' ?>><?= $d ?></option>
-                            <?php endfor; ?>
-                        </select></label>
-                    <label><span><?= $this->te('At') ?></span>
-                        <select name="hour">
-                            <?php for ($h = 0; $h <= 23; $h++): ?>
-                                <option value="<?= $h ?>" <?= $form->old('hour', '8') === (string) $h ? 'selected' : '' ?>><?= sprintf('%02d:00', $h) ?></option>
-                            <?php endfor; ?>
-                        </select></label>
-                </div>
-            <?php endif; ?>
-
-            <?php if ($kind === 'due'): ?>
-                <div class="field-row">
-                    <label><span><?= $this->te('When') ?></span>
-                        <select name="when">
-                            <?php foreach (['before' => 'Before the due date', 'on' => 'On the due date', 'after' => 'After the due date (if not done)'] as $value => $label): ?>
-                                <option value="<?= $value ?>" <?= $form->old('when', 'before') === $value ? 'selected' : '' ?>><?= $this->te($label) ?></option>
-                            <?php endforeach; ?>
-                        </select></label>
-                    <label><span><?= $this->te('Days') ?></span>
-                        <select name="days">
-                            <?php foreach (\App\Modules\Automation\Contract\Automation::DUE_DAY_CHOICES as $days): ?>
-                                <option value="<?= $days ?>" <?= $form->old('days', '1') === (string) $days ? 'selected' : '' ?>><?= $days ?></option>
-                            <?php endforeach; ?>
-                        </select></label>
-                </div>
-            <?php endif; ?>
-
-            <?php if (in_array($kind, ['board_button', 'schedule', 'due'], true)): ?>
-                <label><span><?= $this->te('Which cards') ?></span>
-                    <select name="scope">
-                        <option value=""><?= $this->te('Every open card on the board') ?></option>
-                        <?php foreach ($options['lists'] as $id => $name): ?>
-                            <option value="<?= $id ?>" <?= $form->old('scope') === (string) $id ? 'selected' : '' ?>><?= $this->te('Cards in :list', ['list' => '“' . $name . '”']) ?></option>
-                        <?php endforeach; ?>
-                    </select></label>
-            <?php endif; ?>
-
-            <?php if ($kind !== 'card_button'): ?>
-                <fieldset class="stack-sm">
-                    <legend><?= $this->te('Only if (optional)') ?></legend>
-                    <?php for ($i = 0; $i < 3; $i++): ?>
-                        <select name="conditions[]" aria-label="<?= $this->te('Condition :n', ['n' => (string) ($i + 1)]) ?>">
-                            <option value=""><?= $this->te('No condition') ?></option>
-                            <?php foreach ($options['conditions'] as $value => $label): ?>
-                                <option value="<?= $this->e($value) ?>"><?= $this->e($label) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    <?php endfor; ?>
-                    <?php if ($form->error('conditions')): ?><p class="field-error"><?= $this->te((string) $form->error('conditions')) ?></p><?php endif; ?>
-                </fieldset>
-            <?php endif; ?>
-
-            <fieldset class="stack-sm">
-                <legend><?= $this->te('Then') ?></legend>
-                <?php for ($i = 0; $i < 4; $i++): ?>
-                    <div class="action-row">
-                        <select name="actions[<?= $i ?>][do]" aria-label="<?= $this->te('Action :n', ['n' => (string) ($i + 1)]) ?>">
-                            <option value=""><?= $this->te($i === 0 ? 'Choose an action' : 'Nothing more') ?></option>
-                            <?php foreach ($options['actions'] as $value => $label): ?>
-                                <?php if ($kind === 'card_button' && str_starts_with($value, 'list.')) {
-                                    continue;
-                                } ?>
-                                <option value="<?= $this->e($value) ?>"><?= $this->e($label) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                        <input name="actions[<?= $i ?>][text]" maxlength="2000" dir="auto" aria-label="<?= $this->te('Text for action :n', ['n' => (string) ($i + 1)]) ?>"
-                               placeholder="<?= $this->te('Text, for a comment, a notice or a checklist') ?>">
-                    </div>
-                <?php endfor; ?>
-                <p class="muted small"><?= $this->te('For a checklist, write its name, then the items separated by new lines or by " | ".') ?></p>
-                <?php if ($form->error('actions')): ?><p class="field-error"><?= $this->te((string) $form->error('actions')) ?></p><?php endif; ?>
-            </fieldset>
-
-            <div class="form-actions">
-                <button class="btn btn-primary" type="submit"><?= $this->icon('check') ?> <?= $this->te('Save automation') ?></button>
-            </div>
-        </form>
+        <?= $this->partial('automation/form', ['kind' => $kind, 'action' => $base, 'submit' => 'Save automation', 'values' => [], 'options' => $options]) ?>
     </section>
 
     <section class="card stack" id="log">

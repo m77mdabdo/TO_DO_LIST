@@ -13,6 +13,7 @@ use App\Modules\Board\Contract\BoardSummary;
 use App\Modules\Card\Contract\CardSummary;
 use App\Modules\Card\Contract\CardWriter;
 use App\Modules\Card\Contract\Events\CardChanged;
+use App\Modules\Card\Contract\Events\CardCopied;
 use App\Modules\Card\Contract\Events\CardCreated;
 use App\Modules\Card\Contract\Events\CardDeleted;
 use App\Modules\Card\Contract\Events\CardMemberChanged;
@@ -34,6 +35,8 @@ final class CardService implements CardWriter
 {
     public const TITLE_MAX = 200;
     public const DESCRIPTION_MAX = 10000;
+    /** What a card copy can keep. */
+    public const COPY_PARTS = ['description', 'dates', 'labels', 'checklists', 'members'];
 
     public function __construct(
         private CardRepository $cards,
@@ -123,6 +126,62 @@ final class CardService implements CardWriter
             foreach ($changes as $change => $details) {
                 $this->events->publish(new CardChanged($card->id, $card->boardId, $actorId, $change, $fields['title'], $details, $this->clock->now()));
             }
+        });
+    }
+
+    /** Marks the card as a template (or a plain card again). */
+    public function setTemplate(int $actorId, CardSummary $card, bool $template): void
+    {
+        $this->gate->authorize($actorId, $card->boardId, Permission::EditCards);
+        $this->assertBoardOpen($card->boardId);
+
+        if ($template === $card->isTemplate) {
+            return;
+        }
+
+        $this->transactions->run(function () use ($actorId, $card, $template): void {
+            $this->cards->update($card->id, ['is_template' => $template ? 1 : 0]);
+            $this->events->publish(new CardChanged($card->id, $card->boardId, $actorId, $template ? 'made_template' : 'unmade_template', $card->title, [], $this->clock->now()));
+        });
+    }
+
+    /**
+     * Copies a card to the end of a list, on its own board or another one
+     * the actor may edit. The copy is a plain, open card. $keep picks what
+     * comes along (COPY_PARTS); comments, attachments, votes and history
+     * never do, and members only if they can see the target board.
+     *
+     * @param list<string> $keep
+     */
+    public function copyCard(int $actorId, CardSummary $card, int $toBoardId, int $toListId, string $title, array $keep): CardSummary
+    {
+        $this->gate->authorize($actorId, $card->boardId, Permission::ViewBoard);
+        $this->gate->authorize($actorId, $toBoardId, Permission::EditCards);
+        $this->assertOpenList($toBoardId, $toListId);
+        $this->assertValid(['title' => $title], ['title' => ['Title', 'required|max:' . self::TITLE_MAX]]);
+        $keep = array_values(array_intersect(self::COPY_PARTS, $keep));
+        $has = static fn (string $part): bool => in_array($part, $keep, true);
+
+        return $this->transactions->run(function () use ($actorId, $card, $toBoardId, $toListId, $title, $keep, $has): CardSummary {
+            $copy = $this->cards->create($toBoardId, $toListId, trim($title), $this->cards->positionAtEnd($toListId), $actorId, [
+                'description' => $has('description') ? $card->description : null,
+                'due_at'      => $has('dates') ? $card->dueAt : null,
+            ]);
+            if ($has('dates') && $card->startAt !== null) {
+                $this->cards->update($copy->id, ['start_at' => $card->startAt]);
+            }
+            if ($has('members')) {
+                foreach ($this->cards->membersOf($card->id) as $memberId) {
+                    if ($this->gate->can($memberId, $toBoardId, Permission::ViewBoard)) {
+                        $this->cards->addMember($copy->id, $memberId);
+                    }
+                }
+            }
+
+            $this->events->publish(new CardCreated($copy->id, $toBoardId, $toListId, $actorId, $copy->title, $this->clock->now()));
+            $this->events->publish(new CardCopied($card->id, $copy->id, $toBoardId, $actorId, $this->clock->now(), array_values(array_intersect(CardCopied::PARTS, $keep))));
+
+            return $this->cards->find($copy->id);
         });
     }
 

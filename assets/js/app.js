@@ -64,6 +64,40 @@
         toast(btn.dataset.copied || 'Copied', 'success');
     }));
 
+    /* ---------- bulk actions on a board ----------
+     * Shows only the field the chosen action needs, keeps the count of
+     * chosen cards, and asks again before deleting.
+     */
+
+    $$('.js-bulk').forEach((form) => {
+        const action = $('.js-bulk-action', form);
+        const boxes = () => $$('.js-bulk-card');
+        const count = $('.js-bulk-count', form);
+        const all = $('.js-bulk-all', form);
+        const refresh = () => {
+            $$('[data-bulk-for]', form).forEach((field) => {
+                field.hidden = field.dataset.bulkFor !== action.value;
+            });
+            count.textContent = String(boxes().filter((box) => box.checked).length);
+        };
+        action.addEventListener('change', refresh);
+        document.addEventListener('change', (event) => {
+            if (event.target.classList && event.target.classList.contains('js-bulk-card')) refresh();
+        });
+        if (all) {
+            all.hidden = false;
+            all.addEventListener('click', () => {
+                const on = boxes().some((box) => !box.checked);
+                boxes().forEach((box) => { box.checked = on; });
+                refresh();
+            });
+        }
+        form.addEventListener('submit', (event) => {
+            if (action.value === 'delete' && !window.confirm(form.dataset.confirmDelete)) event.preventDefault();
+        });
+        refresh();
+    });
+
     /* ---------- keyboard shortcuts ----------
      * Each one is a faster way to something that has a visible control too.
      * Ignored while typing, and when a modifier key is held.
