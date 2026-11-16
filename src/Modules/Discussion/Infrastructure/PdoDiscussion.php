@@ -11,7 +11,7 @@ use PDO;
 
 final class PdoDiscussion implements DiscussionRepository
 {
-    private const COLUMNS = 'id, card_id, board_id, author_id, body, created_at, edited_at';
+    private const COLUMNS = 'id, card_id, board_id, author_id, body, created_at, edited_at, attachment_id';
 
     public function __construct(private PDO $db, private Clock $clock)
     {
@@ -25,9 +25,11 @@ final class PdoDiscussion implements DiscussionRepository
         $stmt->execute($beforeId !== null ? [$cardId, $beforeId] : [$cardId]);
         $rows = $stmt->fetchAll();
 
-        $mentions = $this->mentionsOf(array_map(static fn (array $row) => (int) $row['id'], $rows));
+        $ids = array_map(static fn (array $row) => (int) $row['id'], $rows);
+        $mentions = $this->mentionsOf($ids);
+        $reactions = $this->reactionsOf($ids);
 
-        return array_map(static fn (array $row) => Comment::fromRow($row, $mentions[(int) $row['id']] ?? []), $rows);
+        return array_map(static fn (array $row) => Comment::fromRow($row, $mentions[(int) $row['id']] ?? [], $reactions[(int) $row['id']] ?? []), $rows);
     }
 
     public function findComment(int $id): ?Comment
@@ -36,13 +38,13 @@ final class PdoDiscussion implements DiscussionRepository
         $stmt->execute([$id]);
         $row = $stmt->fetch();
 
-        return $row ? Comment::fromRow($row, $this->mentionsOf([$id])[$id] ?? []) : null;
+        return $row ? Comment::fromRow($row, $this->mentionsOf([$id])[$id] ?? [], $this->reactionsOf([$id])[$id] ?? []) : null;
     }
 
-    public function addComment(int $cardId, int $boardId, int $authorId, string $body, array $mentions): int
+    public function addComment(int $cardId, int $boardId, int $authorId, string $body, array $mentions, ?int $attachmentId = null): int
     {
-        $this->db->prepare('INSERT INTO comments (card_id, board_id, author_id, body, created_at) VALUES (?, ?, ?, ?, ?)')
-            ->execute([$cardId, $boardId, $authorId, $body, $this->now()]);
+        $this->db->prepare('INSERT INTO comments (card_id, board_id, author_id, body, created_at, attachment_id) VALUES (?, ?, ?, ?, ?, ?)')
+            ->execute([$cardId, $boardId, $authorId, $body, $this->now(), $attachmentId]);
         $id = (int) $this->db->lastInsertId();
         $this->saveMentions($id, $mentions);
 
@@ -59,6 +61,7 @@ final class PdoDiscussion implements DiscussionRepository
     public function deleteComment(int $id): void
     {
         $this->db->prepare('DELETE FROM comment_mentions WHERE comment_id = ?')->execute([$id]);
+        $this->db->prepare('DELETE FROM comment_reactions WHERE comment_id = ?')->execute([$id]);
         $this->db->prepare('DELETE FROM comments WHERE id = ?')->execute([$id]);
     }
 
@@ -110,6 +113,73 @@ final class PdoDiscussion implements DiscussionRepository
         }
 
         return $counts;
+    }
+
+    public function toggleReaction(int $commentId, int $userId, string $emoji): bool
+    {
+        $delete = $this->db->prepare('DELETE FROM comment_reactions WHERE comment_id = ? AND user_id = ? AND emoji = ?');
+        $delete->execute([$commentId, $userId, $emoji]);
+        if ($delete->rowCount() > 0) {
+            return false;
+        }
+
+        try {
+            $this->db->prepare('INSERT INTO comment_reactions (comment_id, user_id, emoji, created_at) VALUES (?, ?, ?, ?)')
+                ->execute([$commentId, $userId, $emoji, $this->now()]);
+        } catch (\PDOException) {
+            // A double click raced us to the same row; the primary key kept it single.
+        }
+
+        return true;
+    }
+
+    public function touchTyping(int $cardId, int $userId, string $staleBefore): void
+    {
+        $this->db->prepare('DELETE FROM card_typing WHERE typed_at < ?')->execute([$staleBefore]);
+        $update = $this->db->prepare('UPDATE card_typing SET typed_at = ? WHERE card_id = ? AND user_id = ?');
+        $update->execute([$this->now(), $cardId, $userId]);
+        if ($update->rowCount() === 0) {
+            try {
+                $this->db->prepare('INSERT INTO card_typing (card_id, user_id, typed_at) VALUES (?, ?, ?)')->execute([$cardId, $userId, $this->now()]);
+            } catch (\PDOException) {
+                // Another request from the same person inserted it first.
+            }
+        }
+    }
+
+    public function stopTyping(int $cardId, int $userId): void
+    {
+        $this->db->prepare('DELETE FROM card_typing WHERE card_id = ? AND user_id = ?')->execute([$cardId, $userId]);
+    }
+
+    public function typingOn(int $cardId, string $since): array
+    {
+        $stmt = $this->db->prepare('SELECT user_id FROM card_typing WHERE card_id = ? AND typed_at >= ? ORDER BY typed_at');
+        $stmt->execute([$cardId, $since]);
+
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
+
+    /**
+     * @param list<int> $commentIds
+     * @return array<int, array<string, list<int>>>
+     */
+    private function reactionsOf(array $commentIds): array
+    {
+        if ($commentIds === []) {
+            return [];
+        }
+
+        $marks = implode(', ', array_fill(0, count($commentIds), '?'));
+        $stmt = $this->db->prepare("SELECT comment_id, emoji, user_id FROM comment_reactions WHERE comment_id IN ($marks) ORDER BY created_at, user_id");
+        $stmt->execute($commentIds);
+
+        $byComment = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_NUM) as [$commentId, $emoji, $userId]) {
+            $byComment[(int) $commentId][(string) $emoji][] = (int) $userId;
+        }
+
+        return $byComment;
     }
 
     /**

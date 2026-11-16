@@ -12,7 +12,8 @@ interface EventBus
 {
     /**
      * The listener names the concrete event it handles, e.g. fn (CardMoved $e) => ...
-     * It is only ever called with events published under $eventName.
+     * It is only ever called with events published under $eventName, or
+     * with every event when $eventName is "*".
      *
      * @template TEvent of DomainEvent
      * @param callable(TEvent): void $listener

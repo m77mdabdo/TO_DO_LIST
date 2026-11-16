@@ -170,8 +170,16 @@ $selecting = ($selecting ?? false) && ($canEdit || $canMove || $canArchive);
     <p class="board-description muted" dir="auto"><?= nl2br($this->e($board->description)) ?></p>
 <?php endif; ?>
 
+<div class="banner banner-updates js-board-stale" role="status" hidden>
+    <?= $this->icon('activity') ?>
+    <span class="js-board-stale-text"><?= $this->te('Someone changed this board.') ?></span>
+    <button class="btn btn-primary js-board-refresh" type="button"><?= $this->te('Show the changes') ?></button>
+</div>
+
 <div class="board-layout">
-    <main class="lists js-lists" data-board-move-base="<?= $this->url($base . '/lists') ?>">
+    <main class="lists js-lists" data-board-move-base="<?= $this->url($base . '/lists') ?>"
+          data-version="<?= (int) ($version ?? 0) ?>" data-changes-url="<?= $this->url($base . '/changes') ?>"
+          data-updated-by="<?= $this->te(':name changed the board') ?>" data-updated="<?= $this->te('The board was updated') ?>">
         <?php foreach ($lists as $i => $list): $cards = $cardsByList[$list->id] ?? []; ?>
             <section class="list <?= $list->color ? 'list-color tile-' . $this->e($list->color) : '' ?>" data-list-id="<?= $list->id ?>" <?= $canMove ? 'draggable="true"' : '' ?>
                      data-move-url="<?= $this->url($base . '/lists/' . $list->id . '/move') ?>">
@@ -277,7 +285,7 @@ $selecting = ($selecting ?? false) && ($canEdit || $canMove || $canArchive);
     </main>
 
     <?php if ($activity): ?>
-        <aside class="activity card">
+        <aside class="activity card js-board-activity">
             <h2><?= $this->icon('activity') ?> <?= $this->te('Activity') ?></h2>
             <ul class="activity-list">
                 <?php foreach ($activity as $entry): ?>
