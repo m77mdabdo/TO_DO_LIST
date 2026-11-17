@@ -41,6 +41,15 @@ final class Markdown
     /** 'ul', 'ol', or '' when no list is open */
     private string $list = '';
 
+    /**
+     * @param (\Closure(string): ?string)|null $internal given a bare link (decoded), returns the
+     *        HTML to show instead (e.g. a chip for a card of this app), or null to keep a plain link.
+     *        It must not fetch anything from outside.
+     */
+    public function __construct(private ?\Closure $internal = null)
+    {
+    }
+
     public function toHtml(string $text): string
     {
         $text = str_replace(["\r\n", "\r"], "\n", mb_substr($text, 0, self::MAX_LENGTH));
@@ -161,8 +170,9 @@ final class Markdown
         $text = preg_replace_callback('#\bhttps?://(?:(?!&quot;|&\#039;|&gt;)[^\s<\x{E000}])+#iu', function (array $m): string {
             // Sentence punctuation right after a link isn't part of it.
             $url = rtrim($m[0], '.,:;!?)');
+            $chip = $this->internal !== null ? ($this->internal)(html_entity_decode($url, ENT_QUOTES | ENT_HTML5, 'UTF-8')) : null;
 
-            return $this->hold(self::link($url, $url)) . substr($m[0], strlen($url));
+            return $this->hold($chip ?? self::link($url, $url)) . substr($m[0], strlen($url));
         }, $text);
 
         $text = preg_replace('/\*\*(?=\S)(.+?)(?<=\S)\*\*/', '<strong>$1</strong>', $text);

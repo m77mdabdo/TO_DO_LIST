@@ -30,11 +30,11 @@ final class PdoCardRepository implements CardRepository
         $now = $this->now();
         $created = $extra['created_at'] ?? $now;
 
-        $this->db->prepare('INSERT INTO cards (public_id, board_id, list_id, title, description, position, due_at, completed_at, created_by, created_at, updated_at)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        $this->db->prepare('INSERT INTO cards (public_id, board_id, list_id, title, description, position, start_at, due_at, completed_at, created_by, created_at, updated_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
             ->execute([
                 Ulid::generate(), $boardId, $listId, $title, $extra['description'] ?? null, $position,
-                $extra['due_at'] ?? null, $extra['completed_at'] ?? null, $createdBy, $created, $now,
+                $extra['start_at'] ?? null, $extra['due_at'] ?? null, $extra['completed_at'] ?? null, $createdBy, $created, $now,
             ]);
 
         return $this->find((int) $this->db->lastInsertId());

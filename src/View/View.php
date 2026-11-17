@@ -27,6 +27,9 @@ final class View
 
     private ?Markdown $markdown = null;
 
+    /** @var (\Closure(string): ?string)|null */
+    private ?\Closure $internalLink = null;
+
     public function __construct(
         private string $directory,
         private Url $url,
@@ -88,10 +91,23 @@ final class View
         return $this->renderFile($template, $data);
     }
 
+    /**
+     * Lets a module show links to this app's own pages (pasted in descriptions
+     * and comments) as something richer than a plain link. The closure gets
+     * the link and returns safe HTML, or null for a plain link.
+     *
+     * @param \Closure(string): ?string $render
+     */
+    public function renderInternalLinks(\Closure $render): void
+    {
+        $this->internalLink = $render;
+        $this->markdown = null;
+    }
+
     /** User-written Markdown as safe HTML (raw HTML in it is escaped, never run). */
     public function markdown(?string $text): string
     {
-        return ($this->markdown ??= new Markdown())->toHtml((string) $text);
+        return ($this->markdown ??= new Markdown($this->internalLink))->toHtml((string) $text);
     }
 
     public function e(mixed $value): string

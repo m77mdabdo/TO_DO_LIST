@@ -34,10 +34,12 @@ final class App
             'timezone' => 'Asia/Riyadh',
             'locale'   => $locale,
             'url'      => 'https://todo.test',
+            'key'      => 'base64:' . base64_encode(str_repeat('k', 32)),
             'mail'     => ['driver' => 'memory', 'from_address' => 'team@todo.test', 'from_name' => 'To Do List'],
             'db'       => TestDatabase::config(),
             'attachments' => ['path' => self::scratch('attachments')],
             'backups'     => ['path' => self::scratch('backups')],
+            'imports'     => ['path' => self::scratch('imports')],
             ...$config,
         ]), $this->session);
         $this->container->singleton(Clock::class, fn () => new FrozenClock($now));

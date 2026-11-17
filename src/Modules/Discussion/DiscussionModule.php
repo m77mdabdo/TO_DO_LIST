@@ -72,6 +72,7 @@ final class DiscussionModule implements ModuleProvider
         });
         $container->singleton(DiscussionRepository::class, fn (Container $c) => new PdoDiscussion($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(DiscussionService::class, fn (Container $c) => $c->build(DiscussionService::class));
+        $container->singleton(\App\Modules\Discussion\Contract\CommentWriter::class, fn (Container $c) => $c->get(DiscussionService::class));
 
         $container->extend(View::class, function (object $view, Container $c): void {
             /** @var View $view */
