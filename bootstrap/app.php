@@ -85,6 +85,7 @@ return static function (Config $config, Session $session, string $basePath = '',
     ));
     $container->singleton(Transactions::class, fn (Container $c) => new Transactions($c->get(PDO::class)));
     $container->singleton(Url::class, fn () => new Url($basePath, $root));
+    $container->singleton(\App\Security\Secrets::class, fn () => new \App\Security\Secrets((string) $config->get('key', '')));
     $container->singleton(Csrf::class, fn (Container $c) => new Csrf($c->get(Session::class)));
     $container->singleton(FormState::class, fn (Container $c) => new FormState($c->get(Session::class)));
 

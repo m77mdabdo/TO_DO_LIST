@@ -190,8 +190,12 @@ final class Webhooks
         return [$sent, $failed];
     }
 
-    /** @return array<string, mixed> */
-    private function payload(DomainEvent $event): array
+    /**
+     * What a message about the event says (also used by the ready-made integrations).
+     *
+     * @return array<string, mixed>
+     */
+    public function payload(DomainEvent $event): array
     {
         /** @var CardCreated|CardMoved|CardChanged|CardMemberChanged|LabelAttached|ChecklistChanged|CommentPosted $event */
         $board = $this->boards->find($event->boardId);

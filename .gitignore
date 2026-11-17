@@ -3,6 +3,7 @@ config.local.php
 storage/mail/
 storage/attachments/
 storage/backups/
+storage/imports/
 database/*.sqlite
 database/*.sqlite-*
 .DS_Store

@@ -69,14 +69,17 @@ final class CardService implements CardWriter
     {
         $this->gate->authorize($actorId, $boardId, Permission::EditCards);
         $this->assertOpenList($boardId, $listId);
-        $this->assertValid(['title' => $title, 'due_date' => $extra['due_date'] ?? ''], [
-            'title'    => ['Title', 'required|max:' . self::TITLE_MAX],
-            'due_date' => ['Due date', 'date'],
+        $this->assertValid(['title' => $title, 'due_date' => $extra['due_date'] ?? '', 'start_date' => $extra['start_date'] ?? '', 'description' => $extra['description'] ?? ''], [
+            'title'       => ['Title', 'required|max:' . self::TITLE_MAX],
+            'description' => ['Description', 'max:' . self::DESCRIPTION_MAX],
+            'start_date'  => ['Start date', 'date'],
+            'due_date'    => ['Due date', 'date'],
         ]);
 
         return $this->transactions->run(function () use ($actorId, $boardId, $listId, $title, $extra): CardSummary {
             $card = $this->cards->create($boardId, $listId, trim($title), $this->cards->positionAtEnd($listId), $actorId, [
                 'description'  => $extra['description'] ?? null,
+                'start_at'     => self::dueAt($extra['start_date'] ?? null),
                 'due_at'       => self::dueAt($extra['due_date'] ?? null),
                 'completed_at' => $extra['completed_at'] ?? null,
                 'created_at'   => $extra['created_at'] ?? null,

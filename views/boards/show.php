@@ -76,6 +76,7 @@ $selecting = ($selecting ?? false) && ($canEdit || $canMove || $canArchive);
         </details>
         <a class="btn btn-ghost" href="<?= $this->url($base . '/fields') ?>" title="<?= $this->te('Custom fields') ?>"><?= $this->icon('table') ?><span class="hide-sm"><?= $this->te('Fields') ?></span></a>
         <a class="btn btn-ghost" href="<?= $this->url($base . '/archived') ?>"><?= $this->icon('archive') ?><span class="hide-sm"><?= $this->te('Archived items') ?></span></a>
+        <?= $this->slot('board.toolbar', ['board' => $board, 'role' => $role]) ?>
         <?php if ($role->allows(Permission::Export)): ?>
             <details class="menu menu-end">
                 <summary class="btn btn-ghost" title="<?= $this->te('Export') ?>"><?= $this->icon('download') ?><span class="visually-hidden"><?= $this->te('Export') ?></span></summary>

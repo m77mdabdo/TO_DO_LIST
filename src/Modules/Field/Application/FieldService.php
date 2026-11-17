@@ -27,7 +27,7 @@ use DateTimeImmutable;
  * labels); filling them in needs EditCards on an open card of an open board.
  * Every value is checked against its field's type on the server.
  */
-final class FieldService
+final class FieldService implements \App\Modules\Field\Contract\FieldValues
 {
     public function __construct(
         private FieldRepository $fields,

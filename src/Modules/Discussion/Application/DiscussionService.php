@@ -42,7 +42,7 @@ use App\Validation\Validator;
  * (everyone who can see the board). Only people who can see the board are
  * ever notified; mentioned workspace members who can't are reported back.
  */
-final class DiscussionService
+final class DiscussionService implements \App\Modules\Discussion\Contract\CommentWriter
 {
     public const BODY_MAX = 5000;
     public const PAGE = 20;

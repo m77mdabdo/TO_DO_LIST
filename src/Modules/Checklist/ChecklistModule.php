@@ -82,6 +82,7 @@ final class ChecklistModule implements ModuleProvider
         $container->singleton(ChecklistRepository::class, fn (Container $c) => new PdoChecklists($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(ChecklistService::class, fn (Container $c) => $c->build(ChecklistService::class));
         $container->singleton(ChecklistQueries::class, fn (Container $c) => $c->get(ChecklistService::class));
+        $container->singleton(\App\Modules\Checklist\Contract\ChecklistWriter::class, fn (Container $c) => $c->get(ChecklistService::class));
 
         $container->extend(View::class, function (object $view, Container $c): void {
             /** @var View $view */

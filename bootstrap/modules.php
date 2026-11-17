@@ -26,6 +26,7 @@ return [
     App\Modules\LegacyImport\LegacyImportModule::class,
     App\Modules\Integration\IntegrationModule::class,
     App\Modules\Personal\PersonalModule::class,
+    App\Modules\Import\ImportModule::class,
     // Last, so a rule's effects are recorded after the change that set it off.
     App\Modules\Automation\AutomationModule::class,
 ];

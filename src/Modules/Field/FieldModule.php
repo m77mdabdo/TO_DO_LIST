@@ -48,6 +48,7 @@ final class FieldModule implements ModuleProvider
     {
         $container->singleton(FieldRepository::class, fn (Container $c) => new PdoFields($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(FieldService::class, fn (Container $c) => $c->build(FieldService::class));
+        $container->singleton(\App\Modules\Field\Contract\FieldValues::class, fn (Container $c) => $c->get(FieldService::class));
 
         $container->extend(SearchSources::class, function (object $sources, Container $c): void {
             /** @var SearchSources $sources */

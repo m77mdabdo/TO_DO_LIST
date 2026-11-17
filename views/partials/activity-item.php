@@ -67,6 +67,8 @@ $templates = [
     'card.recurred' => ':actor completed :subject, the next due date is :to',
     'card.recurrence_changed' => ':actor changed how :subject repeats',
     'board.background'  => ':actor changed the board background',
+    'card.linked'       => ':actor linked :subject to another card',
+    'card.unlinked'     => ':actor removed a linked card from :subject',
 ];
 // Translate the sentence first, then drop the names in as isolated, bold
 // spans, so an English title inside an Arabic sentence keeps its place.
