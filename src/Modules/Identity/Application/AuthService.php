@@ -23,6 +23,12 @@ final class AuthService implements Authenticator
     private const SESSION_KEY = 'user_id';
     // Sessions from before auth versions existed hold none: they count as version 1.
     private const VERSION_KEY = 'auth_version';
+    /** This browser's secret in user_sessions. */
+    private const DEVICE_KEY = 'device';
+    /** The password was right; the second step (two-step sign-in) is next. */
+    private const PENDING_KEY = 'two_factor_login';
+    private const PENDING_SECONDS = 300;
+    private const PENDING_TRIES = 5;
 
     private ?User $user = null;
 
@@ -34,6 +40,9 @@ final class AuthService implements Authenticator
         private Validator $validator,
         private EventBus $events,
         private Clock $clock,
+        private DeviceSessions $devices,
+        private TwoFactor $twoFactor,
+        private \App\I18n\Translator $translator,
     ) {
     }
 
@@ -45,12 +54,25 @@ final class AuthService implements Authenticator
             return null;
         }
 
+        if ($this->user !== null) {
+            return $this->user;
+        }
         $version = $this->session->get(self::VERSION_KEY);
-        $this->user ??= $this->users->findForSession($id, is_int($version) ? $version : 1);
+        $this->user = $this->users->findForSession($id, is_int($version) ? $version : 1);
+
+        $device = $this->session->get(self::DEVICE_KEY);
+        if ($this->user !== null && is_string($device) && !$this->devices->check($id, $device)) {
+            // Signed out from another device's list.
+            $this->user = null;
+        } elseif ($this->user !== null && !is_string($device)) {
+            // A session from before the device list: it joins the list now.
+            $this->session->put(self::DEVICE_KEY, $this->devices->start($id, '', ''));
+        }
 
         // The password changed since this session started (here or on another device).
         if ($this->user === null) {
             $this->session->forget(self::SESSION_KEY);
+            $this->session->forget(self::DEVICE_KEY);
         }
 
         return $this->user;
@@ -62,10 +84,22 @@ final class AuthService implements Authenticator
         $this->user = null;
     }
 
-    /** Signs $userId in on this device (used after a password reset). */
-    public function signIn(int $userId): User
+    /**
+     * Signs $userId in on this device (used after a password reset). With
+     * two-step sign-in on, the code is still asked for: null means "next step".
+     */
+    public function signIn(int $userId, string $ip = '', string $agent = ''): ?User
     {
-        return $this->startSession($userId);
+        // Ends sessions that never joined the device list too.
+        $this->devices->endAll($userId);
+        if ($this->twoFactor->enabled($userId)) {
+            $this->session->regenerate();
+            $this->session->put(self::PENDING_KEY, ['user' => $userId, 'until' => $this->clock->now()->getTimestamp() + self::PENDING_SECONDS, 'tries' => 0]);
+
+            return null;
+        }
+
+        return $this->startSession($userId, $ip, $agent);
     }
 
     public function check(): bool
@@ -74,10 +108,13 @@ final class AuthService implements Authenticator
     }
 
     /**
+     * Null means the password was right and the second step is next
+     * (completeTwoFactor), when the account has two-step sign-in on.
+     *
      * @param array<string, mixed> $input email and password
      * @throws ValidationException when the form is invalid or the login fails
      */
-    public function login(array $input, string $ip): User
+    public function login(array $input, string $ip, string $agent = ''): ?User
     {
         if ($this->throttle->tooManyAttempts($ip)) {
             $this->fail('login', 'Too many attempts. Please wait 15 minutes and try again.');
@@ -103,10 +140,92 @@ final class AuthService implements Authenticator
             $this->users->updatePassword($credentials->userId, $this->hasher->hash($password));
         }
 
-        $user = $this->startSession($credentials->userId);
+        if ($this->twoFactor->enabled($credentials->userId)) {
+            $this->session->regenerate();
+            $this->session->put(self::PENDING_KEY, ['user' => $credentials->userId, 'until' => $this->clock->now()->getTimestamp() + self::PENDING_SECONDS, 'tries' => 0]);
+
+            return null;
+        }
+
+        $user = $this->startSession($credentials->userId, $ip, $agent);
         $this->events->publish(new UserLoggedIn($user->id, $user->name, $this->clock->now()));
 
         return $user;
+    }
+
+    /** Is someone between the password and the second step? */
+    public function pendingTwoFactor(): bool
+    {
+        return $this->pending() !== null;
+    }
+
+    /** The second step: a code from the app or a recovery code. */
+    public function completeTwoFactor(string $code, string $ip, string $agent = ''): User
+    {
+        $pending = $this->pending() ?? $this->fail('code', 'Please sign in again.');
+        if (!$this->twoFactor->verify($pending['user'], $code)) {
+            $pending['tries']++;
+            if ($pending['tries'] >= self::PENDING_TRIES) {
+                $this->session->forget(self::PENDING_KEY);
+                $this->fail('code', 'Too many wrong codes. Please sign in again.');
+            }
+            $this->session->put(self::PENDING_KEY, $pending);
+            $this->fail('code', 'That code is not right. Try the newest code from your app, or a recovery code.');
+        }
+        $this->session->forget(self::PENDING_KEY);
+        $user = $this->startSession($pending['user'], $ip, $agent);
+        $this->events->publish(new UserLoggedIn($user->id, $user->name, $this->clock->now()));
+
+        return $user;
+    }
+
+    /** The user id waiting for the second step, for the security log. */
+    public function pendingUserId(): ?int
+    {
+        return $this->pending()['user'] ?? null;
+    }
+
+    public function cancelTwoFactor(): void
+    {
+        $this->session->forget(self::PENDING_KEY);
+    }
+
+    /** This browser's place in the device list (null before sign-in). */
+    public function deviceSecret(): ?string
+    {
+        $device = $this->session->get(self::DEVICE_KEY);
+
+        return is_string($device) ? $device : null;
+    }
+
+    /** Signs out every other browser; this one stays signed in. @return int how many were signed out */
+    public function signOutOtherDevices(int $userId): int
+    {
+        // A new auth version also ends sessions that never joined the device list.
+        $this->users->bumpAuthVersion($userId);
+        $this->session->put(self::VERSION_KEY, $this->users->authVersion($userId));
+        $this->user = null;
+
+        return $this->devices->endAll($userId, $this->deviceSecret());
+    }
+
+    /** Signs out every browser, this one too. */
+    public function signOutEverywhere(int $userId): void
+    {
+        $this->users->bumpAuthVersion($userId);
+        $this->devices->endAll($userId);
+        $this->logout();
+    }
+
+    /** @return array{user: int, until: int, tries: int}|null */
+    private function pending(): ?array
+    {
+        $pending = $this->session->get(self::PENDING_KEY);
+        if (!is_array($pending) || !is_int($pending['user'] ?? null) || (int) ($pending['until'] ?? 0) < $this->clock->now()->getTimestamp()) {
+            return null;
+        }
+
+        return ['user' => $pending['user'], 'until' => (int) $pending['until'], 'tries' => (int) ($pending['tries'] ?? 0)];
     }
 
     /**
@@ -149,15 +268,24 @@ final class AuthService implements Authenticator
 
     public function logout(): void
     {
+        $device = $this->deviceSecret();
+        if ($device !== null) {
+            $this->devices->endSecret($device);
+        }
         $this->user = null;
         $this->session->invalidate();
     }
 
-    private function startSession(int $userId): User
+    private function startSession(int $userId, string $ip = '', string $agent = ''): User
     {
         $this->session->regenerate();
         $this->session->put(self::SESSION_KEY, $userId);
         $this->session->put(self::VERSION_KEY, $this->users->authVersion($userId));
+        $this->session->put(self::DEVICE_KEY, $this->devices->start($userId, $ip, $agent));
+        $locale = $this->users->locale($userId);
+        if ($locale !== null) {
+            $this->translator->setLocale($locale);
+        }
         $this->user = null;
 
         return $this->user();

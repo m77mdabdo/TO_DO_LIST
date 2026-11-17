@@ -50,9 +50,25 @@ return [
     // The rules and their defaults are listed in docs/trello-parity-roadmap.md (batch 1).
     'rate_limits' => [],
 
-    // Database backups made by bin/backup.php.
+    // Database backups made by bin/backup.php: the newest `keep` of each kind
+    // are kept, and none older than `keep_days` (0 = no age limit). The newest
+    // backup is never removed.
     'backups' => [
-        'path' => getenv('BACKUPS_PATH') ?: __DIR__ . '/storage/backups',
+        'path'      => getenv('BACKUPS_PATH') ?: __DIR__ . '/storage/backups',
+        'keep'      => (int) (getenv('BACKUPS_KEEP') ?: 14),
+        'keep_days' => (int) (getenv('BACKUPS_KEEP_DAYS') ?: 0),
+    ],
+
+    // How long bin/cleanup.php keeps records (days).
+    'retention' => [
+        'audit_days'         => (int) (getenv('AUDIT_LOG_DAYS') ?: 730),
+        'notification_days'  => (int) (getenv('NOTIFICATIONS_DAYS') ?: 180),
+        'idle_session_days'  => (int) (getenv('IDLE_SESSION_DAYS') ?: 30),
+    ],
+
+    // A board's ZIP export (JSON + attached files) is refused above this size.
+    'exports' => [
+        'zip_max_mb' => (int) (getenv('EXPORT_ZIP_MAX_MB') ?: 200),
     ],
 
     // "log" writes each email to storage/mail (nothing is sent), "smtp" sends through

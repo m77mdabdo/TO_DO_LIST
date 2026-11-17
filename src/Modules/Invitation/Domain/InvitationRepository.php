@@ -11,7 +11,7 @@ use App\Modules\Workspace\Contract\WorkspaceRole;
 interface InvitationRepository
 {
     /** @param list<int> $boardIds */
-    public function create(int $workspaceId, string $email, WorkspaceRole $role, BoardRole $boardRole, array $boardIds, string $tokenHash, int $invitedBy, string $expiresAt): Invitation;
+    public function create(int $workspaceId, string $email, WorkspaceRole $role, BoardRole $boardRole, array $boardIds, string $tokenHash, int $invitedBy, string $expiresAt, bool $awaitingApproval = false): Invitation;
 
     public function findByTokenHash(string $tokenHash): ?Invitation;
 

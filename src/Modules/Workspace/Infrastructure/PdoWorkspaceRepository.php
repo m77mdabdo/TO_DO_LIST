@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Workspace\Infrastructure;
 
 use App\Modules\Workspace\Contract\WorkspaceInfo;
+use App\Modules\Workspace\Contract\WorkspacePolicy;
 use App\Modules\Workspace\Contract\WorkspaceRole;
 use App\Modules\Workspace\Contract\WorkspaceSummary;
 use App\Modules\Workspace\Domain\WorkspaceRepository;
@@ -48,7 +49,7 @@ final class PdoWorkspaceRepository implements WorkspaceRepository
 
     public function firstWorkspaceIdOf(int $userId): ?int
     {
-        $stmt = $this->db->prepare('SELECT workspace_id FROM workspace_members WHERE user_id = ? ORDER BY joined_at, workspace_id LIMIT 1');
+        $stmt = $this->db->prepare('SELECT workspace_id FROM workspace_members WHERE user_id = ? AND suspended_at IS NULL ORDER BY joined_at, workspace_id LIMIT 1');
         $stmt->execute([$userId]);
         $id = $stmt->fetchColumn();
 
@@ -65,7 +66,7 @@ final class PdoWorkspaceRepository implements WorkspaceRepository
     {
         // The user's rows come from the (user_id, ...) index; a user is in a handful of workspaces.
         $stmt = $this->db->prepare('SELECT w.public_id FROM workspace_members m JOIN workspaces w ON w.id = m.workspace_id
-            WHERE m.user_id = ? AND m.last_opened_at IS NOT NULL ORDER BY m.last_opened_at DESC, m.workspace_id DESC LIMIT 1');
+            WHERE m.user_id = ? AND m.suspended_at IS NULL AND m.last_opened_at IS NOT NULL ORDER BY m.last_opened_at DESC, m.workspace_id DESC LIMIT 1');
         $stmt->execute([$userId]);
         $id = $stmt->fetchColumn();
 
@@ -74,7 +75,7 @@ final class PdoWorkspaceRepository implements WorkspaceRepository
 
     public function summariesOf(int $userId): array
     {
-        $stmt = $this->db->prepare(self::SUMMARY_SELECT . ' WHERE m.user_id = ? ORDER BY m.joined_at, w.id');
+        $stmt = $this->db->prepare(self::SUMMARY_SELECT . ' WHERE m.user_id = ? AND m.suspended_at IS NULL ORDER BY m.joined_at, w.id');
         $stmt->execute([$userId]);
 
         return array_map([$this, 'summary'], $stmt->fetchAll());
@@ -82,7 +83,7 @@ final class PdoWorkspaceRepository implements WorkspaceRepository
 
     public function role(int $userId, int $workspaceId): ?WorkspaceRole
     {
-        $stmt = $this->db->prepare('SELECT role FROM workspace_members WHERE workspace_id = ? AND user_id = ?');
+        $stmt = $this->db->prepare('SELECT role FROM workspace_members WHERE workspace_id = ? AND user_id = ? AND suspended_at IS NULL');
         $stmt->execute([$workspaceId, $userId]);
         $role = $stmt->fetchColumn();
 
@@ -91,7 +92,7 @@ final class PdoWorkspaceRepository implements WorkspaceRepository
 
     public function findForUser(string $publicId, int $userId): ?WorkspaceSummary
     {
-        $stmt = $this->db->prepare(self::SUMMARY_SELECT . ' WHERE w.public_id = ? AND m.user_id = ?');
+        $stmt = $this->db->prepare(self::SUMMARY_SELECT . ' WHERE w.public_id = ? AND m.user_id = ? AND m.suspended_at IS NULL');
         $stmt->execute([$publicId, $userId]);
         $row = $stmt->fetch();
 
@@ -100,7 +101,7 @@ final class PdoWorkspaceRepository implements WorkspaceRepository
 
     public function members(int $workspaceId): array
     {
-        $stmt = $this->db->prepare('SELECT user_id, role FROM workspace_members WHERE workspace_id = ? ORDER BY joined_at, user_id');
+        $stmt = $this->db->prepare('SELECT user_id, role FROM workspace_members WHERE workspace_id = ? AND suspended_at IS NULL ORDER BY joined_at, user_id');
         $stmt->execute([$workspaceId]);
 
         return array_map(
@@ -120,9 +121,52 @@ final class PdoWorkspaceRepository implements WorkspaceRepository
         $this->db->prepare('DELETE FROM workspace_members WHERE workspace_id = ? AND user_id = ?')->execute([$workspaceId, $userId]);
     }
 
+    public function suspended(int $workspaceId): array
+    {
+        $stmt = $this->db->prepare('SELECT user_id, role, suspended_at FROM workspace_members WHERE workspace_id = ? AND suspended_at IS NOT NULL ORDER BY suspended_at');
+        $stmt->execute([$workspaceId]);
+
+        return array_map(static fn (array $r) => ['userId' => (int) $r['user_id'], 'role' => WorkspaceRole::from((string) $r['role']), 'since' => (string) $r['suspended_at']], $stmt->fetchAll());
+    }
+
+    public function anyRole(int $userId, int $workspaceId): ?WorkspaceRole
+    {
+        $stmt = $this->db->prepare('SELECT role FROM workspace_members WHERE workspace_id = ? AND user_id = ?');
+        $stmt->execute([$workspaceId, $userId]);
+        $role = $stmt->fetchColumn();
+
+        return $role === false ? null : WorkspaceRole::from((string) $role);
+    }
+
+    public function setSuspended(int $workspaceId, int $userId, ?int $actorId): void
+    {
+        $this->db->prepare('UPDATE workspace_members SET suspended_at = ?, suspended_by = ? WHERE workspace_id = ? AND user_id = ?')
+            ->execute([$actorId !== null ? $this->clock->now()->format('Y-m-d H:i:s') : null, $actorId, $workspaceId, $userId]);
+    }
+
+    public function policy(int $workspaceId): WorkspacePolicy
+    {
+        $stmt = $this->db->prepare('SELECT invite_policy, invite_role, invite_approval, public_links FROM workspaces WHERE id = ?');
+        $stmt->execute([$workspaceId]);
+        $row = $stmt->fetch();
+
+        return $row ? new WorkspacePolicy(
+            (string) $row['invite_policy'] === 'members',
+            WorkspaceRole::tryFrom((string) $row['invite_role']) === WorkspaceRole::Guest ? WorkspaceRole::Guest : WorkspaceRole::Member,
+            (bool) $row['invite_approval'],
+            (bool) $row['public_links'],
+        ) : new WorkspacePolicy();
+    }
+
+    public function savePolicy(int $workspaceId, WorkspacePolicy $policy): void
+    {
+        $this->db->prepare('UPDATE workspaces SET invite_policy = ?, invite_role = ?, invite_approval = ?, public_links = ? WHERE id = ?')
+            ->execute([$policy->membersInvite ? 'members' : 'admins', $policy->inviteRole->value, $policy->inviteApproval ? 1 : 0, $policy->publicLinks ? 1 : 0, $workspaceId]);
+    }
+
     public function ownerCount(int $workspaceId): int
     {
-        $stmt = $this->db->prepare("SELECT COUNT(*) FROM workspace_members WHERE workspace_id = ? AND role = 'owner'");
+        $stmt = $this->db->prepare("SELECT COUNT(*) FROM workspace_members WHERE workspace_id = ? AND role = 'owner' AND suspended_at IS NULL");
         $stmt->execute([$workspaceId]);
 
         return (int) $stmt->fetchColumn();

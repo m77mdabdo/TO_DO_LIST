@@ -41,6 +41,12 @@ final class AccessModule implements ModuleProvider
 
     public function register(Container $container): void
     {
+        $container->extend(\App\Shared\Export\PersonalData::class, function (object $data, Container $c): void {
+            /** @var \App\Shared\Export\PersonalData $data */
+            $db = fn (): \PDO => $c->get(\PDO::class);
+            $data->eraseWith('board_members', static fn (int $userId) => \App\Shared\Export\PersonalData::deleteRows($db(), $userId, ['board_members']));
+        });
+
         $container->singleton(BoardMembers::class, fn (Container $c) => new PdoBoardMembers($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(Gate::class, fn (Container $c) => $c->build(Gate::class));
         $container->singleton(AccessGate::class, fn (Container $c) => $c->get(Gate::class));

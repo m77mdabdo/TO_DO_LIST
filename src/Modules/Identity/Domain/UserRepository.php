@@ -31,4 +31,21 @@ interface UserRepository
     public function findByEmail(string $email): ?User;
 
     public function markEmailVerified(int $id): void;
+
+    /** Signs out every session that holds the old number. */
+    public function bumpAuthVersion(int $id): void;
+
+    public function updateProfile(int $id, string $name, ?string $locale): void;
+
+    public function locale(int $id): ?string;
+
+    /** @return array{secret: string, recovery: string}|null the encrypted secret and the recovery JSON, when two-step sign-in is on */
+    public function twoFactor(int $id): ?array;
+
+    public function setTwoFactor(int $id, ?string $encryptedSecret, ?string $recoveryJson): void;
+
+    public function setRecovery(int $id, string $recoveryJson): void;
+
+    /** Removes the personal data and makes the account unusable; the row stays for the authorship of old work. */
+    public function anonymize(int $id, string $unusablePasswordHash): void;
 }

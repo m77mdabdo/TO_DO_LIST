@@ -60,6 +60,27 @@ final class NotificationCenter
         $this->store->setEmailEnabled($userId, $enabled);
     }
 
+    /** @return array{email: bool, muted: list<string>, emailOff: list<string>} */
+    public function preferences(int $userId): array
+    {
+        return $this->store->preferences($userId);
+    }
+
+    /**
+     * Saves the choices per kind; unknown kinds are ignored and changes to
+     * the person's own access can't be hidden from the app.
+     *
+     * @param list<string> $shown kinds to show in the app
+     * @param list<string> $emailed kinds to email
+     */
+    public function savePreferences(int $userId, bool $email, array $shown, array $emailed): void
+    {
+        $types = array_keys(\App\Modules\Notification\Contract\Messages::LABELS);
+        $muted = array_values(array_diff($types, $shown, \App\Modules\Notification\Contract\Messages::ALWAYS_SHOWN));
+        $emailOff = array_values(array_diff(\App\Modules\Notification\Contract\Messages::EMAILED, $emailed));
+        $this->store->savePreferences($userId, $email, $muted, $emailOff);
+    }
+
     public function isWatchingCard(int $userId, int $cardId): bool
     {
         return $this->store->isWatching($userId, 'card', $cardId);

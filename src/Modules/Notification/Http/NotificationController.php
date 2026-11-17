@@ -44,6 +44,7 @@ final class NotificationController extends Controller
             'hasMore'       => count($notifications) === NotificationCenter::PAGE,
             'people'        => $this->users->findMany($actors),
             'emailEnabled'  => $this->center->emailEnabled($user->id),
+            'preferences'   => $this->center->preferences($user->id),
             'unread'        => $this->center->unreadCount($user->id),
         ]);
     }
@@ -105,9 +106,15 @@ final class NotificationController extends Controller
 
     public function settings(Request $request): Response
     {
-        $this->center->setEmailEnabled($this->user($request)->id, $request->input('email') === '1');
+        $body = $request->body();
+        $list = static fn (mixed $v): array => is_array($v) ? array_values(array_filter($v, 'is_string')) : [];
+        if (($body['detailed'] ?? '') === '1') {
+            $this->center->savePreferences($this->user($request)->id, $request->input('email') === '1', $list($body['shown'] ?? []), $list($body['emailed'] ?? []));
+        } else {
+            $this->center->setEmailEnabled($this->user($request)->id, $request->input('email') === '1');
+        }
 
-        return $this->redirect('/notifications', 'Settings saved.');
+        return $this->redirect('/notifications#email-settings', 'Settings saved.');
     }
 
     /** @param array{card: string} $params */

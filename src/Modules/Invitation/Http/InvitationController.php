@@ -51,9 +51,26 @@ final class InvitationController extends Controller
             return $this->backWithErrors($e, $request, $back . '#invite');
         }
 
+        if ($link === null) {
+            return $this->redirect($back . '#invitations', 'Invitation saved. An owner or admin approves it before it is sent.');
+        }
         $this->session->flash(self::LINK_FLASH, $link);
 
         return $this->redirect($back . '#invitations', 'Invitation sent.');
+    }
+
+    /** @param array{invitation: string} $params */
+    public function approve(Request $request, array $params): Response
+    {
+        try {
+            $link = $this->invitations->approve($this->user($request)->id, $params['invitation']);
+        } catch (ValidationException $e) {
+            return $this->backWithErrors($e, $request, '/');
+        }
+
+        $this->session->flash(self::LINK_FLASH, $link);
+
+        return $this->redirect($this->backToMembers($request), 'Invitation approved and sent.');
     }
 
     /** @param array{invitation: string} $params */

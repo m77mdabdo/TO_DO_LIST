@@ -53,12 +53,16 @@ final class Notifier
         $count = 0;
 
         foreach ($recipients as $userId) {
+            $choices = $this->store->preferences($userId);
+            if (in_array($type, $choices['muted'], true) && !in_array($type, Messages::ALWAYS_SHOWN, true)) {
+                continue;
+            }
             if (!$this->store->add($userId, $type, $actorId, $boardId, $cardId, $subject, $data, $link, $dedupeKey)) {
                 continue;
             }
             $count++;
 
-            if ($emailed && isset($people[$userId]) && $this->store->emailEnabled($userId)) {
+            if ($emailed && isset($people[$userId]) && $choices['email'] && !in_array($type, $choices['emailOff'], true)) {
                 $this->email($people[$userId]->email, $people[$userId]->name, $type, $actorId !== null ? ($people[$actorId]->name ?? '') : '', $subject, $data, $link);
             }
         }
@@ -81,7 +85,7 @@ final class Notifier
             '',
             rtrim((string) $this->config->get('url', ''), '/') . $link,
             '',
-            $this->translator->t('You get these emails for mentions, assignments and due dates. Turn them off from your notifications page.'),
+            $this->translator->t('You get these emails for mentions, assignments and due dates. Choose which ones on your notifications page.'),
         ]);
 
         $this->mailer->send(new Message($to, $name, $sentence, $body));

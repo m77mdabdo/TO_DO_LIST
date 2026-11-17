@@ -38,6 +38,16 @@ final class WorkspaceModule implements ModuleProvider
 
     public function register(Container $container): void
     {
+        $container->extend(\App\Shared\Export\PersonalData::class, function (object $data, Container $c): void {
+            /** @var \App\Shared\Export\PersonalData $data */
+            $db = fn (): \PDO => $c->get(\PDO::class);
+            $data->add('workspaces', static fn (int $userId): array => array_map(
+                static fn ($w) => ['company' => $w->companyName, 'role' => $w->role->value],
+                $c->get(\App\Modules\Workspace\Contract\WorkspaceDirectory::class)->workspacesOf($userId),
+            ));
+            $data->eraseWith('workspaces', static fn (int $userId) => \App\Shared\Export\PersonalData::deleteRows($db(), $userId, ['workspace_members']));
+        });
+
         $container->singleton(WorkspaceRepository::class, fn (Container $c) => new PdoWorkspaceRepository($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(WorkspaceService::class, fn (Container $c) => $c->build(WorkspaceService::class));
         $container->singleton(WorkspaceDirectory::class, fn (Container $c) => $c->get(WorkspaceService::class));
@@ -74,6 +84,9 @@ final class WorkspaceModule implements ModuleProvider
             $router->get('/workspaces/{workspace:ulid}/members', [WorkspaceController::class, 'members']);
             $router->post('/workspaces/{workspace:ulid}/members/{id}', [WorkspaceController::class, 'changeRole']);
             $router->post('/workspaces/{workspace:ulid}/members/{id}/remove', [WorkspaceController::class, 'removeMember']);
+            $router->post('/workspaces/{workspace:ulid}/members/{id}/suspend', [WorkspaceController::class, 'suspend']);
+            $router->post('/workspaces/{workspace:ulid}/owner', [WorkspaceController::class, 'transfer']);
+            $router->post('/workspaces/{workspace:ulid}/rules', [WorkspaceController::class, 'rules']);
             $router->post('/workspaces/{workspace:ulid}/leave', [WorkspaceController::class, 'leave']);
         });
     }

@@ -1258,3 +1258,11 @@ main.wrap > section.card:not(.table-wrap) { padding: clamp(1rem, 3vw, 1.6rem); }
 .integration-tools { display: flex; flex-wrap: wrap; gap: .5rem; align-items: flex-start; }
 .integration.is-paused { opacity: .85; }
 .integrations-page h1 small { font-size: .9rem; font-weight: 500; }
+
+/* Batch 8: account security, audit filters, public board view */
+.recovery-codes { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(9rem, 100%), 1fr)); gap: .35rem .8rem; list-style: none; padding: 0; margin: 0; }
+.recovery-codes code, .setup-key { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .04em; }
+.setup-key { display: inline-block; padding: .2rem .45rem; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); word-break: break-all; }
+.audit-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(10rem, 100%), 1fr)); gap: .6rem; align-items: end; }
+.audit-filters .form-actions { grid-column: 1 / -1; flex-wrap: wrap; }
+.page-public .board-bar { padding-inline: 1rem; }

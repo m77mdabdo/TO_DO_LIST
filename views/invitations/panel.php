@@ -5,6 +5,8 @@
  * @var \App\View\View $this
  * @var \App\Modules\Workspace\Contract\WorkspaceSummary $workspace
  * @var bool $canInvite
+ * @var bool $manager owner or admin (a member may invite only when the workspace rules allow it)
+ * @var \App\Modules\Workspace\Contract\WorkspacePolicy $policy
  * @var list<\App\Modules\Invitation\Contract\Invitation> $invitations
  * @var array<int, \App\Modules\Identity\Contract\User> $inviters
  * @var list<\App\Modules\Board\Contract\BoardSummary> $boards
@@ -37,6 +39,10 @@ $oldBoards = $this->form->oldArray('boards');
                 <input type="email" name="email" required maxlength="190" dir="ltr" value="<?= $this->e($this->form->old('email')) ?>" placeholder="name@company.com">
                 <?= $this->partial('partials/field-error', ['field' => 'email']) ?>
             </label>
+            <?php if (!$manager): ?>
+                <p class="small"><?= $this->te('Workspace role') ?>: <strong><?= $this->te($policy->inviteRole->label()) ?></strong>
+                    <?php if ($policy->inviteApproval): ?><br><span class="muted"><?= $this->te('An owner or admin approves your invitation before it is sent.') ?></span><?php endif; ?></p>
+            <?php else: ?>
             <label><?= $this->te('Workspace role') ?>
                 <select name="role">
                     <?php foreach ($workspace->role->grantable() as $role): ?>
@@ -46,6 +52,7 @@ $oldBoards = $this->form->oldArray('boards');
                 </select>
                 <?= $this->partial('partials/field-error', ['field' => 'role']) ?>
             </label>
+            <?php endif; ?>
         </div>
 
         <?php if ($boards): ?>
@@ -59,7 +66,7 @@ $oldBoards = $this->form->oldArray('boards');
                 <?= $this->partial('partials/field-error', ['field' => 'boards']) ?>
                 <label><?= $this->te('Role on those boards') ?>
                     <select name="board_role">
-                        <?php foreach (['member' => 'Member', 'viewer' => 'Viewer', 'manager' => 'Manager'] as $value => $label): ?>
+                        <?php foreach ($manager ? ['member' => 'Member', 'viewer' => 'Viewer', 'manager' => 'Manager'] : ['member' => 'Member', 'viewer' => 'Viewer'] as $value => $label): ?>
                             <option value="<?= $value ?>" <?= ($this->form->old('board_role') ?: 'member') === $value ? 'selected' : '' ?>><?= $this->te($label) ?></option>
                         <?php endforeach; ?>
                     </select>
@@ -81,7 +88,7 @@ $oldBoards = $this->form->oldArray('boards');
     <?php else: ?>
         <ul class="member-list">
             <?php foreach ($invitations as $invitation): ?>
-                <?php $expired = !$invitation->isPending($now); ?>
+                <?php $waiting = $invitation->awaitingApproval; $expired = !$waiting && !$invitation->isPending($now); ?>
                 <li>
                     <span class="avatar avatar-muted" aria-hidden="true"><?= $this->icon('mail') ?></span>
                     <span class="member-name">
@@ -90,21 +97,31 @@ $oldBoards = $this->form->oldArray('boards');
                             <?= $this->te($invitation->role->label()) ?>
                             <?php if ($invitation->boardIds): ?> · <?= $this->te(':count boards', ['count' => (string) count($invitation->boardIds)]) ?><?php endif; ?>
                             · <?= $this->te('invited by :name', ['name' => $inviters[$invitation->invitedBy]->name ?? '?']) ?>
-                            · <?= $expired ? '<span class="danger">' . $this->te('expired') . '</span>' : $this->te('expires :date', ['date' => substr($invitation->expiresAt, 0, 10)]) ?>
+                            · <?= $waiting ? '<strong>' . $this->te('waiting for approval') . '</strong>' : ($expired ? '<span class="danger">' . $this->te('expired') . '</span>' : $this->te('expires :date', ['date' => substr($invitation->expiresAt, 0, 10)])) ?>
                         </small>
                     </span>
+                    <?php if ($manager): ?>
                     <span class="row-actions">
+                        <?php if ($waiting): ?>
+                        <form action="<?= $this->url('/invitations/' . $invitation->publicId . '/approve') ?>" method="post">
+                            <?= $this->csrfField() ?>
+                            <input type="hidden" name="back" value="<?= $this->e($back) ?>">
+                            <button class="btn btn-primary" type="submit"><?= $this->te('Approve and send') ?></button>
+                        </form>
+                        <?php else: ?>
                         <form action="<?= $this->url('/invitations/' . $invitation->publicId . '/resend') ?>" method="post">
                             <?= $this->csrfField() ?>
                             <input type="hidden" name="back" value="<?= $this->e($back) ?>">
                             <button class="btn btn-ghost" type="submit"><?= $this->te('Send again') ?></button>
                         </form>
+                        <?php endif; ?>
                         <form action="<?= $this->url('/invitations/' . $invitation->publicId . '/revoke') ?>" method="post" data-confirm="<?= $this->te('Cancel this invitation? Its link will stop working.') ?>">
                             <?= $this->csrfField() ?>
                             <input type="hidden" name="back" value="<?= $this->e($back) ?>">
                             <button class="icon-btn danger" type="submit" aria-label="<?= $this->te('Cancel invitation') ?>" title="<?= $this->te('Cancel invitation') ?>"><?= $this->icon('close') ?></button>
                         </form>
                     </span>
+                    <?php endif; ?>
                 </li>
             <?php endforeach; ?>
         </ul>

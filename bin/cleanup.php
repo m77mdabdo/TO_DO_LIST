@@ -7,7 +7,10 @@ declare(strict_types=1);
  |  - password reset and email confirmation links that were used or expired a day ago,
  |  - failed login attempts past the 15-minute lockout,
  |  - request counters older than a day (the longest rate-limit window),
- |  - account security events older than SECURITY_LOG_DAYS (180 by default).
+ |  - account security events older than SECURITY_LOG_DAYS (180 by default),
+ |  - workspace audit log entries older than AUDIT_LOG_DAYS (730),
+ |  - notifications older than NOTIFICATIONS_DAYS (180),
+ |  - signed-in devices not used for IDLE_SESSION_DAYS (30).
  |
  |   php bin/cleanup.php
  |
@@ -32,6 +35,9 @@ $app = (require __DIR__ . '/../bootstrap/app.php')($config, new ArraySession());
 
 $removed = $app->get(AccountCleanup::class)->run((int) $config->get('security.log_days', 180));
 $removed['rate_limit_hits'] = $app->get(RateLimiter::class)->prune(86400);
+$removed['audit_entries'] = $app->get(\App\Modules\Audit\Domain\AuditLog::class)->prune((int) $config->get('retention.audit_days', 730));
+$removed['notifications'] = $app->get(\App\Modules\Notification\Domain\NotificationStore::class)->prune((int) $config->get('retention.notification_days', 180));
+$removed['idle_sessions'] = $app->get(\App\Modules\Identity\Application\DeviceSessions::class)->prune((int) $config->get('retention.idle_session_days', 30));
 
 foreach ($removed as $what => $count) {
     echo str_pad($what, 18) . $count . "\n";

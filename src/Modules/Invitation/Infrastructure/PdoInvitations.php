@@ -14,18 +14,18 @@ use PDO;
 
 final class PdoInvitations implements InvitationRepository
 {
-    private const COLUMNS = 'id, public_id, workspace_id, email, role, board_role, invited_by, sent_at, expires_at, accepted_at, revoked_at';
+    private const COLUMNS = 'id, public_id, workspace_id, email, role, board_role, invited_by, sent_at, expires_at, accepted_at, revoked_at, awaiting_approval';
 
     public function __construct(private PDO $db, private Clock $clock)
     {
     }
 
-    public function create(int $workspaceId, string $email, WorkspaceRole $role, BoardRole $boardRole, array $boardIds, string $tokenHash, int $invitedBy, string $expiresAt): Invitation
+    public function create(int $workspaceId, string $email, WorkspaceRole $role, BoardRole $boardRole, array $boardIds, string $tokenHash, int $invitedBy, string $expiresAt, bool $awaitingApproval = false): Invitation
     {
         $now = $this->now();
-        $this->db->prepare('INSERT INTO invitations (public_id, workspace_id, email, role, board_role, token_hash, invited_by, created_at, sent_at, expires_at)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-            ->execute([Ulid::generate(), $workspaceId, $email, $role->value, $boardRole->value, $tokenHash, $invitedBy, $now, $now, $expiresAt]);
+        $this->db->prepare('INSERT INTO invitations (public_id, workspace_id, email, role, board_role, token_hash, invited_by, created_at, sent_at, expires_at, awaiting_approval)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            ->execute([Ulid::generate(), $workspaceId, $email, $role->value, $boardRole->value, $tokenHash, $invitedBy, $now, $now, $expiresAt, $awaitingApproval ? 1 : 0]);
         $id = (int) $this->db->lastInsertId();
 
         $link = $this->db->prepare('INSERT INTO invitation_boards (invitation_id, board_id) VALUES (?, ?)');
@@ -58,7 +58,7 @@ final class PdoInvitations implements InvitationRepository
 
     public function renew(int $id, string $tokenHash, string $expiresAt): void
     {
-        $this->db->prepare('UPDATE invitations SET token_hash = ?, sent_at = ?, expires_at = ? WHERE id = ?')
+        $this->db->prepare('UPDATE invitations SET token_hash = ?, sent_at = ?, expires_at = ?, awaiting_approval = 0 WHERE id = ?')
             ->execute([$tokenHash, $this->now(), $expiresAt, $id]);
     }
 
@@ -67,7 +67,7 @@ final class PdoInvitations implements InvitationRepository
         // The conditions make this a compare-and-set: two clicks on the same
         // link at once can't both succeed.
         $stmt = $this->db->prepare('UPDATE invitations SET accepted_at = ?, accepted_by = ?
-            WHERE id = ? AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at > ?');
+            WHERE id = ? AND accepted_at IS NULL AND revoked_at IS NULL AND awaiting_approval = 0 AND expires_at > ?');
         $stmt->execute([$now, $userId, $id, $now]);
 
         return $stmt->rowCount() === 1;
@@ -130,6 +130,7 @@ final class PdoInvitations implements InvitationRepository
             (string) $row['expires_at'],
             $row['accepted_at'] !== null ? (string) $row['accepted_at'] : null,
             $row['revoked_at'] !== null ? (string) $row['revoked_at'] : null,
+            (int) $row['awaiting_approval'] === 1,
         ), $rows);
     }
 

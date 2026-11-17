@@ -56,7 +56,7 @@ final class PdoUserRepository implements UserRepository, UserDirectory
 
     public function credentials(string $email): ?Credentials
     {
-        $stmt = $this->db->prepare('SELECT id, password FROM users WHERE email = ?');
+        $stmt = $this->db->prepare('SELECT id, password FROM users WHERE email = ? AND deleted_at IS NULL');
         $stmt->execute([self::normalize($email)]);
         $row = $stmt->fetch();
 
@@ -78,7 +78,7 @@ final class PdoUserRepository implements UserRepository, UserDirectory
 
     public function findForSession(int $id, int $authVersion): ?User
     {
-        $stmt = $this->db->prepare('SELECT id, name, email, email_verified_at FROM users WHERE id = ? AND auth_version = ?');
+        $stmt = $this->db->prepare('SELECT id, name, email, email_verified_at FROM users WHERE id = ? AND auth_version = ? AND deleted_at IS NULL');
         $stmt->execute([$id, $authVersion]);
         $row = $stmt->fetch();
 
@@ -111,6 +111,53 @@ final class PdoUserRepository implements UserRepository, UserDirectory
     {
         $this->db->prepare('UPDATE users SET email_verified_at = ? WHERE id = ? AND email_verified_at IS NULL')
             ->execute([$this->clock->now()->format('Y-m-d H:i:s'), $id]);
+    }
+
+    public function bumpAuthVersion(int $id): void
+    {
+        $this->db->prepare('UPDATE users SET auth_version = auth_version + 1 WHERE id = ?')->execute([$id]);
+    }
+
+    public function updateProfile(int $id, string $name, ?string $locale): void
+    {
+        $this->db->prepare('UPDATE users SET name = ?, locale = ? WHERE id = ?')->execute([$name, $locale, $id]);
+    }
+
+    public function locale(int $id): ?string
+    {
+        $stmt = $this->db->prepare('SELECT locale FROM users WHERE id = ?');
+        $stmt->execute([$id]);
+        $locale = $stmt->fetchColumn();
+
+        return is_string($locale) && $locale !== '' ? $locale : null;
+    }
+
+    public function twoFactor(int $id): ?array
+    {
+        $stmt = $this->db->prepare('SELECT two_factor_secret, two_factor_recovery FROM users WHERE id = ? AND two_factor_enabled_at IS NOT NULL');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+
+        return $row && $row['two_factor_secret'] !== null ? ['secret' => (string) $row['two_factor_secret'], 'recovery' => (string) $row['two_factor_recovery']] : null;
+    }
+
+    public function setTwoFactor(int $id, ?string $encryptedSecret, ?string $recoveryJson): void
+    {
+        $this->db->prepare('UPDATE users SET two_factor_secret = ?, two_factor_recovery = ?, two_factor_enabled_at = ? WHERE id = ?')
+            ->execute([$encryptedSecret, $recoveryJson, $encryptedSecret !== null ? $this->clock->now()->format('Y-m-d H:i:s') : null, $id]);
+    }
+
+    public function setRecovery(int $id, string $recoveryJson): void
+    {
+        $this->db->prepare('UPDATE users SET two_factor_recovery = ? WHERE id = ?')->execute([$recoveryJson, $id]);
+    }
+
+    public function anonymize(int $id, string $unusablePasswordHash): void
+    {
+        $this->db->prepare("UPDATE users SET name = ?, email = ?, password = ?, auth_version = auth_version + 1, locale = NULL,
+                two_factor_secret = NULL, two_factor_recovery = NULL, two_factor_enabled_at = NULL, email_verified_at = NULL, deleted_at = ?
+            WHERE id = ?")
+            ->execute(['Deleted user', 'deleted-' . $id . '@deleted.invalid', $unusablePasswordHash, $this->clock->now()->format('Y-m-d H:i:s'), $id]);
     }
 
     private static function normalize(string $email): string
