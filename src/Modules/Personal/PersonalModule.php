@@ -33,6 +33,20 @@ final class PersonalModule implements ModuleProvider
 
     public function register(Container $container): void
     {
+        $container->extend(\App\Shared\Export\PersonalData::class, function (object $data, Container $c): void {
+            /** @var \App\Shared\Export\PersonalData $data */
+            $db = fn (): \PDO => $c->get(\PDO::class);
+            $rows = static function (\PDO $db, string $sql, int $userId): array {
+                $stmt = $db->prepare($sql);
+                $stmt->execute([$userId]);
+
+                return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            };
+            $data->add('inbox', static fn (int $userId): array => $rows($db(), 'SELECT title, description, due_date, created_at FROM inbox_items WHERE user_id = ?', $userId));
+            $data->add('planner', static fn (int $userId): array => $rows($db(), 'SELECT * FROM planner_sessions WHERE user_id = ?', $userId));
+            $data->eraseWith('personal', static fn (int $userId) => \App\Shared\Export\PersonalData::deleteRows($db(), $userId, ['inbox_items', 'planner_sessions', 'calendar_feeds']));
+        });
+
         $container->singleton(Inbox::class, fn (Container $c) => $c->build(Inbox::class));
         $container->singleton(Planner::class, fn (Container $c) => $c->build(Planner::class));
         $container->singleton(CalendarFeed::class, fn (Container $c) => $c->build(CalendarFeed::class));

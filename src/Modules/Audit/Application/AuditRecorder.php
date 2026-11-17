@@ -36,6 +36,7 @@ final class AuditRecorder
         return [
             InvitationSent::name(), InvitationRevoked::name(), InvitationAccepted::name(),
             MemberJoined::name(), MemberRoleChanged::name(), MemberRemoved::name(), BoardMemberChanged::name(),
+            \App\Modules\Workspace\Contract\Events\WorkspaceAdminAction::name(),
         ];
     }
 
@@ -53,6 +54,7 @@ final class AuditRecorder
                 'from'  => $event->from?->label() ?? '-',
                 'to'    => $event->to?->label() ?? '-',
             ]),
+            $event instanceof \App\Modules\Workspace\Contract\Events\WorkspaceAdminAction => $this->log->add($event->workspaceId, $event->actorId, $event->action, $event->target, $event->details),
             default => null,
         };
     }

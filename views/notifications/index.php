@@ -5,6 +5,7 @@
  * @var bool $hasMore
  * @var array<int, \App\Modules\Identity\Contract\User> $people
  * @var bool $emailEnabled
+ * @var array{email: bool, muted: list<string>, emailOff: list<string>} $preferences
  * @var int $unread
  * @var \App\Support\TimeAgo $timeAgo
  */
@@ -66,11 +67,37 @@ $sentence = function (\App\Modules\Notification\Contract\Notification $n) use ($
         <?php endif; ?>
     </section>
 
-    <section class="card stack">
-        <h2 class="section-title"><?= $this->icon('mail') ?> <?= $this->te('Email') ?></h2>
-        <form action="<?= $this->url('/notifications/settings') ?>" method="post" class="stack-sm">
+    <section class="card stack" id="email-settings" aria-labelledby="email-settings-title">
+        <h2 class="section-title" id="email-settings-title"><?= $this->icon('mail') ?> <?= $this->te('What to tell me') ?></h2>
+        <form action="<?= $this->url('/notifications/settings') ?>" method="post" class="stack">
             <?= $this->csrfField() ?>
+            <input type="hidden" name="detailed" value="1">
             <label class="check"><input type="checkbox" name="email" value="1" <?= $emailEnabled ? 'checked' : '' ?>> <?= $this->te('Email me when I am mentioned or assigned, when a due date comes close, and when my access changes') ?></label>
+            <div class="table-wrap">
+                <table class="data-table">
+                    <caption class="visually-hidden"><?= $this->te('Choices for each kind of notification') ?></caption>
+                    <thead>
+                        <tr>
+                            <th scope="col"><?= $this->te('When') ?></th>
+                            <th scope="col"><?= $this->te('In the app') ?></th>
+                            <th scope="col"><?= $this->te('Email') ?></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach (\App\Modules\Notification\Contract\Messages::LABELS as $type => $text): ?>
+                            <?php $always = in_array($type, \App\Modules\Notification\Contract\Messages::ALWAYS_SHOWN, true); $mailable = in_array($type, \App\Modules\Notification\Contract\Messages::EMAILED, true); ?>
+                            <tr>
+                                <th scope="row"><?= $this->te($text) ?></th>
+                                <td><label class="check"><input type="checkbox" name="shown[]" value="<?= $this->e($type) ?>" <?= $always || !in_array($type, $preferences['muted'], true) ? 'checked' : '' ?> <?= $always ? 'disabled' : '' ?>>
+                                    <span class="visually-hidden"><?= $this->te('In the app') ?>: <?= $this->te($text) ?></span></label></td>
+                                <td><?php if ($mailable): ?><label class="check"><input type="checkbox" name="emailed[]" value="<?= $this->e($type) ?>" <?= !in_array($type, $preferences['emailOff'], true) ? 'checked' : '' ?>>
+                                    <span class="visually-hidden"><?= $this->te('Email') ?>: <?= $this->te($text) ?></span></label><?php else: ?><span class="muted" aria-label="<?= $this->te('Not emailed') ?>">—</span><?php endif; ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <p class="muted small"><?= $this->te('Changes to your own access always show in the app.') ?></p>
             <div><button class="btn btn-ghost" type="submit"><?= $this->te('Save') ?></button></div>
         </form>
     </section>

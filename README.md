@@ -178,9 +178,14 @@ php bin/reminders.php
 ### Backups
 
 ```bash
-php bin/backup.php                        # database only, keeps the newest 14
+php bin/backup.php                        # database only, keeps the newest 14 (BACKUPS_KEEP)
 php bin/backup.php --with-files --keep=30 # also zip the uploaded attachments
+php bin/backup.php --keep-days=90         # and remove any older than 90 days (BACKUPS_KEEP_DAYS)
 ```
+
+The newest backup is always kept. `php bin/cleanup.php` (daily) also removes old audit entries
+(`AUDIT_LOG_DAYS`, 730), notifications (`NOTIFICATIONS_DAYS`, 180) and signed-in devices unused for
+`IDLE_SESSION_DAYS` (30).
 
 Backups go to `storage/backups/` (or `BACKUPS_PATH`). With SQLite you get a consistent copy of the
 database file; with MySQL a plain SQL dump (gzipped) that phpMyAdmin or `mysql < file` can import.
@@ -339,7 +344,19 @@ Archived boards are read-only.
 | POST | `/workspaces/{id}/invitations` | invite someone by email (the link is also shown once) |
 | POST | `/invitations/{id}/resend`, `/revoke` | send an invitation again with a new link, cancel it |
 | GET / POST | `/invitations/{token}`, `/accept` | open and accept an invitation |
-| GET | `/workspaces/{id}/audit` | the audit log (owners and admins) |
+| GET | `/workspaces/{id}/audit`, `/audit.csv` | the audit log, filtered by person, action and dates, and as CSV (owners and admins) |
+| POST | `/workspaces/{id}/members/{user}/suspend` | suspend a member (`on=1`) or turn them back on (`on=0`) |
+| POST | `/workspaces/{id}/owner`, `/rules` | hand over ownership; who may invite and whether public links are allowed (owners) |
+| POST | `/invitations/{id}/approve` | send a member's invitation that waits for approval |
+| GET / POST | `/boards/{id}/share`, `/share/delete` | make, renew or turn off a board's read-only public link |
+| GET | `/shared/{token}` | a board seen through its public link (no account) |
+| GET / POST | `/boards/{id}/export-zip`, `/export.zip` | size of a ZIP export, then the ZIP (board.json and files) |
+| GET / POST | `/account`, `/account/profile` | name and language |
+| GET / POST | `/account/export.json`, `/account/delete` | download my data; delete my account |
+| GET | `/account/security` | two-step sign-in, signed-in devices, security log |
+| POST | `/account/two-factor/start`, `/confirm`, `/disable`, `/recovery` | set up, turn off two-step sign-in; new recovery codes |
+| POST | `/account/sessions/{id}`, `/others`, `/all` | sign out one device, the others, or everywhere |
+| GET / POST | `/login/two-factor` | the second sign-in step |
 | GET / POST | `/boards/{id}/members` | who is on a board, add someone or change their role |
 | POST | `/boards/{id}/members/{user}/remove` | take someone off a board |
 | GET | `/notifications` | notifications, newest first |
@@ -470,7 +487,9 @@ for PHP 8.1 and 8.3, together with PHPStan.
 - [x] Automation: rules, buttons, schedules and due-date automations
 - [x] Timeline, My tasks, workspace views and team report
 - [x] API tokens, JSON API and webhooks
-- [ ] Import from CSV
+- [x] Import from CSV and Trello
+- [x] Two-step sign-in, signed-in devices, data download and account deletion
+- [x] Public read-only board links, ZIP export, audit filters and retention
 
 Ideas and pull requests are welcome.
 

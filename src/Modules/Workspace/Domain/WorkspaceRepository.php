@@ -39,5 +39,18 @@ interface WorkspaceRepository
 
     public function ownerCount(int $workspaceId): int;
 
+    /** @return list<array{userId: int, role: WorkspaceRole, since: string}> suspended members */
+    public function suspended(int $workspaceId): array;
+
+    /** The role even while suspended. */
+    public function anyRole(int $userId, int $workspaceId): ?WorkspaceRole;
+
+    /** Suspends (actor given) or turns back on (null). */
+    public function setSuspended(int $workspaceId, int $userId, ?int $actorId): void;
+
+    public function policy(int $workspaceId): \App\Modules\Workspace\Contract\WorkspacePolicy;
+
+    public function savePolicy(int $workspaceId, \App\Modules\Workspace\Contract\WorkspacePolicy $policy): void;
+
     public function info(int $workspaceId): ?WorkspaceInfo;
 }
