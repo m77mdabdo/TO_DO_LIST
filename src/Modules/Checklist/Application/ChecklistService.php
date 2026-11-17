@@ -29,7 +29,7 @@ use InvalidArgumentException;
  * card's board (EditCards), and refused on archived cards and boards.
  * Ids that don't exist and ids on boards the user can't see both give a 404.
  */
-final class ChecklistService implements ChecklistQueries
+final class ChecklistService implements ChecklistQueries, \App\Modules\Checklist\Contract\ChecklistWriter
 {
     public const MAX_CHECKLISTS = 20;
     public const MAX_ITEMS = 200;

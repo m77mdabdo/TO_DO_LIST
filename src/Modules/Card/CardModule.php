@@ -74,10 +74,35 @@ final class CardModule implements ModuleProvider
             $actions->add(new ActionType('list.sort_due', 'Sort the list by due date', 'none', static fn (ActionContext $ctx) => $service()->sortList($ctx->actorId, $ctx->boardId, (int) $ctx->listId, 'due'), 'list'));
             $actions->add(new ActionType('list.sort_title', 'Sort the list by title', 'none', static fn (ActionContext $ctx) => $service()->sortList($ctx->actorId, $ctx->boardId, (int) $ctx->listId, 'title'), 'list'));
         });
+        // A pasted address of a card of this app shows as a chip: its title for
+        // those who can open its board, "a card you cannot open" for others.
+        // Nothing is fetched; only this app's own address is recognised.
+        $container->extend(\App\View\View::class, function (object $view, Container $c): void {
+            /** @var \App\View\View $view */
+            $base = rtrim((string) $c->get(\App\Core\Config::class)->get('url', ''), '/');
+            $view->renderInternalLinks(static function (string $url) use ($view, $c, $base): ?string {
+                if ($base === '' || !str_starts_with(mb_strtolower($url), mb_strtolower($base) . '/cards/')) {
+                    return null;
+                }
+                $publicId = \App\Modules\Card\Application\CardLinks::publicIdIn(substr($url, strlen($base)));
+                if ($publicId === null) {
+                    return null;
+                }
+                $viewer = $c->get(\App\Modules\Identity\Contract\Authenticator::class)->user()?->id;
+                $card = $c->get(CardQueries::class)->findByPublicId($publicId);
+                if ($viewer === null || $card === null || $card->archived || !$c->get(\App\Modules\Access\Contract\AccessGate::class)->can($viewer, $card->boardId, \App\Modules\Access\Contract\Permission::ViewBoard)) {
+                    return '<span class="card-chip is-locked">' . $view->icon('lock') . ' ' . $view->te('A card you cannot open.') . '</span>';
+                }
+
+                return '<a class="card-chip' . ($card->isComplete() ? ' is-done' : '') . '" href="' . $view->url('/cards/' . $card->publicId) . '">'
+                    . $view->icon($card->isComplete() ? 'check' : 'board') . '<span class="card-chip-title" dir="auto">' . $view->e($card->title) . '</span></a>';
+            });
+        });
         $container->singleton(CardRepository::class, fn (Container $c) => new PdoCardRepository($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(CardQueries::class, fn (Container $c) => $c->build(CardQueryService::class));
         $container->singleton(CardService::class, fn (Container $c) => $c->build(CardService::class));
         $container->singleton(\App\Modules\Card\Application\RecurringCards::class, fn (Container $c) => $c->build(\App\Modules\Card\Application\RecurringCards::class));
+        $container->singleton(\App\Modules\Card\Application\CardLinks::class, fn (Container $c) => $c->build(\App\Modules\Card\Application\CardLinks::class));
         $container->singleton(CardWriter::class, fn (Container $c) => $c->get(CardService::class));
     }
 
@@ -92,6 +117,8 @@ final class CardModule implements ModuleProvider
             $router->post('/cards/{card:ulid}/complete', [CardController::class, 'complete']);
             $router->post('/cards/{card:ulid}/move', [CardController::class, 'move']);
             $router->post('/cards/{card:ulid}/template', [CardController::class, 'template']);
+            $router->post('/cards/{card:ulid}/connections', [CardController::class, 'link']);
+            $router->post('/cards/{card:ulid}/connections/{id}/delete', [CardController::class, 'unlink']);
             $router->post('/cards/{card:ulid}/looks', [CardController::class, 'looks']);
             $router->post('/cards/{card:ulid}/schedule', [CardController::class, 'schedule']);
             $router->post('/cards/{card:ulid}/repeat', [CardController::class, 'repeat']);

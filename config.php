@@ -8,6 +8,9 @@
 
 return [
     'app_name' => getenv('APP_NAME') ?: 'Todo Board',
+    // Encrypts secrets saved in the database (integrations, two-step sign-in).
+    // Make one with `php bin/app-key.php`, put it in .env, and don't change it.
+    'key'      => getenv('APP_KEY') ?: '',
     // The address people open the app at, used for links in emails (invitations).
     'url'      => getenv('APP_URL') ?: 'http://localhost:8000',
     // Interface language: "ar" (right-to-left, the default) or "en".
@@ -25,6 +28,11 @@ return [
     // Uploaded files. Keep this folder outside the web root, or blocked like storage/ is.
     'attachments' => [
         'path' => getenv('ATTACHMENTS_PATH') ?: __DIR__ . '/storage/attachments',
+    ],
+
+    // Imports waiting for their preview (CSV, Trello). Deleted once run or cancelled.
+    'imports' => [
+        'path' => getenv('IMPORTS_PATH') ?: __DIR__ . '/storage/imports',
     ],
 
     // Outgoing webhooks (sent by bin/webhooks.php). Addresses inside private

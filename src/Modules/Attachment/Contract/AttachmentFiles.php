@@ -23,6 +23,13 @@ interface AttachmentFiles
     public function forCard(int $cardId): array;
 
     /**
+     * Adds a web link (http or https) to the card.
+     *
+     * @throws \App\Validation\ValidationException with the error on "url" or "title"
+     */
+    public function addLink(int $actorId, CardSummary $card, string $url, string $title): Attachment;
+
+    /**
      * Checks and stores a file that is not on a card yet (a personal inbox
      * item). The caller keeps the returned details and later adopts or drops it.
      *

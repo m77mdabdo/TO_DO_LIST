@@ -38,6 +38,7 @@ final class CardController extends Controller
         private BulkCardActions $bulk,
         private \App\Modules\Attachment\Contract\AttachmentFiles $files,
         private \App\Modules\Card\Application\RecurringCards $repeats,
+        private \App\Modules\Card\Application\CardLinks $links,
     ) {
         parent::__construct($view, $url, $session);
     }
@@ -133,6 +134,7 @@ final class CardController extends Controller
                 $this->boards->allInWorkspace($board->workspaceId),
                 fn ($b) => $b->id !== $board->id && !$b->archived && $this->gate->can($user->id, $b->id, Permission::ViewBoard),
             )),
+            'cardLinks'   => $this->links->forCard($user->id, $card),
             'linkedBoard' => $card->linkBoardId !== null && $this->gate->can($user->id, $card->linkBoardId, Permission::ViewBoard) ? $this->boards->find($card->linkBoardId) : null,
         ]);
     }
@@ -248,6 +250,31 @@ final class CardController extends Controller
         return $this->redirect('/boards/' . $board->publicId, 'List sorted.');
     }
 
+    /** Body: target (a card address or id). @param array{card: string} $params */
+    public function link(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        [$card] = $this->cards->cardFor($user->id, $params['card'], Permission::EditCards);
+        try {
+            $this->links->add($user->id, $card, $request->input('target'));
+        } catch (ValidationException $e) {
+            return $this->backWithErrors($e, $request, '/cards/' . $card->publicId . '#linked-cards');
+        }
+
+        return $this->redirect('/cards/' . $card->publicId . '#linked-cards', 'Cards linked.');
+    }
+
+    /** @param array{card: string, id: int} $params */
+    public function unlink(Request $request, array $params): Response
+    {
+        $user = $this->user($request);
+        [$card] = $this->cards->cardFor($user->id, $params['card'], Permission::EditCards);
+        $this->links->remove($user->id, $card, $params['id']);
+
+        return $this->redirect('/cards/' . $card->publicId . '#linked-cards', 'Link removed.');
+    }
+
+    /** @param array{card: string} $params */
     public function template(Request $request, array $params): Response
     {
         $user = $this->user($request);

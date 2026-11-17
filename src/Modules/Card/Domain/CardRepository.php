@@ -8,7 +8,7 @@ use App\Modules\Card\Contract\CardSummary;
 
 interface CardRepository
 {
-    /** @param array{description?: ?string, due_at?: ?string, completed_at?: ?string, created_at?: ?string} $extra */
+    /** @param array{description?: ?string, start_at?: ?string, due_at?: ?string, completed_at?: ?string, created_at?: ?string} $extra */
     public function create(int $boardId, int $listId, string $title, string $position, int $createdBy, array $extra = []): CardSummary;
 
     public function find(int $id): ?CardSummary;

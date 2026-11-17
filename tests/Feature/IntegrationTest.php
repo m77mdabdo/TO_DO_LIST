@@ -31,6 +31,7 @@ final class IntegrationTest extends TestCase
         $this->f = new BoardFixture(new App(), BoardVisibility::Private);
         $this->f->app->container->singleton(UrlGuard::class, fn () => new UrlGuard(static fn (string $host): array => match ($host) {
             'hooks.example.com'    => ['93.184.216.34'],
+            'hooks.slack.com'      => ['54.230.1.1'],
             'internal.example.com' => ['10.0.0.5'],
             default                => [],
         }));
@@ -86,6 +87,122 @@ final class IntegrationTest extends TestCase
         $clock = $this->f->app->container->get(Clock::class);
         $clock->travel('+91 days');
         $this->assertSame(401, $this->api('GET', '/api/v1/me', $write)->status);
+    }
+
+    public function testTheApiEditsMovesAndPagesCardsWithUniformErrors(): void
+    {
+        $read = $this->token('Reader', 'read');
+        $write = $this->token('Writer', 'write');
+        $board = '/api/v1/boards/' . $this->f->board->publicId;
+        for ($i = 1; $i <= 3; $i++) {
+            $this->assertSame(201, $this->api('POST', $board . '/cards', $write, ['list' => 'To do', 'title' => "Card $i", 'start_date' => '2026-01-25', 'due_date' => '2026-02-0' . $i])->status);
+        }
+
+        $page = json_decode($this->api('GET', $board . '/cards?limit=2', $read)->body, true);
+        $this->assertSame([2, 3, 2], [count($page['cards']), $page['total'], $page['next_page']]);
+        $page2 = json_decode($this->api('GET', $board . '/cards?limit=2&page=2', $read)->body, true);
+        $this->assertSame(['Card 3'], array_column($page2['cards'], 'title'));
+        $this->assertNull($page2['next_page']);
+        $bad = json_decode($this->api('GET', $board . '/cards?limit=500', $read)->body, true);
+        $this->assertSame(['invalid', true], [$bad['error'], isset($bad['fields']['limit'])]);
+        $this->assertSame([], json_decode($this->api('GET', $board . '/cards?list=Doing', $read)->body, true)['cards']);
+        $this->assertSame(['To do', 'Doing', 'Done'], array_column(json_decode($this->api('GET', $board . '/lists', $read)->body, true)['lists'], 'name'));
+
+        $id = $page['cards'][0]['id'];
+        $card = '/api/v1/cards/' . $id;
+        $this->assertSame('2026-01-25', json_decode($this->api('GET', $card, $read)->body, true)['card']['start']);
+
+        // Partial update keeps what was not sent.
+        $updated = json_decode($this->api('POST', $card, $write, ['title' => 'Renamed'])->body, true)['card'];
+        $this->assertSame(['Renamed', '2026-01-25', '2026-02-01'], [$updated['title'], $updated['start'], $updated['due']]);
+        $cleared = json_decode($this->api('POST', $card, $write, ['due_date' => null])->body, true)['card'];
+        $this->assertSame(['Renamed', null], [$cleared['title'], $cleared['due']]);
+        $invalid = json_decode($this->api('POST', $card, $write, ['due_date' => 'soon'])->body, true);
+        $this->assertSame(['invalid', true], [$invalid['error'], isset($invalid['fields']['due_date'])]);
+
+        $this->assertSame('Doing', json_decode($this->api('POST', $card . '/move', $write, ['list' => 'Doing'])->body, true)['card']['list']);
+        $this->assertSame(422, $this->api('POST', $card . '/move', $write, ['list' => 'Nowhere'])->status);
+        $this->assertTrue(json_decode($this->api('POST', $card . '/complete', $write)->body, true)['card']['complete']);
+        $this->assertFalse(json_decode($this->api('POST', $card . '/complete', $write, ['complete' => false])->body, true)['card']['complete']);
+
+        $this->assertSame(201, $this->api('POST', $card . '/comments', $write, ['body' => 'Hello from the API'])->status);
+        $this->assertSame(['Hello from the API'], array_column(json_decode($this->api('GET', $card . '/comments', $read)->body, true)['comments'], 'body'));
+        $denied = json_decode($this->api('POST', $card . '/comments', $read, ['body' => 'Nope'])->body, true);
+        $this->assertSame('forbidden', $denied['error']);
+
+        $field = $this->f->app->container->get(\App\Modules\Field\Application\FieldService::class)->create($this->f->owner, $this->f->board, ['name' => 'Points', 'type' => 'number']);
+        $this->assertSame(['Points'], array_column(json_decode($this->api('GET', $board . '/fields', $read)->body, true)['fields'], 'name'));
+        $filled = json_decode($this->api('POST', $card . '/fields', $write, ['fields' => [(string) $field->id => '5']])->body, true)['card'];
+        $this->assertSame('5', $filled['fields'][0]['value']);
+        $this->assertSame(422, $this->api('POST', $card . '/fields', $write, ['fields' => ['999999' => '1']])->status);
+
+        $this->assertTrue(json_decode($this->api('POST', $card . '/archive', $write)->body, true)['card']['archived']);
+        $this->assertSame(404, $this->api('GET', $card, $read)->status, 'Archived cards are gone from reads.');
+        $this->assertFalse(json_decode($this->api('POST', $card . '/archive', $write, ['archived' => false])->body, true)['card']['archived']);
+
+        // Another board's card is invisible, and the error has a code.
+        $other = $this->f->app->container->get(BoardService::class)->createBoard($this->f->owner, $this->f->workspaceId, 'Other', BoardVisibility::Private);
+        $list = $this->f->app->container->get(BoardService::class)->addList($this->f->owner, $other->id, 'Inbox');
+        $hidden = $this->f->app->container->get(CardService::class)->createCard($this->f->owner, $other->id, $list->id, 'Secret');
+        $missing = $this->api('GET', '/api/v1/cards/' . $hidden->publicId, $write);
+        $this->assertSame([404, 'not_found'], [$missing->status, json_decode($missing->body, true)['error']]);
+        $this->assertSame('unauthorized', json_decode($this->api('GET', '/api/v1/me', null)->body, true)['error']);
+        $this->assertSame('forbidden', json_decode($this->api('POST', $board . '/cards', $read, ['list' => 'To do', 'title' => 'x'])->body, true)['error']);
+    }
+
+    public function testSlackIsConnectedEncryptedLoggedAndChecksTheConnectorAtSendTime(): void
+    {
+        $ws = $this->f->app->container->get(\App\Modules\Workspace\Contract\WorkspaceDirectory::class)->current($this->f->owner);
+        $center = '/workspaces/' . $ws->publicId . '/integrations';
+        $hook = 'https://hooks.slack.com/services/T000/B000/abcdefSECRET1234';
+        $this->assertSame(200, $this->f->app->get($center)->status);
+
+        $this->f->app->post($center, ['type' => 'slack', 'secret' => 'https://evil.example.com/x', 'boards' => [$this->f->board->publicId], 'events' => ['card.created']]);
+        $this->assertSame(0, (int) $this->f->app->pdo()->query('SELECT COUNT(*) FROM integrations')->fetchColumn(), 'Only Slack addresses.');
+        $this->f->app->post($center, ['type' => 'slack', 'name' => '#team', 'secret' => $hook, 'boards' => [$this->f->board->publicId], 'events' => ['card.created', 'card.completed']]);
+        $row = $this->f->app->pdo()->query('SELECT * FROM integrations')->fetch();
+        $this->assertFalse(str_contains((string) $row['secret'], 'SECRET'), 'Stored encrypted.');
+        $this->assertFalse(str_contains($this->f->app->page($center), 'abcdefSECRET'), 'Never shown again.');
+        $this->assertTrue(str_contains($this->f->app->page($center), '…1234'));
+
+        $this->f->app->post('/integrations/' . $row['public_id'] . '/test');
+        $this->assertSame('https://hooks.slack.com/services/T000/B000/abcdefSECRET1234', $this->sent[0]['url']);
+        $this->assertSame('54.230.1.1', $this->sent[0]['ip']);
+
+        $cards = $this->f->app->container->get(CardService::class);
+        $card = $cards->createCard($this->f->owner, $this->f->board->id, $this->f->todo->id, 'Launch <party> & cake');
+        $cards->update($this->f->owner, $card, ['title' => 'Launch <party> & cake', 'due_date' => '2026-02-01']);
+        $this->assertSame(1, (int) $this->f->app->pdo()->query('SELECT COUNT(*) FROM integration_deliveries')->fetchColumn(), 'Only the chosen events.');
+        $integrations = $this->f->app->container->get(\App\Modules\Integration\Application\Integrations::class);
+        $this->assertSame([1, 0], $integrations->deliverDue());
+        $text = json_decode($this->sent[1]['body'], true)['text'];
+        $this->assertTrue(str_contains($text, 'Launch &lt;party&gt; &amp; cake'), $text);
+        $this->assertTrue(str_contains($text, 'https://todo.test/cards/' . $card->publicId));
+
+        // Mona connects a second one, then loses the board: nothing is sent for her.
+        $mona = $this->f->colleague('mona@example.com', \App\Modules\Workspace\Contract\WorkspaceRole::Admin);
+        $this->f->app->loginAs('mona@example.com');
+        $this->f->app->post($center, ['type' => 'slack', 'secret' => 'https://hooks.slack.com/services/T1/B1/zzzz9999', 'boards' => [$this->f->board->publicId], 'events' => ['card.created']]);
+        $this->assertSame(2, (int) $this->f->app->pdo()->query("SELECT COUNT(*) FROM integrations WHERE status = 'active'")->fetchColumn());
+        $this->f->app->loginAs('sara@example.com');
+        $this->f->app->post('/workspaces/' . $ws->publicId . '/members/' . $mona . '/remove');
+        $this->f->app->container->get(\App\Modules\Access\Contract\AccessGate::class)->forget($mona, $this->f->board->id);
+        $cards->createCard($this->f->owner, $this->f->board->id, $this->f->todo->id, 'Second');
+        $this->assertSame([1, 1], $integrations->deliverDue());
+        $this->assertTrue(str_contains((string) $this->f->app->pdo()->query('SELECT last_error FROM integrations WHERE connected_by = ' . $mona)->fetchColumn(), 'can no longer open this board'));
+
+        // Rotate, pause, disconnect: all logged; disconnecting wipes the secret.
+        $this->f->app->post('/integrations/' . $row['public_id'] . '/rotate', ['secret' => 'https://hooks.slack.com/services/T000/B000/new5678']);
+        $this->f->app->post('/integrations/' . $row['public_id'], ['name' => '#team', 'boards' => [$this->f->board->publicId], 'events' => ['card.created'], 'active' => '0']);
+        $this->f->app->post('/integrations/' . $row['public_id'] . '/disconnect');
+        $this->assertNull($this->f->app->pdo()->query('SELECT secret FROM integrations WHERE id = ' . (int) $row['id'])->fetchColumn());
+        $this->assertSame(['connected', 'tested', 'rotated', 'settings_changed', 'paused', 'disconnected'], $this->f->app->pdo()->query('SELECT action FROM integration_log WHERE integration_id = ' . (int) $row['id'] . ' ORDER BY id')->fetchAll(\PDO::FETCH_COLUMN));
+
+        // A plain member can't see or change any of it.
+        $this->f->colleague('omar@example.com');
+        $this->f->app->loginAs('omar@example.com');
+        $this->assertFalse(str_contains($this->f->app->page($center), '#team'));
+        $this->assertSame(404, $this->f->app->post('/integrations/' . $row['public_id'] . '/test')->status);
     }
 
     public function testATokenNeverOutlivesItsOwnersAccess(): void
@@ -171,6 +288,8 @@ final class IntegrationTest extends TestCase
     /** @param array<string, mixed> $body */
     private function api(string $method, string $path, ?string $token, array $body = []): Response
     {
-        return $this->f->app->send(new Request($method, $path, [], $body, $token !== null ? ['authorization' => 'Bearer ' . $token] : [], '10.0.0.1'));
+        parse_str((string) parse_url($path, PHP_URL_QUERY), $query);
+
+        return $this->f->app->send(new Request($method, (string) parse_url($path, PHP_URL_PATH), $query, $body, $token !== null ? ['authorization' => 'Bearer ' . $token] : [], '10.0.0.1'));
     }
 }

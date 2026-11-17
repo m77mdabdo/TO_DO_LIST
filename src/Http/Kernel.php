@@ -95,7 +95,10 @@ final class Kernel
         }
 
         if ($request->wantsJson()) {
-            return Response::json(['ok' => false, 'message' => $message], $status);
+            $code = $e instanceof HttpException ? $e->code() : 'server_error';
+            $fields = $e instanceof HttpException ? $e->fields() : [];
+
+            return Response::json(['ok' => false, 'error' => $code, 'message' => $message] + ($fields !== [] ? ['fields' => $fields] : []), $status);
         }
 
         $html = $this->container->get(View::class)->render('errors/error', [

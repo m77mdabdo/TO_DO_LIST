@@ -375,8 +375,9 @@ Archived boards are read-only.
 | POST | `/integrations/tokens/{id}/revoke` | revoke a token |
 | GET / POST | `/boards/{id}/webhooks` | a board's webhooks and deliveries, add one (managers) |
 | POST | `/webhooks/{id}/toggle`, `/delete` | pause or delete a webhook |
-| GET | `/api/v1/me`, `/api/v1/boards`, `/api/v1/boards/{id}/cards` | the API (Bearer token) |
-| POST | `/api/v1/boards/{id}/cards` | add a card through the API (JSON body: list, title, description, due_date) |
+| GET/POST | `/api/v1/...` | the JSON API (Bearer token): boards, lists, cards, comments, custom fields; see [docs/api.md](docs/api.md) |
+| GET/POST | `/boards/{id}/import`, `/import/trello`, `/imports/{id}` | import cards from CSV, or a Trello board, with a preview |
+| GET/POST | `/workspaces/{id}/integrations` | the integration center (Slack) |
 | GET | `/boards/{id}/export.json` | the whole board as JSON |
 | GET | `/workspaces/{id}/export.json` | every board of a workspace as JSON (owners and admins) |
 | POST | `/boards/{id}/copy`, `/template` | copy a board, mark it as a template |
