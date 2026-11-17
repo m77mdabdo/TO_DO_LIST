@@ -31,14 +31,18 @@ final class AuthServiceTest extends TestCase
         $this->clock = new FrozenClock('2026-01-20 10:00:00');
         $this->session = new ArraySession();
         $this->events = new RecordingEventBus();
+        $users = new PdoUserRepository($pdo, $this->clock);
         $this->auth = new AuthService(
-            new PdoUserRepository($pdo, $this->clock),
+            $users,
             new PasswordHasher(),
             new PdoLoginThrottle($pdo, $this->clock),
             $this->session,
             new Validator(),
             $this->events,
             $this->clock,
+            new \App\Modules\Identity\Application\DeviceSessions($pdo, $this->clock),
+            new \App\Modules\Identity\Application\TwoFactor($users, new \App\Security\Secrets(''), $this->session, $this->clock),
+            new \App\I18n\Translator(dirname(__DIR__, 2) . '/lang', 'en', $this->session),
         );
     }
 

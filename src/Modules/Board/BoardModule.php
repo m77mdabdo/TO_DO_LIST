@@ -45,6 +45,12 @@ final class BoardModule implements ModuleProvider
 
     public function register(Container $container): void
     {
+        $container->extend(\App\Shared\Export\PersonalData::class, function (object $data, Container $c): void {
+            /** @var \App\Shared\Export\PersonalData $data */
+            $db = fn (): \PDO => $c->get(\PDO::class);
+            $data->eraseWith('board_settings', static fn (int $userId) => \App\Shared\Export\PersonalData::deleteRows($db(), $userId, ['board_preferences', 'saved_searches', 'view_settings']));
+        });
+
         $container->singleton(BoardRepository::class, fn (Container $c) => new PdoBoardRepository($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(BoardQueries::class, fn (Container $c) => $c->build(BoardQueries::class));
         $container->singleton(BoardDirectory::class, fn (Container $c) => $c->get(BoardQueries::class));
@@ -53,13 +59,27 @@ final class BoardModule implements ModuleProvider
         $container->singleton(SavedSearches::class, fn (Container $c) => new PdoSavedSearches($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(BoardPreferences::class, fn (Container $c) => new PdoBoardPreferences($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(\App\Modules\Board\Application\BoardGroups::class, fn (Container $c) => $c->build(\App\Modules\Board\Application\BoardGroups::class));
+        $container->singleton(\App\Modules\Board\Application\BoardZip::class, fn (Container $c) => $c->build(\App\Modules\Board\Application\BoardZip::class));
+        $container->singleton(\App\Modules\Board\Application\PublicLinks::class, fn (Container $c) => $c->build(\App\Modules\Board\Application\PublicLinks::class));
         $container->singleton(BoardVersions::class, fn (Container $c) => new PdoBoardVersions($c->get(PDO::class), $c->get(Clock::class)));
+
+        $container->extend(\App\Security\RateLimits::class, function (object $limits): void {
+            /** @var \App\Security\RateLimits $limits */
+            $limits->add(new \App\Security\RateLimitRule('public-board', 'GET', '/shared/*', 120, 60));
+            $limits->add(new \App\Security\RateLimitRule('board-zip', 'POST', '/boards/*/export.zip', 10, 3600, 'user'));
+        });
     }
 
     public function routes(Router $router): void
     {
+        // The secret in the link is the key: no sign-in.
+        $router->get('/shared/{token:token}', [\App\Modules\Board\Http\PublicBoardController::class, 'show']);
+
         $router->group([Authenticate::class], function (Router $router): void {
             $router->get('/', [BoardController::class, 'index']);
+            $router->get('/boards/{board:ulid}/share', [\App\Modules\Board\Http\PublicBoardController::class, 'manage']);
+            $router->post('/boards/{board:ulid}/share', [\App\Modules\Board\Http\PublicBoardController::class, 'create']);
+            $router->post('/boards/{board:ulid}/share/delete', [\App\Modules\Board\Http\PublicBoardController::class, 'revoke']);
             $router->get('/search', [SearchController::class, 'index']);
             $router->post('/search/saved', [SearchController::class, 'save']);
             $router->post('/search/saved/{saved:ulid}', [SearchController::class, 'update']);
@@ -74,6 +94,8 @@ final class BoardModule implements ModuleProvider
             $router->get('/boards/{board:ulid}/archived', [BoardController::class, 'archived']);
             $router->get('/boards/{board:ulid}/export', [BoardController::class, 'export']);
             $router->get('/boards/{board:ulid}/export.json', [BoardController::class, 'exportJson']);
+            $router->get('/boards/{board:ulid}/export-zip', [\App\Modules\Board\Http\ZipExportController::class, 'preview']);
+            $router->post('/boards/{board:ulid}/export.zip', [\App\Modules\Board\Http\ZipExportController::class, 'download']);
             $router->get('/workspaces/{workspace:ulid}/export.json', [BoardController::class, 'exportWorkspace']);
             $router->post('/boards/{board:ulid}/copy', [BoardController::class, 'copy']);
             $router->post('/boards/{board:ulid}/template', [BoardController::class, 'template']);

@@ -35,6 +35,28 @@ final class Messages
         'board.added', 'workspace.role_changed', 'workspace.removed', 'automation.notice',
     ];
 
+    /** What each kind is about, for the settings page. */
+    public const LABELS = [
+        'card.assigned'          => 'Someone adds me to a card',
+        'checklist.assigned'     => 'Someone gives me a checklist item',
+        'comment.mentioned'      => 'Someone mentions me',
+        'comment.posted'         => 'New comments on cards I watch',
+        'card.due_changed'       => 'Due date changes on cards I watch',
+        'card.completed'         => 'Cards I watch are completed',
+        'card.moved'             => 'Cards I watch move',
+        'card.due_soon'          => 'A due date comes close',
+        'card.overdue'           => 'A card is overdue',
+        'card.reminder'          => 'Reminders I set',
+        'board.added'            => 'Someone adds me to a board',
+        'invitation.accepted'    => 'Someone accepts my invitation',
+        'workspace.role_changed' => 'My role changes',
+        'workspace.removed'      => 'I am removed from a workspace',
+        'automation.notice'      => 'Automation messages',
+    ];
+
+    /** Changes to a person's own access always show in the app; only their email can be turned off. */
+    public const ALWAYS_SHOWN = ['workspace.role_changed', 'workspace.removed'];
+
     public static function sentence(string $type): string
     {
         return self::SENTENCES[$type] ?? ':actor updated :subject';

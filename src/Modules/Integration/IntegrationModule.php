@@ -55,6 +55,19 @@ final class IntegrationModule implements ModuleProvider
 
     public function register(Container $container): void
     {
+        $container->extend(\App\Shared\Export\PersonalData::class, function (object $data, Container $c): void {
+            /** @var \App\Shared\Export\PersonalData $data */
+            $db = fn (): \PDO => $c->get(\PDO::class);
+            $rows = static function (\PDO $db, string $sql, int $userId): array {
+                $stmt = $db->prepare($sql);
+                $stmt->execute([$userId]);
+
+                return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            };
+            $data->add('api_tokens', static fn (int $userId): array => $rows($db(), 'SELECT name, scope, created_at, last_used_at FROM api_tokens WHERE user_id = ?', $userId));
+            $data->eraseWith('api_tokens', static fn (int $userId) => \App\Shared\Export\PersonalData::deleteRows($db(), $userId, ['api_tokens']));
+        });
+
         $container->singleton(TokenRepository::class, fn (Container $c) => new PdoTokens($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(WebhookRepository::class, fn (Container $c) => new PdoWebhooks($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(WebhookTransport::class, fn () => new CurlTransport());

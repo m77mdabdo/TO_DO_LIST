@@ -40,6 +40,19 @@ final class CardModule implements ModuleProvider
 
     public function register(Container $container): void
     {
+        $container->extend(\App\Shared\Export\PersonalData::class, function (object $data, Container $c): void {
+            /** @var \App\Shared\Export\PersonalData $data */
+            $db = fn (): \PDO => $c->get(\PDO::class);
+            $rows = static function (\PDO $db, string $sql, int $userId): array {
+                $stmt = $db->prepare($sql);
+                $stmt->execute([$userId]);
+
+                return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            };
+            $data->add('assigned_cards', static fn (int $userId): array => $rows($db(), 'SELECT cards.public_id AS id, cards.title, cards.due_at FROM card_members JOIN cards ON cards.id = card_members.card_id WHERE card_members.user_id = ?', $userId));
+            $data->eraseWith('card_members', static fn (int $userId) => \App\Shared\Export\PersonalData::deleteRows($db(), $userId, ['card_members']));
+        });
+
         $container->extend(SearchSources::class, function (object $sources, Container $c): void {
             /** @var SearchSources $sources */
             $sources->add(new PdoCardSearch($c->get(PDO::class)));

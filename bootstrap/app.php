@@ -101,6 +101,8 @@ return static function (Config $config, Session $session, string $basePath = '',
     // Modules add what they can be searched for (see App\Shared\Search).
     $container->singleton(SearchSources::class, fn () => new SearchSources());
     $container->singleton(ExportParts::class, fn () => new ExportParts());
+    $container->singleton(\App\Shared\Export\ExportFiles::class, fn () => new \App\Shared\Export\ExportFiles());
+    $container->singleton(\App\Shared\Export\PersonalData::class, fn () => new \App\Shared\Export\PersonalData());
     $container->singleton(\App\Shared\Export\ExportColumns::class, fn () => new \App\Shared\Export\ExportColumns());
     // ...and what automations can do with their things (see App\Shared\Automation).
     $container->singleton(AutomationActions::class, fn () => new AutomationActions());

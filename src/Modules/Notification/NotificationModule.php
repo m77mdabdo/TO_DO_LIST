@@ -42,6 +42,23 @@ final class NotificationModule implements ModuleProvider
 
     public function register(Container $container): void
     {
+        $container->extend(\App\Shared\Export\PersonalData::class, function (object $data, Container $c): void {
+            /** @var \App\Shared\Export\PersonalData $data */
+            $db = fn (): \PDO => $c->get(\PDO::class);
+            $rows = static function (\PDO $db, string $sql, int $userId): array {
+                $stmt = $db->prepare($sql);
+                $stmt->execute([$userId]);
+
+                return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            };
+            $data->add('notifications', static fn (int $userId): array => [
+                'settings' => $rows($db(), 'SELECT * FROM notification_settings WHERE user_id = ?', $userId)[0] ?? null,
+                'received' => $rows($db(), 'SELECT type, subject, link, created_at, read_at FROM notifications WHERE user_id = ? ORDER BY id DESC', $userId),
+                'watching' => $rows($db(), 'SELECT target, target_id, created_at FROM watches WHERE user_id = ?', $userId),
+            ]);
+            $data->eraseWith('notifications', static fn (int $userId) => \App\Shared\Export\PersonalData::deleteRows($db(), $userId, ['notifications', 'notification_settings', 'watches']));
+        });
+
         $container->extend(AutomationActions::class, function (object $actions, Container $c): void {
             /** @var AutomationActions $actions */
             $notice = static function (string $who) use ($c): \Closure {
@@ -72,6 +89,7 @@ final class NotificationModule implements ModuleProvider
             $view->addToSlot('header.actions', 'notifications/bell');
             $view->addToSlot('card.side', 'notifications/watch-card');
             $view->addToSlot('board.actions', 'notifications/watch-board');
+            $view->addToSlot('account.settings', 'notifications/account-settings');
 
             $userId = static fn (): int => $c->get(Authenticator::class)->user()?->id ?? 0;
 

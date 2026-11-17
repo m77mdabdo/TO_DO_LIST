@@ -39,4 +39,16 @@ interface NotificationStore
     public function emailEnabled(int $userId): bool;
 
     public function setEmailEnabled(int $userId, bool $enabled): void;
+
+    /** @return array{email: bool, muted: list<string>, emailOff: list<string>} */
+    public function preferences(int $userId): array;
+
+    /**
+     * @param list<string> $muted
+     * @param list<string> $emailOff
+     */
+    public function savePreferences(int $userId, bool $email, array $muted, array $emailOff): void;
+
+    /** Deletes notifications older than $days. @return int how many */
+    public function prune(int $days): int;
 }

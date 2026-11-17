@@ -54,10 +54,14 @@ final class InvitationModule implements ModuleProvider
 
             $view->composer('invitations/panel', function (array $data) use ($c): array {
                 $workspace = $data['workspace'];
-                $open = $c->get(InvitationService::class)->openInvitations($data['viewerId'], $workspace->id);
+                $service = $c->get(InvitationService::class);
+                $open = $service->openInvitations($data['viewerId'], $workspace->id);
+                $manager = $workspace->role->managesAllBoards();
 
                 return [
-                    'canInvite'   => $workspace->role->managesAllBoards(),
+                    'canInvite'   => $manager || $service->memberMayInvite($data['viewerId'], $workspace->id),
+                    'manager'     => $manager,
+                    'policy'      => $c->get(\App\Modules\Workspace\Contract\WorkspaceDirectory::class)->policy($workspace->id),
                     'invitations' => $open,
                     'inviters'    => $c->get(UserDirectory::class)->findMany(array_values(array_unique(array_map(static fn ($i) => $i->invitedBy, $open)))),
                     'boards'      => $c->get(BoardCatalog::class)->boardsInWorkspace($data['viewerId'], $workspace->id),
@@ -78,6 +82,7 @@ final class InvitationModule implements ModuleProvider
             $router->post('/workspaces/{workspace:ulid}/invitations', [InvitationController::class, 'store']);
             $router->post('/invitations/{invitation:ulid}/resend', [InvitationController::class, 'resend']);
             $router->post('/invitations/{invitation:ulid}/revoke', [InvitationController::class, 'revoke']);
+            $router->post('/invitations/{invitation:ulid}/approve', [InvitationController::class, 'approve']);
         });
     }
 

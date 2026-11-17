@@ -45,6 +45,7 @@ final class AuditModule implements ModuleProvider
     {
         $router->group([Authenticate::class], function (Router $router): void {
             $router->get('/workspaces/{workspace:ulid}/audit', [AuditController::class, 'index']);
+            $router->get('/workspaces/{workspace:ulid}/audit.csv', [AuditController::class, 'csv']);
         });
     }
 
@@ -55,6 +56,13 @@ final class AuditModule implements ModuleProvider
                 $container->get(AuditRecorder::class)->record($event);
             });
         }
+
+        // Kept in every workspace the person was in, without their name or email.
+        $events->listen(\App\Modules\Identity\Contract\Events\AccountDeleted::name(), static function (\App\Modules\Identity\Contract\Events\AccountDeleted $e) use ($container): void {
+            foreach ($container->get(\App\Modules\Workspace\Contract\WorkspaceDirectory::class)->workspacesOf($e->userId) as $workspace) {
+                $container->get(AuditLog::class)->add($workspace->id, null, 'account.deleted', 'Deleted user #' . $e->userId);
+            }
+        });
     }
 
     public function migrationsPath(): ?string

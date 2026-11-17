@@ -72,7 +72,9 @@ final class PasswordResetController extends Controller
         }
 
         // Every other session of the account was signed out by the new password.
-        $this->auth->signIn($userId);
+        if ($this->auth->signIn($userId, $request->ip, (string) $request->header('User-Agent')) === null) {
+            return $this->redirect('/login/two-factor', 'Your password was changed. Other devices were signed out.');
+        }
 
         return $this->redirect('/', 'Your password was changed. Other devices were signed out.');
     }

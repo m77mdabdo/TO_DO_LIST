@@ -83,6 +83,7 @@ $selecting = ($selecting ?? false) && ($canEdit || $canMove || $canArchive);
                 <div class="menu-panel">
                     <a class="menu-item" href="<?= $this->url($base . '/export') ?>"><?= $this->icon('table') ?><?= $this->te('Spreadsheet (CSV)') ?></a>
                     <a class="menu-item" href="<?= $this->url($base . '/export.json') ?>"><?= $this->icon('download') ?><?= $this->te('Everything (JSON)') ?></a>
+                    <a class="menu-item" href="<?= $this->url($base . '/export-zip') ?>"><?= $this->icon('download') ?><?= $this->te('Everything with files (ZIP)') ?></a>
                 </div>
             </details>
         <?php endif; ?>
@@ -168,6 +169,7 @@ $selecting = ($selecting ?? false) && ($canEdit || $canMove || $canArchive);
                             </form>
                         <?php endif; ?>
                         <hr>
+                        <a class="menu-item" href="<?= $this->url($base . '/share') ?>"><?= $this->icon('link') ?><?= $this->te('Share by public link') ?></a>
                         <form action="<?= $this->url($base . '/template') ?>" method="post">
                             <?= $this->csrfField() ?>
                             <input type="hidden" name="on" value="<?= $board->isTemplate ? '0' : '1' ?>">
