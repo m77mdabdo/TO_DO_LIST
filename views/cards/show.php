@@ -16,6 +16,7 @@
  * @var list<array{board: \App\Modules\Board\Contract\BoardSummary, lists: list<\App\Modules\Board\Contract\ListSummary>}> $copyTargets
  * @var list<\App\Modules\Attachment\Contract\Attachment> $coverImages
  * @var list<\App\Modules\Board\Contract\BoardSummary> $linkBoards
+ * @var list<array{id: int, card: ?\App\Modules\Card\Contract\CardSummary, board: ?string, list: ?string}> $cardLinks
  * @var \App\Modules\Board\Contract\BoardSummary|null $linkedBoard the linked board, only when the viewer can open it
  */
 use App\Modules\Access\Contract\Permission;
@@ -191,6 +192,8 @@ $editErrors = $form->error('title') || $form->error('description') || $form->err
                     </form>
                 <?php endif; ?>
             </section>
+
+            <?= $this->partial('cards/linked-cards', ['card' => $card, 'cardLinks' => $cardLinks ?? [], 'canEdit' => $canEdit]) ?>
 
             <?= $this->partial('cards/schedule', ['card' => $card, 'lists' => $lists, 'repeat' => $repeat ?? null, 'canEdit' => $canEdit]) ?>
 

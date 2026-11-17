@@ -28,7 +28,7 @@ final class ApiAuthenticate implements Middleware
         $user = $token !== null ? $this->users->find($token->userId) : null;
 
         if ($token === null || $user === null) {
-            return Response::json(['ok' => false, 'message' => 'A valid API token is required.'], 401)
+            return Response::json(['ok' => false, 'error' => 'unauthorized', 'message' => 'A valid API token is required.'], 401)
                 ->withHeader('WWW-Authenticate', 'Bearer');
         }
 

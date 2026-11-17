@@ -144,6 +144,7 @@ $tile = function (BoardSummary $board): string {
                     <button class="btn btn-primary" type="submit"><?= $this->te('Create board') ?></button>
                 </form>
             </details>
+            <?= $this->slot('boards.create', ['workspace' => $workspace]) ?>
         <?php endif; ?>
     </section>
 
