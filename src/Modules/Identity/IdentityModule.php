@@ -54,6 +54,23 @@ final class IdentityModule implements ModuleProvider
 
     public function register(Container $container): void
     {
+        $container->extend(\App\Shared\Export\PersonalData::class, function (object $data, Container $c): void {
+            /** @var \App\Shared\Export\PersonalData $data */
+            $db = fn (): \PDO => $c->get(\PDO::class);
+            $rows = static function (\PDO $db, string $sql, int $userId): array {
+                $stmt = $db->prepare($sql);
+                $stmt->execute([$userId]);
+
+                return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            };
+            $data->add('profile', static function (int $userId) use ($db, $rows): array {
+                return ($rows($db(), 'SELECT name, email, locale, created_at, email_verified_at, two_factor_enabled_at FROM users WHERE id = ?', $userId)[0] ?? [])
+                    + ['security_events' => $rows($db(), 'SELECT type, ip, detail, created_at FROM security_events WHERE user_id = ? ORDER BY id DESC', $userId),
+                       'signed_in_devices' => $rows($db(), 'SELECT ip, user_agent, created_at, last_seen_at FROM user_sessions WHERE user_id = ?', $userId)];
+            });
+            $data->eraseWith('identity', static fn (int $userId) => \App\Shared\Export\PersonalData::deleteRows($db(), $userId, ['security_events', 'user_tokens']));
+        });
+
         $container->singleton(PdoUserRepository::class, fn (Container $c) => new PdoUserRepository($c->get(PDO::class), $c->get(Clock::class)));
         $container->singleton(UserRepository::class, fn (Container $c) => $c->get(PdoUserRepository::class));
         $container->singleton(UserDirectory::class, fn (Container $c) => $c->get(PdoUserRepository::class));
@@ -63,6 +80,9 @@ final class IdentityModule implements ModuleProvider
         $container->singleton(PasswordReset::class, fn (Container $c) => $c->build(PasswordReset::class));
         $container->singleton(EmailVerification::class, fn (Container $c) => $c->build(EmailVerification::class));
         $container->singleton(AccountCleanup::class, fn (Container $c) => $c->build(AccountCleanup::class));
+        $container->singleton(\App\Modules\Identity\Application\DeviceSessions::class, fn (Container $c) => new \App\Modules\Identity\Application\DeviceSessions($c->get(PDO::class), $c->get(Clock::class)));
+        $container->singleton(\App\Modules\Identity\Application\TwoFactor::class, fn (Container $c) => $c->build(\App\Modules\Identity\Application\TwoFactor::class));
+        $container->singleton(\App\Modules\Identity\Application\AccountSettings::class, fn (Container $c) => $c->build(\App\Modules\Identity\Application\AccountSettings::class));
 
         // One instance behind both names, so the "current user" is looked up once per request.
         $container->singleton(AuthService::class, fn (Container $c) => $c->build(AuthService::class));
@@ -78,6 +98,9 @@ final class IdentityModule implements ModuleProvider
             $limits->add(new RateLimitRule('password-reset-submit', 'POST', '/reset-password/*', 10, 900));
             $limits->add(new RateLimitRule('email-link', 'GET', '/verify-email/*', 20, 900));
             $limits->add(new RateLimitRule('verification-resend', 'POST', '/email/verification', 3, 900, 'user'));
+            $limits->add(new RateLimitRule('two-factor-login', 'POST', '/login/two-factor', 10, 300));
+            $limits->add(new RateLimitRule('two-factor-confirm', 'POST', '/account/two-factor/*', 10, 300, 'user'));
+            $limits->add(new RateLimitRule('account-delete', 'POST', '/account/delete', 5, 900, 'user'));
         });
 
         // Unconfirmed accounts get a banner under the app header.
@@ -96,6 +119,8 @@ final class IdentityModule implements ModuleProvider
             $router->post('/register', [RegisterController::class, 'store']);
             $router->get('/forgot-password', [PasswordResetController::class, 'showRequest']);
             $router->post('/forgot-password', [PasswordResetController::class, 'request']);
+            $router->get('/login/two-factor', [LoginController::class, 'twoFactorForm']);
+            $router->post('/login/two-factor', [LoginController::class, 'twoFactor']);
         });
 
         // Links from emails work whether or not someone is signed in on this browser.
@@ -107,6 +132,17 @@ final class IdentityModule implements ModuleProvider
             $router->post('/logout', [LoginController::class, 'destroy']);
             $router->post('/email/verification', [EmailVerificationController::class, 'resend']);
             $router->get('/account/security', [AccountSecurityController::class, 'index']);
+            $router->post('/account/two-factor/start', [AccountSecurityController::class, 'startTwoFactor']);
+            $router->post('/account/two-factor/confirm', [AccountSecurityController::class, 'confirmTwoFactor']);
+            $router->post('/account/two-factor/disable', [AccountSecurityController::class, 'disableTwoFactor']);
+            $router->post('/account/two-factor/recovery', [AccountSecurityController::class, 'newRecoveryCodes']);
+            $router->post('/account/sessions/others', [AccountSecurityController::class, 'endOtherSessions']);
+            $router->post('/account/sessions/all', [AccountSecurityController::class, 'endAllSessions']);
+            $router->post('/account/sessions/{id}', [AccountSecurityController::class, 'endSession']);
+            $router->get('/account', [\App\Modules\Identity\Http\AccountController::class, 'index']);
+            $router->post('/account/profile', [\App\Modules\Identity\Http\AccountController::class, 'profile']);
+            $router->get('/account/export.json', [\App\Modules\Identity\Http\AccountController::class, 'export']);
+            $router->post('/account/delete', [\App\Modules\Identity\Http\AccountController::class, 'delete']);
         });
     }
 

@@ -71,8 +71,8 @@ $currentWorkspace ??= null;
             <span class="show-light"><?= $this->icon('moon') ?></span><span class="show-dark"><?= $this->icon('sun') ?></span>
         </button>
         <?php if (isset($user)): ?>
-            <a class="avatar" href="<?= $this->url('/account/security') ?>" title="<?= $this->e($user->email) ?>"
-               aria-label="<?= $this->te('Account security') ?>"><?= $this->e($user->initial()) ?></a>
+            <a class="avatar" href="<?= $this->url('/account') ?>" title="<?= $this->e($user->email) ?>"
+               aria-label="<?= $this->te('Your account') ?>"><?= $this->e($user->initial()) ?></a>
             <form action="<?= $this->url('/logout') ?>" method="post">
                 <?= $this->csrfField() ?>
                 <button class="icon-btn" title="<?= $this->te('Log out') ?>"><?= $this->icon('logout') ?></button>

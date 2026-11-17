@@ -23,4 +23,18 @@ interface WorkspaceDirectory
 
     /** @return list<array{userId: int, role: WorkspaceRole}> */
     public function members(int $workspaceId): array;
+
+    /** The workspace's rules (invitations, public links). */
+    public function policy(int $workspaceId): WorkspacePolicy;
+
+    /** True while an owner or admin has suspended the user in this workspace. */
+    public function isSuspended(int $userId, int $workspaceId): bool;
+
+    /**
+     * Workspaces where this person is the only owner and others still work:
+     * they must be handed over before the account can be deleted.
+     *
+     * @return list<WorkspaceSummary>
+     */
+    public function soleOwnerOf(int $userId): array;
 }

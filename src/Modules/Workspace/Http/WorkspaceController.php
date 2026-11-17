@@ -11,6 +11,7 @@ use App\Http\Response;
 use App\Http\Url;
 use App\Modules\Identity\Contract\UserDirectory;
 use App\Modules\Workspace\Application\WorkspaceService;
+use App\Modules\Workspace\Contract\WorkspaceRole;
 use App\Modules\Workspace\Contract\WorkspaceSummary;
 use App\Session\Session;
 use App\Validation\ValidationException;
@@ -72,6 +73,9 @@ final class WorkspaceController extends Controller
             'people'    => $people,
             'viewerId'  => $viewer->id,
             'grantable' => $workspace->role->grantable(),
+            'suspended' => $suspended = ($workspace->role->managesAllBoards() ? $this->workspaces->suspendedMembers($workspace->id) : []),
+            'suspendedPeople' => $this->users->findMany(array_column($suspended, 'userId')),
+            'policy'    => $this->workspaces->policy($workspace->id),
         ]);
     }
 
@@ -101,6 +105,47 @@ final class WorkspaceController extends Controller
         }
 
         return $this->redirect($this->membersPath($workspace->publicId), 'Member removed.');
+    }
+
+    /** Body: on (1 suspends, 0 turns back on). @param array{workspace: string, id: string} $params */
+    public function suspend(Request $request, array $params): Response
+    {
+        $workspace = $this->workspaceOf($request, $params);
+        $on = $request->input('on') === '1';
+        try {
+            $this->workspaces->setSuspended($this->user($request)->id, $workspace->id, (int) $params['id'], $on);
+        } catch (ValidationException $e) {
+            return $this->backWithErrors($e, $request, $this->membersPath($workspace->publicId));
+        }
+
+        return $this->redirect($this->membersPath($workspace->publicId), $on ? 'Member suspended. They can\'t open anything here until you turn them back on.' : 'Member turned back on.');
+    }
+
+    /** Body: user_id. @param array{workspace: string} $params */
+    public function transfer(Request $request, array $params): Response
+    {
+        $workspace = $this->workspaceOf($request, $params);
+        try {
+            $this->workspaces->transferOwnership($this->user($request)->id, $workspace->id, (int) $request->input('user_id'));
+        } catch (ValidationException $e) {
+            return $this->backWithErrors($e, $request, $this->membersPath($workspace->publicId) . '#ownership');
+        }
+
+        return $this->redirect($this->membersPath($workspace->publicId), 'Ownership handed over. You are now an admin.');
+    }
+
+    /** Body: members_invite, invite_role, invite_approval, public_links. @param array{workspace: string} $params */
+    public function rules(Request $request, array $params): Response
+    {
+        $workspace = $this->workspaceOf($request, $params);
+        $this->workspaces->savePolicy($this->user($request)->id, $workspace->id, new \App\Modules\Workspace\Contract\WorkspacePolicy(
+            $request->input('members_invite') === '1',
+            $request->input('invite_role') === 'guest' ? WorkspaceRole::Guest : WorkspaceRole::Member,
+            $request->input('invite_approval') === '1',
+            $request->input('public_links') === '1',
+        ));
+
+        return $this->redirect($this->membersPath($workspace->publicId) . '#rules', 'Workspace rules saved.');
     }
 
     /** @param array{workspace: string} $params */

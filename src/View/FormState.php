@@ -11,7 +11,7 @@ use App\Session\Session;
  */
 final class FormState
 {
-    private const NEVER_KEPT = ['_token', 'password', 'password_confirmation'];
+    private const NEVER_KEPT = ['_token', 'password', 'password_confirmation', 'code'];
 
     /** @var array<string, string>|null */
     private ?array $errors = null;

@@ -49,6 +49,7 @@ final class WorkspaceService implements WorkspaceDirectory, WorkspaceProvisionin
         private Clock $clock,
         private Session $session,
         private Validator $validator,
+        private \App\Modules\Identity\Contract\UserDirectory $users,
     ) {
     }
 
@@ -205,6 +206,106 @@ final class WorkspaceService implements WorkspaceDirectory, WorkspaceProvisionin
         $this->remove($workspaceId, $userId, $target, $actorId);
     }
 
+    /**
+     * Suspends a member (or turns them back on): they keep their place and
+     * their work, but can't open the workspace, its boards, or use API tokens
+     * and integrations there until turned back on.
+     *
+     * @throws ValidationException|HttpException
+     */
+    public function setSuspended(int $actorId, int $workspaceId, int $userId, bool $suspend): void
+    {
+        $target = $this->manageable($actorId, $workspaceId, $userId);
+        if ($suspend && $target === WorkspaceRole::Owner && $this->workspaces->ownerCount($workspaceId) <= 1) {
+            $this->fail('member', 'A workspace needs at least one owner.');
+        }
+        $this->workspaces->setSuspended($workspaceId, $userId, $suspend ? $actorId : null);
+        $this->roles[$userId . ':' . $workspaceId] = $suspend ? null : $target;
+        $this->events->publish(new \App\Modules\Workspace\Contract\Events\WorkspaceAdminAction(
+            $workspaceId, $actorId, $suspend ? 'member.suspended' : 'member.reactivated', $this->userEmail($userId), ['role' => $target->label()], $this->clock->now(),
+        ));
+    }
+
+    public function isSuspended(int $userId, int $workspaceId): bool
+    {
+        return $this->roleOf($userId, $workspaceId) === null && $this->workspaces->anyRole($userId, $workspaceId) !== null;
+    }
+
+    /** @return list<array{userId: int, role: WorkspaceRole, since: string}> */
+    public function suspendedMembers(int $workspaceId): array
+    {
+        return $this->workspaces->suspended($workspaceId);
+    }
+
+    public function policy(int $workspaceId): \App\Modules\Workspace\Contract\WorkspacePolicy
+    {
+        return $this->workspaces->policy($workspaceId);
+    }
+
+    /** Owners only. */
+    public function savePolicy(int $actorId, int $workspaceId, \App\Modules\Workspace\Contract\WorkspacePolicy $policy): void
+    {
+        if ($this->roleOf($actorId, $workspaceId) !== WorkspaceRole::Owner) {
+            throw new HttpException(403, 'Only owners can change the workspace rules.');
+        }
+        $old = $this->workspaces->policy($workspaceId);
+        $this->workspaces->savePolicy($workspaceId, $policy);
+        $changes = [];
+        foreach (['membersInvite' => 'members_invite', 'inviteApproval' => 'invite_approval', 'publicLinks' => 'public_links'] as $prop => $key) {
+            if ($old->$prop !== $policy->$prop) {
+                $changes[$key] = $policy->$prop ? 'on' : 'off';
+            }
+        }
+        if ($old->inviteRole !== $policy->inviteRole) {
+            $changes['invite_role'] = $policy->inviteRole->label();
+        }
+        if ($changes !== []) {
+            $this->events->publish(new \App\Modules\Workspace\Contract\Events\WorkspaceAdminAction($workspaceId, $actorId, 'workspace.policy_changed', '', $changes, $this->clock->now()));
+        }
+    }
+
+    /**
+     * Hands ownership to another member: they become an owner and the actor
+     * becomes an admin. Only an owner can do it.
+     *
+     * @throws ValidationException|HttpException
+     */
+    public function transferOwnership(int $actorId, int $workspaceId, int $userId): void
+    {
+        if ($this->roleOf($actorId, $workspaceId) !== WorkspaceRole::Owner) {
+            throw new HttpException(403, 'Only owners can hand over the workspace.');
+        }
+        $target = $this->roleOf($userId, $workspaceId);
+        if ($target === null || $target === WorkspaceRole::Guest || $userId === $actorId) {
+            $this->fail('owner', 'Choose an active member of the workspace (not a guest).');
+        }
+        $this->transactions->run(function () use ($actorId, $workspaceId, $userId, $target): void {
+            if ($target !== WorkspaceRole::Owner) {
+                $this->workspaces->setRole($workspaceId, $userId, WorkspaceRole::Owner);
+                $this->events->publish(new MemberRoleChanged($workspaceId, $userId, $target, WorkspaceRole::Owner, $actorId, $this->clock->now()));
+            }
+            $this->workspaces->setRole($workspaceId, $actorId, WorkspaceRole::Admin);
+            $this->events->publish(new MemberRoleChanged($workspaceId, $actorId, WorkspaceRole::Owner, WorkspaceRole::Admin, $actorId, $this->clock->now()));
+            $this->events->publish(new \App\Modules\Workspace\Contract\Events\WorkspaceAdminAction($workspaceId, $actorId, 'workspace.ownership_transferred', $this->userEmail($userId), [], $this->clock->now()));
+            $this->roles[$userId . ':' . $workspaceId] = WorkspaceRole::Owner;
+            $this->roles[$actorId . ':' . $workspaceId] = WorkspaceRole::Admin;
+        });
+    }
+
+    /** Workspaces where the user is the only active owner and others remain (they must hand it over first). @return list<WorkspaceSummary> */
+    public function soleOwnerOf(int $userId): array
+    {
+        return array_values(array_filter(
+            $this->workspaces->summariesOf($userId),
+            fn (WorkspaceSummary $w) => $w->role === WorkspaceRole::Owner && $this->workspaces->ownerCount($w->id) <= 1 && count($this->workspaces->members($w->id)) + count($this->workspaces->suspended($w->id)) > 1,
+        ));
+    }
+
+    private function userEmail(int $userId): string
+    {
+        return $this->users->find($userId)?->email ?? '#' . $userId;
+    }
+
     /** The user leaves the workspace themselves. The last owner can't. */
     public function leave(int $userId, int $workspaceId): void
     {
@@ -232,7 +333,7 @@ final class WorkspaceService implements WorkspaceDirectory, WorkspaceProvisionin
     private function manageable(int $actorId, int $workspaceId, int $userId): WorkspaceRole
     {
         $actor = $this->roleOf($actorId, $workspaceId) ?? throw HttpException::notFound();
-        $target = $this->roleOf($userId, $workspaceId) ?? throw HttpException::notFound();
+        $target = $this->workspaces->anyRole($userId, $workspaceId) ?? throw HttpException::notFound();
 
         if ($actorId === $userId) {
             $this->fail('member', 'You cannot change your own role.');

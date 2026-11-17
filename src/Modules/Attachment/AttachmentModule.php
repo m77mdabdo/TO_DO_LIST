@@ -43,6 +43,30 @@ final class AttachmentModule implements ModuleProvider
 
     public function register(Container $container): void
     {
+        // The files themselves, for a board's ZIP export: attachments/<card id>/<attachment id>-<name>.
+        $container->extend(\App\Shared\Export\ExportFiles::class, function (object $files, Container $c): void {
+            /** @var \App\Shared\Export\ExportFiles $files */
+            $files->add('attachments', function (array $cardIds) use ($c): array {
+                if ($cardIds === []) {
+                    return [];
+                }
+                $stmt = $c->get(\PDO::class)->prepare('SELECT a.public_id, a.name, a.size, a.stored_name, c.public_id AS card FROM attachments a JOIN cards c ON c.id = a.card_id
+                    WHERE a.kind = \'file\' AND a.card_id IN (' . implode(',', array_fill(0, count($cardIds), '?')) . ') ORDER BY a.id');
+                $stmt->execute(array_values($cardIds));
+                $out = [];
+                foreach ($stmt->fetchAll() as $row) {
+                    $path = $c->get(FileStore::class)->path((string) $row['stored_name']);
+                    if ($path !== null && is_file($path)) {
+                        // Only safe characters in the archive path, whatever the original name was.
+                        $name = preg_replace('/[^\p{L}\p{N}._ -]+/u', '_', (string) $row['name']) ?: 'file';
+                        $out[] = ['path' => $path, 'name' => $row['card'] . '/' . $row['public_id'] . '-' . mb_substr($name, 0, 120), 'size' => (int) $row['size']];
+                    }
+                }
+
+                return $out;
+            });
+        });
+
         $container->extend(ExportParts::class, function (object $parts, Container $c): void {
             /** @var ExportParts $parts */
             $parts->add('attachments', function (array $cardIds) use ($c): array {

@@ -69,23 +69,29 @@ final class InvitationService
 
     /**
      * @param array<string, mixed> $input email, role, board_role, boards (list of board ids)
-     * @return array{0: Invitation, 1: string} the invitation and its link, shown once to the inviter
+     * @return array{0: Invitation, 1: ?string} the invitation and its link, shown once to the inviter (null while it waits for approval)
      */
     public function invite(int $actorId, int $workspaceId, array $input): array
     {
-        $this->assertManager($actorId, $workspaceId);
+        $manager = $this->workspaces->canManageMembers($actorId, $workspaceId);
+        if (!$manager && !$this->memberMayInvite($actorId, $workspaceId)) {
+            throw new HttpException(403, 'You do not have permission to do that.');
+        }
+        $this->assertConfirmed($actorId);
+        $policy = $this->directory->policy($workspaceId);
 
         $email = mb_strtolower(trim((string) ($input['email'] ?? '')));
         $result = $this->validator->validate(['email' => $email], ['email' => ['Email', 'required|email|max:190']]);
-        $role = WorkspaceRole::tryFrom((string) ($input['role'] ?? ''));
+        // A member's invitation always gives the role the owners chose, never more.
+        $role = $manager ? WorkspaceRole::tryFrom((string) ($input['role'] ?? '')) : $policy->inviteRole;
         $boardRole = BoardRole::tryFrom((string) ($input['board_role'] ?? 'member'));
         $boardIds = $this->boardIds($input['boards'] ?? []);
 
         // Ownership is only handed to someone already in the workspace, never by a link.
-        if ($role === null || $role === WorkspaceRole::Owner || !$this->workspaces->mayGrant($actorId, $workspaceId, $role)) {
+        if ($role === null || $role === WorkspaceRole::Owner || ($manager && !$this->workspaces->mayGrant($actorId, $workspaceId, $role))) {
             $result = $result->with('role', 'You cannot give that role.');
         }
-        if ($boardRole === null || ($role === WorkspaceRole::Guest && $boardRole === BoardRole::Manager)) {
+        if ($boardRole === null || (($role === WorkspaceRole::Guest || !$manager) && $boardRole === BoardRole::Manager)) {
             $result = $result->with('board_role', 'Choose a board role.');
         }
         if ($role === WorkspaceRole::Guest && $boardIds === []) {
@@ -111,11 +117,36 @@ final class InvitationService
         }
 
         $token = InvitationToken::generate();
+        if (!$manager && $policy->inviteApproval) {
+            // Nothing leaves the app yet: the stored hash belongs to a secret
+            // nobody sees, and approving it makes a fresh one.
+            $invitation = $this->invitations->create($workspaceId, $email, $role, $boardRole, $boardIds, $token->hash(), $actorId, $this->expiry(), true);
+
+            return [$invitation, null];
+        }
         $invitation = $this->invitations->create($workspaceId, $email, $role, $boardRole, $boardIds, $token->hash(), $actorId, $this->expiry());
         $this->send($invitation, $token, $actorId);
         $this->events->publish(new InvitationSent($invitation->id, $workspaceId, $email, $role, $actorId, false, $this->clock->now()));
 
         return [$invitation, $this->link($token)];
+    }
+
+    /** An owner or admin lets a member's invitation go out: a new link, the email, and the usual record. */
+    public function approve(int $actorId, string $publicId): string
+    {
+        $invitation = $this->openInvitation($actorId, $publicId);
+        if (!$invitation->awaitingApproval) {
+            $this->fail('invitation', 'This invitation was already sent.');
+        }
+
+        return $this->resend($actorId, $publicId);
+    }
+
+    /** May this full member invite, under the workspace's rules? (Owners and admins always may.) */
+    public function memberMayInvite(int $actorId, int $workspaceId): bool
+    {
+        return $this->directory->roleOf($actorId, $workspaceId) === WorkspaceRole::Member
+            && $this->directory->policy($workspaceId)->membersInvite;
     }
 
     /** A new link (the old one stops working), a new expiry, and the email again. */
@@ -145,7 +176,14 @@ final class InvitationService
     /** @return list<Invitation> */
     public function openInvitations(int $actorId, int $workspaceId): array
     {
-        return $this->workspaces->canManageMembers($actorId, $workspaceId) ? $this->invitations->open($workspaceId) : [];
+        if ($this->workspaces->canManageMembers($actorId, $workspaceId)) {
+            return $this->invitations->open($workspaceId);
+        }
+
+        // A member who may invite sees only the invitations they made.
+        return $this->memberMayInvite($actorId, $workspaceId)
+            ? array_values(array_filter($this->invitations->open($workspaceId), static fn (Invitation $i) => $i->invitedBy === $actorId))
+            : [];
     }
 
     /**
@@ -261,14 +299,6 @@ final class InvitationService
         }
 
         return $invitation;
-    }
-
-    private function assertManager(int $actorId, int $workspaceId): void
-    {
-        if (!$this->workspaces->canManageMembers($actorId, $workspaceId)) {
-            throw new HttpException(403, 'You do not have permission to do that.');
-        }
-        $this->assertConfirmed($actorId);
     }
 
     /** Invitations are emails to other people: only from accounts whose own email is confirmed. */

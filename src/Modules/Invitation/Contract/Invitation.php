@@ -18,6 +18,8 @@ final class Invitation
     public const EXPIRED = 'expired';
     public const ACCEPTED = 'accepted';
     public const REVOKED = 'revoked';
+    /** Sent by a member; waits for an owner or admin before any email or working link exists. */
+    public const AWAITING = 'awaiting';
 
     /** @param list<int> $boardIds */
     public function __construct(
@@ -33,6 +35,7 @@ final class Invitation
         public readonly string $expiresAt,
         public readonly ?string $acceptedAt,
         public readonly ?string $revokedAt,
+        public readonly bool $awaitingApproval = false,
     ) {
     }
 
@@ -41,6 +44,7 @@ final class Invitation
         return match (true) {
             $this->acceptedAt !== null                       => self::ACCEPTED,
             $this->revokedAt !== null                        => self::REVOKED,
+            $this->awaitingApproval                          => self::AWAITING,
             $this->expiresAt <= $now->format('Y-m-d H:i:s') => self::EXPIRED,
             default                                          => self::PENDING,
         };

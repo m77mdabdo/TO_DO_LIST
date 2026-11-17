@@ -74,7 +74,11 @@ final class Gate implements AccessGate
             return [];
         }
 
-        $people = $this->members->membersOf($boardId);
+        $people = array_filter(
+            $this->members->membersOf($boardId),
+            fn (int $userId): bool => !$this->workspaces->isSuspended($userId, $board->workspaceId),
+            ARRAY_FILTER_USE_KEY,
+        );
 
         foreach ($this->workspaces->members($board->workspaceId) as ['userId' => $userId, 'role' => $workspaceRole]) {
             if ($workspaceRole->managesAllBoards()) {
@@ -99,16 +103,21 @@ final class Gate implements AccessGate
 
     private function resolve(int $userId, int $boardId): ?BoardRole
     {
-        $explicit = $this->members->role($boardId, $userId);
-
-        if ($explicit === BoardRole::Manager) {
-            return $explicit;
-        }
-
         $board = $this->boards->find($boardId);
 
         if ($board === null) {
             return null;
+        }
+
+        // A suspended member has no role anywhere in the workspace, board memberships included.
+        if ($this->workspaces->isSuspended($userId, $board->workspaceId)) {
+            return null;
+        }
+
+        $explicit = $this->members->role($boardId, $userId);
+
+        if ($explicit === BoardRole::Manager) {
+            return $explicit;
         }
 
         $workspaceRole = $this->workspaces->roleOf($userId, $board->workspaceId);

@@ -15,6 +15,7 @@ $errors = $this->form->errors();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="<?= $this->csrfToken() ?>">
     <meta name="theme-color" content="#7c5cff">
+    <?php if (!empty($noindex)): ?><meta name="robots" content="noindex, nofollow"><?php endif; ?>
     <title><?= $this->e($title ? $this->t($title) . " · $appName" : $appName) ?></title>
     <link rel="icon" href="<?= $this->asset('img/favicon.svg') ?>" type="image/svg+xml">
     <link rel="stylesheet" href="<?= $this->asset('css/style.css') ?>">

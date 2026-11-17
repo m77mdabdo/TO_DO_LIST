@@ -62,15 +62,24 @@ final class Backup
      *
      * @return list<string> files removed
      */
-    public function prune(int $keep): array
+    /**
+     * Keeps the newest $keep of each kind, and removes any older than $maxDays
+     * (0 = no age limit). The newest backup of each kind is never removed.
+     *
+     * @return list<string> the files removed
+     */
+    public function prune(int $keep, int $maxDays = 0, ?int $now = null): array
     {
         $removed = [];
+        $cutoff = $maxDays > 0 ? ($now ?? time()) - $maxDays * 86400 : null;
         foreach (['database-*', 'attachments-*'] as $pattern) {
             $files = glob($this->dir . '/' . $pattern) ?: [];
             rsort($files); // names carry a sortable timestamp
-            foreach (array_slice($files, max(1, $keep)) as $old) {
-                if (@unlink($old)) {
-                    $removed[] = $old;
+            foreach ($files as $i => $file) {
+                $tooMany = $i >= max(1, $keep);
+                $tooOld = $i > 0 && $cutoff !== null && (int) filemtime($file) < $cutoff;
+                if (($tooMany || $tooOld) && @unlink($file)) {
+                    $removed[] = $file;
                 }
             }
         }

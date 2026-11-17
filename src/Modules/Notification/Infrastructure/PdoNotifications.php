@@ -111,8 +111,40 @@ final class PdoNotifications implements NotificationStore
 
     public function setEmailEnabled(int $userId, bool $enabled): void
     {
+        $current = $this->preferences($userId);
+        $this->savePreferences($userId, $enabled, $current['muted'], $current['emailOff']);
+    }
+
+    public function preferences(int $userId): array
+    {
+        $stmt = $this->db->prepare('SELECT email_enabled, muted_types, email_off_types FROM notification_settings WHERE user_id = ?');
+        $stmt->execute([$userId]);
+        $row = $stmt->fetch();
+        if ($row === false) {
+            return ['email' => true, 'muted' => [], 'emailOff' => []];
+        }
+        $list = static function (mixed $json): array {
+            $value = json_decode((string) $json, true);
+
+            return is_array($value) ? array_values(array_filter($value, 'is_string')) : [];
+        };
+
+        return ['email' => (int) $row['email_enabled'] === 1, 'muted' => $list($row['muted_types']), 'emailOff' => $list($row['email_off_types'])];
+    }
+
+    public function savePreferences(int $userId, bool $email, array $muted, array $emailOff): void
+    {
         $this->db->prepare('DELETE FROM notification_settings WHERE user_id = ?')->execute([$userId]);
-        $this->db->prepare('INSERT INTO notification_settings (user_id, email_enabled) VALUES (?, ?)')->execute([$userId, $enabled ? 1 : 0]);
+        $this->db->prepare('INSERT INTO notification_settings (user_id, email_enabled, muted_types, email_off_types) VALUES (?, ?, ?, ?)')
+            ->execute([$userId, $email ? 1 : 0, json_encode(array_values($muted), JSON_THROW_ON_ERROR), json_encode(array_values($emailOff), JSON_THROW_ON_ERROR)]);
+    }
+
+    public function prune(int $days): int
+    {
+        $stmt = $this->db->prepare('DELETE FROM notifications WHERE created_at < ?');
+        $stmt->execute([$this->clock->now()->modify('-' . max(1, $days) . ' days')->format('Y-m-d H:i:s')]);
+
+        return $stmt->rowCount();
     }
 
     /** @param array<string, mixed> $row */

@@ -44,6 +44,19 @@ final class DiscussionModule implements ModuleProvider
 
     public function register(Container $container): void
     {
+        $container->extend(\App\Shared\Export\PersonalData::class, function (object $data, Container $c): void {
+            /** @var \App\Shared\Export\PersonalData $data */
+            $db = fn (): \PDO => $c->get(\PDO::class);
+            $rows = static function (\PDO $db, string $sql, int $userId): array {
+                $stmt = $db->prepare($sql);
+                $stmt->execute([$userId]);
+
+                return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            };
+            $data->add('comments', static fn (int $userId): array => $rows($db(), 'SELECT cards.public_id AS card, comments.body, comments.created_at, comments.edited_at FROM comments JOIN cards ON cards.id = comments.card_id WHERE comments.author_id = ? ORDER BY comments.id', $userId));
+            $data->eraseWith('discussion', static fn (int $userId) => \App\Shared\Export\PersonalData::deleteRows($db(), $userId, ['card_votes', 'comment_reactions', 'comment_mentions', 'card_typing']));
+        });
+
         $container->extend(AutomationActions::class, function (object $actions, Container $c): void {
             /** @var AutomationActions $actions */
             $actions->add(new ActionType('comment.post', 'Post a comment', 'text', static function (ActionContext $ctx, string $text) use ($c): void {
