@@ -116,7 +116,7 @@ final class AuthService implements Authenticator
      */
     public function login(array $input, string $ip, string $agent = ''): ?User
     {
-        if ($this->throttle->tooManyAttempts($ip)) {
+        if ($this->throttle->tooManyAttempts($ip, (string) ($input['email'] ?? ''))) {
             $this->fail('login', 'Too many attempts. Please wait 15 minutes and try again.');
         }
 
@@ -134,7 +134,7 @@ final class AuthService implements Authenticator
             $this->fail('login', "That email and password don't match.");
         }
 
-        $this->throttle->clear($ip);
+        $this->throttle->clear($email);
 
         if ($this->hasher->needsRehash($credentials->passwordHash)) {
             $this->users->updatePassword($credentials->userId, $this->hasher->hash($password));

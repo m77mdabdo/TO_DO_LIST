@@ -88,7 +88,8 @@ final class IdentityModule implements ModuleProvider
         $container->singleton(AuthService::class, fn (Container $c) => $c->build(AuthService::class));
         $container->singleton(Authenticator::class, fn (Container $c) => $c->get(AuthService::class));
 
-        // Requests per window. On top of these, failed logins lock an IP out after 5 tries (LoginThrottle).
+        // Requests per window. On top of these, LoginThrottle blocks sign-in after 5 failures for one
+        // account from one IP, 20 for one account from anywhere, or 50 from one IP across accounts.
         $container->extend(RateLimits::class, function (object $limits): void {
             /** @var RateLimits $limits */
             $limits->add(new RateLimitRule('login', 'POST', '/login', 10, 60));
