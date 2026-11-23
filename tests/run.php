@@ -42,6 +42,11 @@ foreach ($files as $file) {
         }
 
         $assertions += $test->assertionCount();
+
+        // Close this test's connections before dropping its databases.
+        unset($test);
+        gc_collect_cycles();
+        \Tests\Support\TestDatabase::dropCreated();
     }
 }
 

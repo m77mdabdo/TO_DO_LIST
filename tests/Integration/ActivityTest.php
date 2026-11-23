@@ -24,7 +24,10 @@ final class ActivityTest extends TestCase
 
         $this->assertSame(['card.moved', 'card.created', 'list.created', 'list.created', 'list.created', 'board.created'], $types);
         [$moved] = $feed->forCard($card->id);
-        $this->assertSame(['from' => 'To do', 'to' => 'Doing'], $moved->data);
+        // MySQL's JSON type stores object keys in its own order, so compare the content, not the order.
+        $data = $moved->data;
+        ksort($data);
+        $this->assertSame(['from' => 'To do', 'to' => 'Doing'], $data);
     }
 
     public function testPagesWithAKeysetCursor(): void
