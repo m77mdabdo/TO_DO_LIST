@@ -106,7 +106,7 @@ final class AuthServiceTest extends TestCase
         $this->assertTrue($this->auth->check());
     }
 
-    public function testLocksAnIpOutAfterFiveFailures(): void
+    public function testLocksAnAccountOnAnIpAfterFiveFailures(): void
     {
         $this->auth->register($this->signup());
         $this->auth->logout();
@@ -121,6 +121,105 @@ final class AuthServiceTest extends TestCase
         $this->clock->travel('+16 minutes');
         $this->auth->login(['email' => 'sara@example.com', 'password' => 'secret123'], '2.2.2.2');
         $this->assertTrue($this->auth->check());
+    }
+
+    /**
+     * Regression: a correct login used to clear every failure from the IP, so an
+     * attacker could fail 4 times on someone else's account, sign in to their own,
+     * and start over with unlimited guesses.
+     */
+    public function testSigningInToAnotherAccountDoesNotResetTheCount(): void
+    {
+        $this->registerUsers('sara@example.com', 'omar@example.com');
+
+        for ($i = 0; $i < 4; $i++) {
+            $this->failLogin('sara@example.com', '3.3.3.3');
+        }
+        $this->auth->login(['email' => 'omar@example.com', 'password' => 'secret123'], '3.3.3.3');
+        $this->auth->logout();
+        $this->failLogin('sara@example.com', '3.3.3.3');
+
+        $errors = $this->errorsFrom(fn () => $this->auth->login(['email' => 'sara@example.com', 'password' => 'secret123'], '3.3.3.3'));
+        $this->assertTrue(str_starts_with($errors['login'] ?? '', 'Too many attempts'));
+        $this->assertFalse($this->auth->check());
+    }
+
+    public function testPeopleSharingAnIpAreNotLockedOutBySomeoneElsesMistakes(): void
+    {
+        $this->registerUsers('sara@example.com', 'omar@example.com');
+
+        for ($i = 0; $i < 5; $i++) {
+            $this->failLogin('sara@example.com', '10.0.0.1');
+        }
+
+        $this->auth->login(['email' => 'omar@example.com', 'password' => 'secret123'], '10.0.0.1');
+        $this->assertTrue($this->auth->check());
+    }
+
+    public function testAnAccountAttackedFromManyIpsIsLocked(): void
+    {
+        $this->registerUsers('sara@example.com', 'omar@example.com');
+
+        for ($i = 1; $i <= 20; $i++) {
+            $this->failLogin('sara@example.com', "4.4.4.$i");
+        }
+
+        $errors = $this->errorsFrom(fn () => $this->auth->login(['email' => 'sara@example.com', 'password' => 'secret123'], '5.5.5.5'));
+        $this->assertTrue(str_starts_with($errors['login'] ?? '', 'Too many attempts'));
+
+        $this->auth->login(['email' => 'omar@example.com', 'password' => 'secret123'], '5.5.5.5');
+        $this->assertTrue($this->auth->check(), 'other accounts are not affected');
+    }
+
+    public function testAnIpTryingManyAccountsIsLocked(): void
+    {
+        $this->registerUsers('sara@example.com');
+
+        for ($i = 1; $i <= 50; $i++) {
+            $this->failLogin("guess$i@example.com", '6.6.6.6');
+        }
+
+        $errors = $this->errorsFrom(fn () => $this->auth->login(['email' => 'sara@example.com', 'password' => 'secret123'], '6.6.6.6'));
+        $this->assertTrue(str_starts_with($errors['login'] ?? '', 'Too many attempts'));
+
+        $this->auth->login(['email' => 'sara@example.com', 'password' => 'secret123'], '7.7.7.7');
+        $this->assertTrue($this->auth->check(), 'the same account works from another IP');
+    }
+
+    public function testACorrectLoginClearsOnlyThatAccountsFailures(): void
+    {
+        $this->registerUsers('sara@example.com');
+
+        for ($i = 0; $i < 4; $i++) {
+            $this->failLogin('sara@example.com', '8.8.8.8');
+        }
+        $this->auth->login(['email' => 'Sara@Example.com', 'password' => 'secret123'], '8.8.8.8');
+        $this->auth->logout();
+
+        for ($i = 0; $i < 4; $i++) {
+            $this->failLogin('sara@example.com', '8.8.8.8');
+        }
+        $this->auth->login(['email' => 'sara@example.com', 'password' => 'secret123'], '8.8.8.8');
+        $this->assertTrue($this->auth->check(), 'four new failures after a correct login are still under the limit');
+    }
+
+    public function testFailuresAreCountedForUnknownEmailsWithTheSameMessage(): void
+    {
+        $errors = $this->errorsFrom(fn () => $this->auth->login(['email' => 'nobody@example.com', 'password' => 'whatever'], '9.9.9.9'));
+        $this->assertSame("That email and password don't match.", $errors['login']);
+    }
+
+    private function registerUsers(string ...$emails): void
+    {
+        foreach ($emails as $email) {
+            $this->auth->register($this->signup(['email' => $email]));
+            $this->auth->logout();
+        }
+    }
+
+    private function failLogin(string $email, string $ip): void
+    {
+        $this->errorsFrom(fn () => $this->auth->login(['email' => $email, 'password' => 'wrong-password'], $ip));
     }
 
     /** @return array<string, string> */

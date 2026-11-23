@@ -444,7 +444,7 @@ for PHP 8.1 and 8.3, together with PHPStan.
 | Seeing another company's data (IDOR) | Every board, card and workspace action goes through the access gate; unknown or hidden ids return 404 |
 | Guessable URLs | Public ids are ULIDs, not sequential numbers |
 | Passwords | Argon2id, automatic rehash, same timing for unknown emails |
-| Brute force | 5 failed logins per IP → 15-minute lock |
+| Brute force | Failed logins are counted per account on one IP (5), per account from any IP (20) and per IP across accounts (50), over 15 minutes. A correct password clears only that account's failures, so signing in to another account can't reset the count, and people sharing an office IP aren't locked out by someone else's typos |
 | Session fixation / theft | ID regenerated on login, strict mode, `HttpOnly` + `SameSite=Lax` (+ `Secure` on HTTPS) |
 | Clickjacking & sniffing | `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy` |
 | CSV formula injection | Cells starting with `=`, `+`, `-`, `@` are neutralised in exports |
