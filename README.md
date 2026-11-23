@@ -431,7 +431,14 @@ No PHPUnit needed: `tests/TestCase.php` is a small base class. Unit tests cover 
 integration tests run the repositories against an in-memory SQLite database, feature tests send real
 requests through the whole app (routing, middleware, CSRF, permissions, controllers and views), and
 architecture tests check the module boundaries and translations. The suite runs on GitHub Actions
-for PHP 8.1 and 8.3, together with PHPStan.
+for PHP 8.1 and 8.3 on SQLite, on MariaDB 10.11 (PHP 8.1) and MySQL 8.4 (PHP 8.3), together with PHPStan.
+
+To run it on MySQL or MariaDB locally (XAMPP), point it at a server where the user may create databases.
+Each test gets its own throwaway database, dropped at the end:
+
+```bash
+TEST_DB=mysql TEST_DB_USER=root TEST_DB_PASS= php tests/run.php
+```
 
 ## Security
 
