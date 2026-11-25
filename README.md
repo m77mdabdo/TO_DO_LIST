@@ -194,14 +194,50 @@ Uploaded files live in `storage/attachments/` (or `ATTACHMENTS_PATH`); keep that
 
 ### Docker (optional)
 
-Nothing needs Docker, but a `Dockerfile` and `docker-compose.yml` are included:
+Nothing needs Docker, but the whole app runs in containers with one command. You need Docker
+Desktop (or Docker Engine with the Compose plugin).
 
 ```bash
-docker compose up -d                    # http://localhost:8080 with SQLite
-docker compose --profile mysql up -d    # with a MySQL container (set DB_DRIVER=mysql in .env)
+sh docker/init.sh      # once: creates .env with a new APP_KEY and a database password
+docker compose up -d   # build and start; open http://localhost:8080
 ```
 
-The database and `storage/` are kept in named volumes, so rebuilding the image never loses data.
+| Container | What it does |
+|-----------|--------------|
+| `web` | nginx on port 8080. Serves `assets/` itself with long cache headers and sends everything else to PHP. Only `index.php` can be reached, so `.env`, `config.php` and `database/` are never downloadable. |
+| `app` | PHP 8.3 FPM with OPcache. Runs the migrations on start (one container at a time, guarded by a database lock). |
+| `scheduler` | Runs reminders, automation, webhooks, backup and cleanup on time (`bin/scheduler.php`), so no crontab is needed. |
+| `db` | MySQL 8.4. Not published on your machine; only the app containers can reach it. |
+| `mailpit` | Development only: catches every email the app sends. Open http://localhost:8025. |
+
+Useful commands:
+
+```bash
+docker compose ps                                  # status and health of each container
+docker compose logs -f app scheduler               # app and job logs (they go to the console)
+docker compose exec app php database/seed.php      # demo company on a fresh database
+docker compose exec app php bin/scheduler.php --list
+docker compose down                                # stop (your data stays in the volumes)
+```
+
+`docker compose up` also reads `compose.override.yaml`, which mounts your working copy (edit a
+file, reload the page) and adds Mailpit. On a server, leave it out:
+
+```bash
+docker compose -f compose.yaml up -d --build
+```
+
+Put HTTPS in front of it (Caddy, Traefik, nginx or a load balancer), set `DOCKER_APP_URL` in `.env`
+to the `https://` address so the session cookie is marked secure, and set `TRUSTED_PROXIES` to the
+proxy's address so the real client IP is used for the sign-in limits. `GET /up` answers
+`{"status":"ok"}` when the app and the database are up, for uptime checks.
+
+How the containers are locked down: they run as a normal user, the code is read-only (only the
+`storage` volume and `/tmp` can be written), Linux capabilities are dropped, memory is capped, logs
+are rotated, and the database data, `storage/` and uploads live in named volumes, so rebuilding or
+updating an image never loses data. Keep `APP_KEY` safe: it encrypts the secrets saved in the
+database. Every push builds the images on GitHub, starts the whole stack, checks the pages and the
+blocked files, and scans the image for known vulnerabilities.
 
 ### Command line
 
@@ -216,14 +252,16 @@ php bin/automation.php              # scheduled and due-date automations (cron, 
 php bin/webhooks.php                # send queued webhook messages (cron, every minute or two)
 ```
 
-A crontab for everything:
+One crontab line runs every job on time (reminders, automation, webhooks, backup and cleanup).
+Each job runs in its own process with a time limit and a lock, so a slow job never overlaps itself:
 
 ```
-*/15 * * * * php /path/to/todolist/bin/reminders.php
-*/15 * * * * php /path/to/todolist/bin/automation.php
-*/2  * * * * php /path/to/todolist/bin/webhooks.php
-0 3 * * *    php /path/to/todolist/bin/backup.php --with-files
+* * * * * php /path/to/todolist/bin/scheduler.php --once
 ```
+
+`php bin/scheduler.php --list` shows the schedule, `--run reminders` runs one job now, and with no
+option it keeps running and starts each job at its time (that is how the Docker `scheduler` container
+uses it).
 
 ## Project structure
 
@@ -497,6 +535,8 @@ TEST_DB=mysql TEST_DB_USER=root TEST_DB_PASS= php tests/run.php
 - [x] Import from CSV and Trello
 - [x] Two-step sign-in, signed-in devices, data download and account deletion
 - [x] Public read-only board links, ZIP export, audit filters and retention
+- [x] Sign-in limits per account and per address, tested on SQLite, MariaDB and MySQL
+- [x] Docker: nginx, PHP-FPM, scheduler and MySQL, checked and scanned on every push
 
 Ideas and pull requests are welcome.
 

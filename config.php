@@ -6,6 +6,14 @@
  | (ignored by git) or set the matching environment variables.
  */
 
+// A yes/no setting from the environment. Unset or empty means the default; "0", "false",
+// "off" and "no" all mean no (a plain `getenv() ?: true` would read "0" as unset).
+$flag = static function (string $name, bool $default): bool {
+    $value = getenv($name);
+
+    return $value === false || $value === '' ? $default : filter_var($value, FILTER_VALIDATE_BOOL);
+};
+
 return [
     'app_name' => getenv('APP_NAME') ?: 'Todo Board',
     // Encrypts secrets saved in the database (integrations, two-step sign-in).
@@ -18,11 +26,15 @@ return [
     'timezone' => getenv('APP_TIMEZONE') ?: 'Asia/Riyadh',
 
     // Show error details on the error page. Keep it off on a real server.
-    'debug' => filter_var(getenv('APP_DEBUG') ?: false, FILTER_VALIDATE_BOOL),
+    'debug' => $flag('APP_DEBUG', false),
 
     // Apply pending database migrations on the first request.
     // Fine locally; on a real server run `php database/migrate.php` on deploy instead.
-    'auto_migrate' => filter_var(getenv('APP_AUTO_MIGRATE') ?: true, FILTER_VALIDATE_BOOL),
+    'auto_migrate' => $flag('APP_AUTO_MIGRATE', true),
+
+    // Where unexpected errors are written: "file" (storage/logs) or "stderr" (containers,
+    // so `docker compose logs` shows them).
+    'log' => getenv('LOG_CHANNEL') === 'stderr' ? 'stderr' : 'file',
 
     // Email for invitations and notifications.
     // Uploaded files. Keep this folder outside the web root, or blocked like storage/ is.
@@ -38,7 +50,7 @@ return [
     // Outgoing webhooks (sent by bin/webhooks.php). Addresses inside private
     // networks are refused unless this is on (only for local testing).
     'webhooks' => [
-        'allow_private_networks' => filter_var(getenv('WEBHOOKS_ALLOW_PRIVATE') ?: 'false', FILTER_VALIDATE_BOOLEAN),
+        'allow_private_networks' => $flag('WEBHOOKS_ALLOW_PRIVATE', false),
     ],
 
     // Account security. Security events older than this are deleted by bin/cleanup.php.

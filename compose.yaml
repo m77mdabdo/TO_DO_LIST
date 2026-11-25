@@ -1,0 +1,122 @@
+# The whole app in containers: nginx, PHP-FPM, the scheduler and MySQL.
+#
+#   sh docker/init.sh            once: makes .env with a fresh APP_KEY and database password
+#   docker compose up -d         start (development extras come from compose.override.yaml)
+#   docker compose -f compose.yaml up -d   start on a server, without the development extras
+#
+# Open http://localhost:8080. See "Run with Docker" in the README.
+
+name: todolist
+
+x-php: &php
+  build:
+    context: .
+    target: app
+  image: todolist-app:local
+  env_file:
+    - path: .env
+      required: false
+  environment: &php-env
+    APP_URL: ${DOCKER_APP_URL:-http://localhost:8080}
+    APP_KEY: ${APP_KEY:?APP_KEY is missing in .env. Run: sh docker/init.sh}
+    DB_DRIVER: mysql
+    DB_HOST: db
+    DB_PORT: "3306"
+    DB_NAME: todolist
+    DB_USER: todolist
+    DB_PASS: ${DOCKER_DB_PASSWORD:?DOCKER_DB_PASSWORD is missing in .env. Run: sh docker/init.sh}
+    LOG_CHANNEL: stderr
+    APP_AUTO_MIGRATE: "0"
+  volumes:
+    - storage:/var/www/html/storage
+  # The code can't be changed from inside: only the storage volume and /tmp are writable.
+  read_only: true
+  tmpfs:
+    - /tmp
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  init: true
+  restart: unless-stopped
+  logging: &logging
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  web:
+    build:
+      context: .
+      target: web
+    image: todolist-web:local
+    ports:
+      - "${HTTP_PORT:-8080}:8080"
+    environment:
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/up"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    mem_limit: 128m
+    logging: *logging
+
+  app:
+    <<: *php
+    environment:
+      <<: *php-env
+      RUN_MIGRATIONS: "1"
+    healthcheck:
+      test: ["CMD-SHELL", "env -i SCRIPT_NAME=/fpm-ping SCRIPT_FILENAME=/fpm-ping REQUEST_METHOD=GET /usr/bin/cgi-fcgi -bind -connect 127.0.0.1:9000 | grep -q pong"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 512m
+
+  # Reminders, automation, webhooks, backup and cleanup (bin/scheduler.php).
+  scheduler:
+    <<: *php
+    command: ["php", "bin/scheduler.php"]
+    depends_on:
+      app:
+        condition: service_healthy
+    mem_limit: 256m
+
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: todolist
+      MYSQL_USER: todolist
+      MYSQL_PASSWORD: ${DOCKER_DB_PASSWORD:?DOCKER_DB_PASSWORD is missing in .env. Run: sh docker/init.sh}
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql:/var/lib/mysql
+    # Not published on the host: only the app containers can reach it.
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u todolist -p\"$$MYSQL_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    mem_limit: 1g
+    logging: *logging
+
+volumes:
+  storage:
+  mysql:

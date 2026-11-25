@@ -9,6 +9,8 @@ declare(strict_types=1);
  */
 
 use App\Core\Config;
+use App\Database\ConnectionFactory;
+use App\Http\HealthCheck;
 use App\Http\Kernel;
 use App\Http\Request;
 use App\Http\Url;
@@ -29,7 +31,23 @@ $config   = Config::load(__DIR__);
 // PHP's built-in server serves from the root, and sets SCRIPT_NAME to the request path
 // for URLs with a dot (like /export.json), which would confuse the detection.
 $basePath = PHP_SAPI === 'cli-server' ? '' : Url::detectBasePath();
-$session  = new NativeSession('todo_session', !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+
+// Health check for load balancers and containers: no session, no app, one query.
+if (parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) === $basePath . '/up') {
+    [$status, $body] = (new HealthCheck(static fn () => ConnectionFactory::make((array) $config->get('db'))))->run();
+    http_response_code($status);
+    header('Content-Type: application/json');
+    header('Cache-Control: no-store');
+    echo $body;
+
+    return;
+}
+
+// Behind a proxy that ends HTTPS (nginx, a load balancer) PHP may not see HTTPS itself,
+// so an https:// APP_URL also keeps the session cookie off plain HTTP.
+$https    = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+    || str_starts_with((string) $config->get('url'), 'https://');
+$session  = new NativeSession('todo_session', $https);
 $app      = (require __DIR__ . '/bootstrap/app.php')($config, $session, $basePath);
 
 $app->get(Kernel::class)

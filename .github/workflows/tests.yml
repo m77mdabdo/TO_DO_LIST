@@ -73,3 +73,62 @@ jobs:
           tools: phpstan:1.12
       - name: PHPStan
         run: phpstan analyse --no-progress --memory-limit=512M
+
+  # Builds both images, starts the whole stack the way compose.yaml runs it on a server,
+  # and checks it from the outside.
+  docker:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint the Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          failure-threshold: error
+      - name: Prepare .env
+        run: |
+          sh docker/init.sh
+          sh docker/init.sh   # a second run must not change anything
+          test "$(grep -c '^APP_KEY=' .env)" = 1
+      - name: Start
+        run: docker compose -f compose.yaml up -d --build --wait --wait-timeout 240
+      - name: Check
+        run: |
+          set -eu
+          base=http://localhost:8080
+          code() { curl -s -o /dev/null -w '%{http_code}' "$base$1"; }
+          test "$(curl -fsS $base/up)" = '{"status":"ok"}'
+          test "$(code /login)" = 200
+          headers=$(curl -fsSI $base/login)
+          echo "$headers" | grep -qi '^content-security-policy:'
+          echo "$headers" | grep -qi '^x-frame-options:'
+          echo "$headers" | grep -qi '^set-cookie:.*httponly'
+          if echo "$headers" | grep -qi '^x-powered-by:'; then echo "PHP version is exposed"; exit 1; fi
+          if echo "$headers" | grep -qi '^server:.*[0-9]'; then echo "nginx version is exposed"; exit 1; fi
+          test "$(code /up)" = 200
+          curl -fsS -o /dev/null "$base/assets/css/style.css"
+          curl -fsSI "$base/assets/css/style.css" | grep -qi 'cache-control:.*max-age'
+          for path in /.env /config.php /composer.json /database/migrate.php /storage/logs/ /src/Http/Kernel.php; do
+            body=$(curl -s "$base$path")
+            if echo "$body" | grep -qE 'APP_KEY|<\?php|getenv'; then echo "leaked: $path"; exit 1; fi
+          done
+          docker compose -f compose.yaml exec -T app php bin/scheduler.php --list
+          docker compose -f compose.yaml exec -T app php bin/scheduler.php --run reminders
+          docker compose -f compose.yaml exec -T app php database/migrate.php --pending
+          if docker compose -f compose.yaml exec -T app touch /var/www/html/index.php; then echo "code is writable"; exit 1; fi
+          test "$(docker compose -f compose.yaml exec -T app id -u)" != 0
+      - name: Restart keeps data and skips done migrations
+        run: |
+          docker compose -f compose.yaml restart app
+          docker compose -f compose.yaml up -d --wait --wait-timeout 120
+          test "$(curl -fsS http://localhost:8080/up)" = '{"status":"ok"}'
+      - name: Logs
+        if: always()
+        run: docker compose -f compose.yaml logs --no-color
+      - name: Scan the image for known vulnerabilities
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: todolist-app:local
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'

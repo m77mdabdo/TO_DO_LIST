@@ -21,13 +21,41 @@ final class MigrationRunner
 {
     private const TABLE = 'schema_migrations';
 
-    /** @param list<string> $directories */
-    public function __construct(private PDO $pdo, private array $directories)
+    /** MySQL named lock that keeps two processes (two app containers starting together) from migrating at once. */
+    private const LOCK = 'todolist_migrations';
+
+    /**
+     * @param list<string> $directories
+     * @param int $lockWaitSeconds how long to wait for another process's migrations (MySQL)
+     */
+    public function __construct(private PDO $pdo, private array $directories, private int $lockWaitSeconds = 120)
     {
     }
 
     /** @return list<string> ids applied by this call, in order */
     public function migrate(): array
+    {
+        if ($this->driver() !== 'mysql') {
+            // SQLite: each migration runs in a transaction that takes the database's write lock.
+            return $this->applyPending();
+        }
+
+        $locked = $this->pdo->prepare('SELECT GET_LOCK(?, ?)');
+        $locked->execute([self::LOCK, $this->lockWaitSeconds]);
+        if ((int) $locked->fetchColumn() !== 1) {
+            throw new RuntimeException("Another process has been migrating the database for over {$this->lockWaitSeconds} s.");
+        }
+
+        try {
+            // Read what's applied only after getting the lock: the other process may just have run them.
+            return $this->applyPending();
+        } finally {
+            $this->pdo->prepare('SELECT RELEASE_LOCK(?)')->execute([self::LOCK]);
+        }
+    }
+
+    /** @return list<string> */
+    private function applyPending(): array
     {
         $this->ensureTable();
 

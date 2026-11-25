@@ -1,0 +1,43 @@
+# Development extras, loaded automatically by `docker compose up` next to compose.yaml.
+# On a server use `docker compose -f compose.yaml up -d` so none of this applies.
+#
+# - Your working copy is mounted into the containers: edit a file, reload the page.
+# - Mailpit catches every email the app sends: open http://localhost:8025.
+
+services:
+  app:
+    environment:
+      PHP_OPCACHE_VALIDATE_TIMESTAMPS: "1"
+      MAIL_MAILER: smtp
+      MAIL_HOST: mailpit
+      MAIL_PORT: "1025"
+      MAIL_ENCRYPTION: ""
+      MAIL_USERNAME: ""
+      MAIL_PASSWORD: ""
+      # Webhooks to services on your machine are allowed only here.
+      WEBHOOKS_ALLOW_PRIVATE: "true"
+    volumes:
+      - .:/var/www/html:ro
+      - storage:/var/www/html/storage
+
+  scheduler:
+    environment:
+      MAIL_MAILER: smtp
+      MAIL_HOST: mailpit
+      MAIL_PORT: "1025"
+      MAIL_ENCRYPTION: ""
+      MAIL_USERNAME: ""
+      MAIL_PASSWORD: ""
+    volumes:
+      - .:/var/www/html:ro
+      - storage:/var/www/html/storage
+
+  web:
+    volumes:
+      - ./assets:/var/www/html/assets:ro
+
+  mailpit:
+    image: axllent/mailpit:v1.21
+    ports:
+      - "8025:8025"
+    restart: unless-stopped

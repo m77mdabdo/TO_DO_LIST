@@ -39,6 +39,7 @@ use App\Shared\Module\ModuleRegistry;
 use App\Support\Clock;
 use App\Support\FileLogger;
 use App\Support\Logger;
+use App\Support\StreamLogger;
 use App\Support\SystemClock;
 use App\Support\TimeAgo;
 use App\View\FormState;
@@ -125,7 +126,9 @@ return static function (Config $config, Session $session, string $basePath = '',
         return $router;
     });
 
-    $container->singleton(Logger::class, fn (Container $c) => new FileLogger($root . '/storage/logs', $c->get(Clock::class)));
+    $container->singleton(Logger::class, fn (Container $c) => $config->get('log') === 'stderr'
+        ? new StreamLogger($c->get(Clock::class))
+        : new FileLogger($root . '/storage/logs', $c->get(Clock::class)));
 
     $container->singleton(MimeFormat::class, fn () => new MimeFormat(
         (string) $config->get('mail.from_address', 'no-reply@localhost'),

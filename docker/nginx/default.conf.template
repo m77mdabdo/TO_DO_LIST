@@ -1,0 +1,35 @@
+# Only assets/ is served from disk. Every other path goes to index.php, so config
+# files, .env, SQL and storage can never be downloaded, whatever ends up in the folder.
+server {
+    listen 8080;
+    server_name _;
+    server_tokens off;
+    root /var/www/html;
+
+    client_max_body_size 14m;
+
+    gzip on;
+    gzip_min_length 1024;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+
+    location /assets/ {
+        try_files $uri =404;
+        # The app links assets with ?v=<file time>, so a changed file gets a new URL.
+        add_header Cache-Control "public, max-age=2592000" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        access_log off;
+    }
+
+    location / {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME /var/www/html/index.php;
+        fastcgi_param SCRIPT_NAME /index.php;
+        fastcgi_param HTTP_AUTHORIZATION $http_authorization;
+        # httpoxy: never let a "Proxy:" request header become HTTP_PROXY in PHP.
+        fastcgi_param HTTP_PROXY "";
+        fastcgi_pass ${PHP_UPSTREAM};
+        fastcgi_read_timeout 120s;
+        fastcgi_buffer_size 32k;
+        fastcgi_buffers 16 16k;
+    }
+}

@@ -68,4 +68,26 @@ final class MigrationRunnerTest extends TestCase
 
         $this->assertTrue(in_array('2026_01_01_000000_core_baseline', $ids, true));
     }
+
+    /** Two app containers starting together must not run the same migration twice (MySQL). */
+    public function testWaitsForAnotherProcessMigratingTheSameDatabase(): void
+    {
+        if (\Tests\Support\TestDatabase::driver() !== 'mysql') {
+            $this->assertTrue(true);
+
+            return;
+        }
+
+        $config = \Tests\Support\TestDatabase::config();
+        $other = ConnectionFactory::make($config);
+        $mine = ConnectionFactory::make($config);
+        file_put_contents("$this->dir/a/2026_01_01_000000_first.mysql.sql", 'CREATE TABLE one (id INT);');
+
+        $other->query("SELECT GET_LOCK('todolist_migrations', 0)")->fetchColumn();
+        $this->assertThrows(RuntimeException::class, fn () => (new MigrationRunner($mine, ["$this->dir/a"], 1))->migrate());
+
+        $other->query("SELECT RELEASE_LOCK('todolist_migrations')")->fetchColumn();
+        $this->assertSame(['2026_01_01_000000_first'], (new MigrationRunner($mine, ["$this->dir/a"], 1))->migrate());
+        $this->assertSame([], (new MigrationRunner($other, ["$this->dir/a"], 1))->migrate(), 'the second process finds nothing left to do');
+    }
 }
